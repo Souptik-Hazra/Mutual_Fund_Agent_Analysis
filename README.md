@@ -550,3 +550,44 @@ Start by validating the data sources and scheme identifiers, then build NAV inge
 The central design principle is:
 
 **Reliable data + deterministic financial analytics + specialized AI agents + traceable research.**
+
+
+## Multi-provider NAV ingestion and reconciliation
+
+NAV ingestion supports two adapters behind one provider-neutral contract:
+
+- \`mfapi\`: convenient scheme-specific historical JSON API.
+- \`amfi\`: AMFI's public historical NAV report, fetched in windows of at most 31 days.
+
+AMFI history is retrieved from \`https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx\`
+using the \`tp=1\` open-ended-scheme report. The adapter parses the observed eight-column
+historical layout and legacy six-column rows, filters the requested scheme, validates
+dates and positive Decimal NAVs, and retains fetched source text in the provider audit
+record. Zero-valued liquidation rows are excluded from price history. AMC/category
+metadata is not inferred from report headings.
+
+Examples:
+
+\`\`\`bash
+mfa-sync-nav 125497 --provider amfi --start-date 2024-01-01 --end-date 2024-12-31
+mfa-sync-nav 125497 --provider mfapi --start-date 2024-01-01 --end-date 2024-12-31
+\`\`\`
+
+### Reconciliation policy (version 1)
+
+- Preserve every provider observation independently using \`(scheme_code, nav_date, source)\`.
+- Prefer AMFI as the canonical source; use MFAPI only when an AMFI observation is not yet present.
+- Compare the maximum and minimum available provider NAVs for the same scheme/date.
+- Classify a date as \`matched\` when the absolute spread is at most ₹0.0001, \`conflict\` when it is larger, and \`single_source\` when only one provider is available.
+- Store all source values, canonical NAV/source, absolute and relative differences, tolerance, and evaluation timestamp in \`nav_reconciliations\`.
+- Recompute reconciliation whenever a new observation for that date is ingested. Conflicts never overwrite or delete either provider's original NAV.
+
+The ₹0.0001 threshold is an initial tolerance aligned to four-decimal NAV publication precision;
+validate it against a larger sample before treating it as a permanent business rule. Canonical
+source selection is a data convention, not a claim that independent published values are
+economically identical.
+
+AMFI adapter coverage currently targets open-ended scheme history (\`tp=1\`). Close-ended and
+interval schemes, daily NAVAll bulk refresh, and scheme-master lifecycle tracking remain
+separate follow-up work. Raw provider-response audit data has no automated purge job yet;
+define deployment retention and backup policies before large-scale ingestion.
