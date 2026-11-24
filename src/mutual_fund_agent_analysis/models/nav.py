@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class NavObservation(Base):
-    """One source-reported NAV value per scheme and valuation date."""
+    """One provider-reported NAV value per scheme, date, and source."""
 
     __tablename__ = "nav_observations"
     __table_args__ = (CheckConstraint("nav > 0", name="ck_nav_observations_positive_nav"),)
@@ -34,8 +34,8 @@ class NavObservation(Base):
         primary_key=True,
     )
     nav_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    source: Mapped[str] = mapped_column(String(40), primary_key=True)
     nav: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
-    source: Mapped[str] = mapped_column(String(40), nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
