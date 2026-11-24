@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Index, Integer, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Index, Integer, PrimaryKeyConstraint, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,9 +16,10 @@ class ProviderSyncRun(Base):
     __tablename__ = "provider_sync_runs"
     __table_args__ = (
         Index("ix_provider_sync_runs_scheme_source_fetched", "scheme_code", "source", "fetched_at"),
+        PrimaryKeyConstraint("id", name="pk_provider_sync_runs"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), nullable=False)
     scheme_code: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("mutual_fund_schemes.scheme_code", ondelete="CASCADE"),
