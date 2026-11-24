@@ -71,6 +71,8 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "mutual_fund_schemes" in tables
     assert "nav_observations" in tables
     assert "alembic_version" in tables
+    nav_primary_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
+    assert set(nav_primary_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
 
 
 def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
@@ -133,3 +135,25 @@ def test_postgres_repository_rejects_invalid_source(migrated_postgres: Engine) -
     with Session(migrated_postgres) as session:
         with pytest.raises(ValueError, match="source must contain"):
             upsert_nav_response(session, make_response(), source=" ")
+
+
+def test_sync_savepoint_remains_rollbackable_by_outer_transaction(
+    migrated_postgres: Engine,
+) -> None:
+    class StubClient:
+        def get_nav_history(self, scheme_code, start_date=None, end_date=None):
+            return MFAPINavResponse.model_validate(
+                {
+                    "meta": {"scheme_code": 991236, "scheme_name": "Rollback Test Fund"},
+                    "data": [{"date": "25-11-2026", "nav": "11.5"}],
+                    "status": "SUCCESS",
+                }
+            )
+
+    with Session(migrated_postgres) as session:
+        session.execute(text("SELECT 1"))
+        sync_scheme_nav(session, 991236, client=StubClient())
+        session.rollback()
+
+    with Session(migrated_postgres) as session:
+        assert session.get(MutualFundScheme, 991236) is None
