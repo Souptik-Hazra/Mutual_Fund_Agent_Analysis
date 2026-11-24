@@ -19,9 +19,9 @@ def readiness() -> dict[str, str]:
     """Confirm that required infrastructure is reachable."""
     try:
         check_database_connection()
-    except SQLAlchemyError as exc:
+    except (SQLAlchemyError, RuntimeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database is unavailable.",
+            detail="Database is unavailable or schema migrations are not current.",
         ) from exc
     return {"status": "ready", "database": "connected"}
