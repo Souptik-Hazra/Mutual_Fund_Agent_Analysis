@@ -1,4 +1,5 @@
 """Idempotent PostgreSQL upserts for scheme metadata and NAV observations."""
+
 from datetime import UTC, datetime
 
 from sqlalchemy.dialects.postgresql import insert
@@ -13,7 +14,7 @@ def upsert_nav_response(
     response: MFAPINavResponse,
     source: str = "mfapi",
 ) -> int:
-    """Upsert scheme metadata and NAV points without duplicating observations."""
+    """Upsert scheme metadata and source-specific NAV observations."""
     metadata = response.meta
     scheme_values = {
         "scheme_code": metadata.scheme_code,
@@ -27,9 +28,19 @@ def upsert_nav_response(
         "source_updated_at": datetime.now(UTC),
     }
     scheme_statement = insert(MutualFundScheme).values(**scheme_values)
+    excluded = scheme_statement.excluded
     scheme_statement = scheme_statement.on_conflict_do_update(
         index_elements=[MutualFundScheme.scheme_code],
-        set_={key: value for key, value in scheme_values.items() if key != "scheme_code"},
+        set_={
+            "scheme_name": excluded.scheme_name,
+            "fund_house": excluded.fund_house,
+            "scheme_type": excluded.scheme_type,
+            "scheme_category": excluded.scheme_category,
+            "isin_growth": excluded.isin_growth,
+            "isin_div_reinvestment": excluded.isin_div_reinvestment,
+            "source": excluded.source,
+            "source_updated_at": excluded.source_updated_at,
+        },
     )
     session.execute(scheme_statement)
 
@@ -52,10 +63,13 @@ def upsert_nav_response(
         batch = nav_values[offset : offset + 1000]
         nav_statement = insert(NavObservation).values(batch)
         nav_statement = nav_statement.on_conflict_do_update(
-            index_elements=[NavObservation.scheme_code, NavObservation.nav_date],
+            index_elements=[
+                NavObservation.scheme_code,
+                NavObservation.nav_date,
+                NavObservation.source,
+            ],
             set_={
                 "nav": nav_statement.excluded.nav,
-                "source": nav_statement.excluded.source,
                 "fetched_at": nav_statement.excluded.fetched_at,
             },
         )
