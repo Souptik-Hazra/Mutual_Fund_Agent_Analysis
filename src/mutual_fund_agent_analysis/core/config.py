@@ -30,7 +30,6 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_project: str = "mutual-fund-agent-analysis"
 
-
     @model_validator(mode="after")
     def validate_production_database_url(self) -> "Settings":
         """Prevent the development fallback credentials from reaching production."""
