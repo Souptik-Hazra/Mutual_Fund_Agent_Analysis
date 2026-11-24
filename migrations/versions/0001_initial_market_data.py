@@ -1,4 +1,4 @@
-"""Create mutual fund scheme and NAV observation tables.
+"""Create mutual fund scheme and source-specific NAV observation tables.
 
 Revision ID: 0001_initial_market_data
 Revises:
@@ -60,8 +60,8 @@ def upgrade() -> None:
         "nav_observations",
         Column("scheme_code", BigInteger(), nullable=False),
         Column("nav_date", Date(), nullable=False),
-        Column("nav", Numeric(18, 8), nullable=False),
         Column("source", String(length=40), nullable=False),
+        Column("nav", Numeric(18, 8), nullable=False),
         Column(
             "fetched_at",
             DateTime(timezone=True),
@@ -74,7 +74,7 @@ def upgrade() -> None:
             ["mutual_fund_schemes.scheme_code"],
             ondelete="CASCADE",
         ),
-        PrimaryKeyConstraint("scheme_code", "nav_date"),
+        PrimaryKeyConstraint("scheme_code", "nav_date", "source"),
     )
 
 
