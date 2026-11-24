@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     langsmith_api_key: SecretStr | None = None
     langsmith_tracing: bool = False
     langsmith_project: str = "mutual-fund-agent-analysis"
+
+
+    @model_validator(mode="after")
+    def validate_production_database_url(self) -> "Settings":
+        """Prevent the development fallback credentials from reaching production."""
+        if self.app_env == "production" and "mfa_dev_password" in self.database_url:
+            raise ValueError("DATABASE_URL must be explicitly configured for production")
+        return self
 
 
 @lru_cache
