@@ -6,7 +6,17 @@ Create Date: 2026-11-25
 """
 
 from alembic import op
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKeyConstraint, Identity, Index, Integer, PrimaryKeyConstraint, String, func
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKeyConstraint,
+    Identity,
+    Integer,
+    PrimaryKeyConstraint,
+    String,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "0003_provider_sync_runs"
