@@ -16,6 +16,8 @@ def upsert_nav_response(
     source: str = "mfapi",
 ) -> int:
     """Upsert scheme metadata and source-specific NAV observations."""
+    if not source.strip() or len(source) > 40:
+        raise ValueError("source must contain between 1 and 40 characters.")
     metadata = response.meta
     scheme_values = {
         "scheme_code": metadata.scheme_code,
