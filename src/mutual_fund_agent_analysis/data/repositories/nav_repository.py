@@ -36,9 +36,13 @@ def upsert_nav_response(
             "scheme_name": excluded.scheme_name,
             "fund_house": func.coalesce(excluded.fund_house, MutualFundScheme.fund_house),
             "scheme_type": func.coalesce(excluded.scheme_type, MutualFundScheme.scheme_type),
-            "scheme_category": func.coalesce(excluded.scheme_category, MutualFundScheme.scheme_category),
+            "scheme_category": func.coalesce(
+                excluded.scheme_category, MutualFundScheme.scheme_category
+            ),
             "isin_growth": func.coalesce(excluded.isin_growth, MutualFundScheme.isin_growth),
-            "isin_div_reinvestment": func.coalesce(excluded.isin_div_reinvestment, MutualFundScheme.isin_div_reinvestment),
+            "isin_div_reinvestment": func.coalesce(
+                excluded.isin_div_reinvestment, MutualFundScheme.isin_div_reinvestment
+            ),
             "source": excluded.source,
             "source_updated_at": excluded.source_updated_at,
         },
