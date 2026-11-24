@@ -1,10 +1,14 @@
 """Mutual fund scheme master model."""
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mutual_fund_agent_analysis.database.base import Base
+
+if TYPE_CHECKING:
+    from mutual_fund_agent_analysis.models.nav import NavObservation
 
 
 class MutualFundScheme(Base):
