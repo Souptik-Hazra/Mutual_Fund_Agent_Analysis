@@ -2,7 +2,11 @@
 
 from collections.abc import Generator
 from functools import lru_cache
+from pathlib import Path
 
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -38,6 +42,15 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def check_database_connection() -> None:
-    """Raise the underlying SQLAlchemy exception when the database is unavailable."""
+    """Verify database connectivity and that all packaged migrations are applied."""
     with get_engine().connect() as connection:
         connection.execute(text("SELECT 1"))
+        project_root = Path(__file__).resolve().parents[3]
+        config = Config(str(project_root / "alembic.ini"))
+        config.set_main_option("script_location", str(project_root / "migrations"))
+        expected_heads = set(ScriptDirectory.from_config(config).get_heads())
+        applied_heads = set(MigrationContext.configure(connection).get_current_heads())
+        if applied_heads != expected_heads:
+            raise RuntimeError(
+                "Database schema migrations are not current. Run alembic upgrade head."
+            )
