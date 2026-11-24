@@ -11,6 +11,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
   "alembic>=1.14,<2",
   "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
   "langchain-core>=0.3,<2",
   "langchain-google-genai>=2,<4",
   "langchain-groq>=0.3,<1",
@@ -22,7 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.3,<2"]
-dev = ["httpx>=0.28,<1", "pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.9,<1"]
+dev = ["pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.9,<1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mutual_fund_agent_analysis"]
