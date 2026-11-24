@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
