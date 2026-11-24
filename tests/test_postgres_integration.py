@@ -66,13 +66,16 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     config.set_main_option("script_location", str(root / "migrations"))
     command.downgrade(config, "base")
     assert "mutual_fund_schemes" not in inspect(migrated_postgres).get_table_names()
+    command.upgrade(config, "0001_initial_market_data")
+    original_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
+    assert set(original_key["constrained_columns"]) == {"scheme_code", "nav_date"}
     command.upgrade(config, "head")
     tables = inspect(migrated_postgres).get_table_names()
     assert "mutual_fund_schemes" in tables
     assert "nav_observations" in tables
     assert "alembic_version" in tables
-    nav_primary_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
-    assert set(nav_primary_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
+    source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
+    assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
 
 
 def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
