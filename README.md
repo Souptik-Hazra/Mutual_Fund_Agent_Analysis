@@ -474,6 +474,73 @@ Only configure providers that are actually used. Keep `.env` out of version cont
 
 ---
 
+
+## Local Development
+
+### Requirements
+
+- Python 3.11, 3.12, or 3.13.
+- Docker Engine with Docker Compose.
+- Git.
+
+### Setup
+
+```bash
+git clone https://github.com/Souptik-Hazra/Mutual_Fund_Agent_Analysis.git
+cd Mutual_Fund_Agent_Analysis
+
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# Linux / macOS:
+source .venv/bin/activate
+
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+Create the local environment file and start PostgreSQL:
+
+```bash
+# Windows PowerShell
+Copy-Item .env.example .env
+# Linux / macOS
+cp .env.example .env
+
+docker compose up -d db
+alembic upgrade head
+```
+
+Run the API:
+
+```bash
+uvicorn mutual_fund_agent_analysis.main:app --reload
+```
+
+- API documentation: http://localhost:8000/docs
+- Liveness: http://localhost:8000/api/v1/health/live
+- Readiness: http://localhost:8000/api/v1/health/ready
+
+### Sync a scheme's NAV history
+
+Find a scheme code using the [MFAPI scheme search endpoint](https://api.mfapi.in/mf/search?q=HDFC), then run:
+
+```bash
+mfa-sync-nav 125497 --start-date 2020-01-01
+```
+
+The command validates the provider response and upserts scheme metadata and NAV observations into PostgreSQL. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
+
+### Quality checks
+
+```bash
+ruff check .
+ruff format --check .
+pytest
+```
+
+The credentials in the local Docker Compose configuration are development-only. Replace them and use managed secrets before deploying anywhere beyond a personal development machine. Never commit `.env` or API keys.
+
 ## Initial Build Priority
 
 Start by validating the data sources and scheme identifiers, then build NAV ingestion and a verified financial analytics engine. Implement single-fund analysis and daily/weekly/monthly/quarterly/yearly views, followed by multi-fund comparison. Add portfolio holdings and event/news ingestion next. Introduce LangGraph only after the core Python services and APIs work reliably; then add social intelligence and document RAG as separate subsystems. This keeps the first release useful even before every API or LLM integration is available.
