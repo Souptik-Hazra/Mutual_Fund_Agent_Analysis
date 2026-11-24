@@ -1,6 +1,7 @@
 """Historical mutual fund NAV observations."""
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -15,6 +16,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mutual_fund_agent_analysis.database.base import Base
+
+if TYPE_CHECKING:
+    from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
 
 class NavObservation(Base):
