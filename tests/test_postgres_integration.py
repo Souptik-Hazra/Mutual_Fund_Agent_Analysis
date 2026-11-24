@@ -127,6 +127,7 @@ def test_postgres_upsert_does_not_erase_optional_scheme_metadata(
 
 def test_sync_uses_savepoint_inside_caller_transaction(migrated_postgres: Engine) -> None:
     """A sync can run after a caller query without committing its transaction."""
+
     class StubClient:
         def get_nav_history(self, scheme_code, start_date=None, end_date=None):
             assert scheme_code == 991235
