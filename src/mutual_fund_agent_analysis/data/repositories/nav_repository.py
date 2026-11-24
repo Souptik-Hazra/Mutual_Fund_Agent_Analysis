@@ -47,14 +47,18 @@ def upsert_nav_response(
         }
         for point in response.data
     ]
-    nav_statement = insert(NavObservation).values(nav_values)
-    nav_statement = nav_statement.on_conflict_do_update(
-        index_elements=[NavObservation.scheme_code, NavObservation.nav_date],
-        set_={
-            "nav": nav_statement.excluded.nav,
-            "source": nav_statement.excluded.source,
-            "fetched_at": nav_statement.excluded.fetched_at,
-        },
-    )
-    session.execute(nav_statement)
-    return len(nav_values)
+    processed = 0
+    for offset in range(0, len(nav_values), 1000):
+        batch = nav_values[offset : offset + 1000]
+        nav_statement = insert(NavObservation).values(batch)
+        nav_statement = nav_statement.on_conflict_do_update(
+            index_elements=[NavObservation.scheme_code, NavObservation.nav_date],
+            set_={
+                "nav": nav_statement.excluded.nav,
+                "source": nav_statement.excluded.source,
+                "fetched_at": nav_statement.excluded.fetched_at,
+            },
+        )
+        session.execute(nav_statement)
+        processed += len(batch)
+    return processed
