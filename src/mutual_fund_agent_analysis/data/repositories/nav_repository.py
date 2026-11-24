@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPINavResponse
-from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation
+from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation, ProviderSyncRun
 
 
 def upsert_nav_response(
@@ -51,9 +51,6 @@ def upsert_nav_response(
     )
     session.execute(scheme_statement)
 
-    if not response.data:
-        return 0
-
     fetched_at = datetime.now(UTC)
     nav_values = [
         {
@@ -82,4 +79,19 @@ def upsert_nav_response(
         )
         session.execute(nav_statement)
         processed += len(batch)
+
+    raw_payload = (
+        response.raw_payload
+        if response.raw_payload is not None
+        else response.model_dump(mode="json")
+    )
+    session.add(
+        ProviderSyncRun(
+            scheme_code=metadata.scheme_code,
+            source=source,
+            fetched_at=fetched_at,
+            observation_count=processed,
+            response_payload=raw_payload,
+        )
+    )
     return processed
