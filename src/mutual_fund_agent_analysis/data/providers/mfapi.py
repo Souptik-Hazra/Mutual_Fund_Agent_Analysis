@@ -70,6 +70,7 @@ class MFAPINavResponse(BaseModel):
     meta: MFAPISchemeMetadata
     data: list[MFAPINavPoint]
     status: str
+    raw_payload: dict[str, Any] | None = Field(default=None, exclude=True)
 
 
 class MFAPIClient:
@@ -164,6 +165,7 @@ class MFAPIClient:
 
         payload = self._get_json(f"/mf/{scheme_code}", params=params or None)
         response = MFAPINavResponse.model_validate(payload)
+        response.raw_payload = payload
         if response.status.upper() != "SUCCESS":
             raise ValueError(f"MFAPI did not return SUCCESS for scheme {scheme_code}.")
         if response.meta.scheme_code != scheme_code:
