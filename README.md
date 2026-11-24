@@ -359,7 +359,7 @@ The platform should maintain a clear separation between source ingestion, normal
 
 ### Data engineering principles
 
-- Store raw source responses or source references where permitted.
+- Store raw provider responses in the append-only `provider_sync_runs` audit table alongside normalized NAV observations, source, fetch time, and observation count.
 - Normalize scheme identifiers, company identifiers, dates, currencies, and units.
 - Record source, retrieval timestamp, effective date, and publication date.
 - Make ingestion jobs idempotent and safe to rerun.
@@ -531,7 +531,7 @@ Find a scheme code using the [MFAPI scheme search endpoint](https://api.mfapi.in
 mfa-sync-nav 125497 --start-date 2020-01-01
 ```
 
-The command validates the provider response and upserts scheme metadata and source-specific NAV observations into PostgreSQL. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
+The command validates the provider response, upserts scheme metadata and source-specific NAV observations, and records the original provider payload in `provider_sync_runs`. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
 
 ### Quality checks
 
