@@ -1,4 +1,5 @@
 """Regression test for Alembic revision template interpolation."""
+
 from pathlib import Path
 
 
