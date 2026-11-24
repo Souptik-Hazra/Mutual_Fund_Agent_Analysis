@@ -16,6 +16,17 @@ services:
       retries: 10
     restart: unless-stopped
 
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://mfa:mfa_dev_password@db:5432/mutual_fund_agent
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build: .
     environment:
@@ -35,8 +46,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
