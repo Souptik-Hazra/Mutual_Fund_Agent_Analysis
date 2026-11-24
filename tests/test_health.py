@@ -30,4 +30,17 @@ def test_readiness_returns_503_when_database_is_unavailable(monkeypatch) -> None
     client = TestClient(create_app())
     response = client.get("/api/v1/health/ready")
     assert response.status_code == 503
-    assert response.json() == {"detail": "Database is unavailable."}
+    assert response.json() == {"detail": "Database is unavailable or schema migrations are not current."}
+
+
+def test_readiness_returns_503_when_migrations_are_pending(monkeypatch) -> None:
+    def raise_migration_error() -> None:
+        raise RuntimeError("Database schema migrations are not current.")
+
+    monkeypatch.setattr(health, "check_database_connection", raise_migration_error)
+    client = TestClient(create_app())
+    response = client.get("/api/v1/health/ready")
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Database is unavailable or schema migrations are not current."
+    }
