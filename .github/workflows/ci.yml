@@ -12,6 +12,22 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mfa
+          POSTGRES_PASSWORD: mfa_test_password
+          POSTGRES_DB: mfa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mfa -d mfa_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://mfa:mfa_test_password@localhost:5432/mfa_test
     strategy:
       fail-fast: false
       matrix:
