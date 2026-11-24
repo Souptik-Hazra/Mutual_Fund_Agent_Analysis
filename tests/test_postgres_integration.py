@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from datetime import date
 
 import pytest
 from alembic import command
@@ -19,7 +20,12 @@ from mutual_fund_agent_analysis.database.session import (
     get_engine,
     get_session_factory,
 )
-from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation, ProviderSyncRun
+from mutual_fund_agent_analysis.models import (
+    MutualFundScheme,
+    NavObservation,
+    NavReconciliation,
+    ProviderSyncRun,
+)
 
 
 @pytest.fixture(scope="module")
@@ -83,6 +89,7 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "mutual_fund_schemes" in tables
     assert "nav_observations" in tables
     assert "provider_sync_runs" in tables
+    assert "nav_reconciliations" in tables
     assert "alembic_version" in tables
     source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
@@ -113,6 +120,11 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
             select(ProviderSyncRun).where(ProviderSyncRun.scheme_code == 991234)
         ).all()
         assert len(sync_runs) == 3
+        reconciliation = session.get(NavReconciliation, (991234, date(2026, 11, 25)))
+        assert reconciliation is not None
+        assert reconciliation.status == "conflict"
+        assert reconciliation.canonical_source == "amfi"
+        assert reconciliation.source_values == {"amfi": "25.50", "mfapi": "25.75"}
         assert sync_runs[0].response_payload["meta"]["scheme_code"] == 991234
         assert sync_runs[0].observation_count == 1
 
