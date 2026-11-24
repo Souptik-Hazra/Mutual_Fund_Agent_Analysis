@@ -3,8 +3,8 @@
 MFAPI is treated as an upstream convenience provider. Store source metadata and
 validate every response; AMFI remains the primary reference for NAV verification.
 """
-from datetime import date, datetime
 import time
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
