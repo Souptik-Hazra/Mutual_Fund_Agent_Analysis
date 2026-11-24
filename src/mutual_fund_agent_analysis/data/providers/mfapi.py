@@ -6,8 +6,8 @@ validate every response; AMFI remains the primary reference for NAV verification
 
 import time
 from datetime import UTC, date, datetime
-from email.utils import parsedate_to_datetime
 from decimal import Decimal, InvalidOperation
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
