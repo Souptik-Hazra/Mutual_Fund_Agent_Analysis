@@ -1,8 +1,8 @@
 """PostgreSQL integration tests for migrations and NAV persistence."""
 
 import os
-from pathlib import Path
 from datetime import date
+from pathlib import Path
 
 import pytest
 from alembic import command
