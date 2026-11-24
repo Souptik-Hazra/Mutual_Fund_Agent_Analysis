@@ -14,6 +14,7 @@ def sync_scheme_nav(
     start_date: date | None = None,
     end_date: date | None = None,
     client: MFAPIClient | None = None,
+    source: str = "mfapi",
 ) -> int:
     """Fetch a scheme's NAV history and upsert it atomically.
 
@@ -30,4 +31,4 @@ def sync_scheme_nav(
 
     transaction = session.begin_nested() if session.in_transaction() else session.begin()
     with transaction:
-        return upsert_nav_response(session, response)
+        return upsert_nav_response(session, response, source=source)
