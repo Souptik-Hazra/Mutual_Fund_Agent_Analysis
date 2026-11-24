@@ -4,6 +4,7 @@ MFAPI is treated as an upstream convenience provider. Store source metadata and
 validate every response; AMFI remains the primary reference for NAV verification.
 """
 from datetime import date, datetime
+import time
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -111,6 +112,7 @@ class MFAPIClient:
                 )
                 if not retryable or attempt == 2:
                     raise
+                time.sleep(0.5 * (2**attempt))
         if last_error is not None:
             raise last_error
         raise RuntimeError("MFAPI request failed without an exception.")
