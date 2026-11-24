@@ -14,7 +14,11 @@ from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPINavResponse
 from mutual_fund_agent_analysis.data.repositories.nav_repository import upsert_nav_response
 from mutual_fund_agent_analysis.data.services.nav_sync import sync_scheme_nav
-from mutual_fund_agent_analysis.database.session import check_database_connection
+from mutual_fund_agent_analysis.database.session import (
+    check_database_connection,
+    get_engine,
+    get_session_factory,
+)
 from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation
 
 
@@ -37,6 +41,10 @@ def migrated_postgres() -> Engine:
         yield engine
     finally:
         engine.dispose()
+        if get_engine.cache_info().currsize:
+            get_engine().dispose()
+        get_session_factory.cache_clear()
+        get_engine.cache_clear()
         if previous_url is None:
             os.environ.pop("DATABASE_URL", None)
         else:
