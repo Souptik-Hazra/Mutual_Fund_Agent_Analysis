@@ -45,6 +45,9 @@ def test_nav_history_parses_provider_date_and_decimal() -> None:
 
     assert response.data[0].date == date(2024, 10, 26)
     assert response.data[0].nav == Decimal("892.45600")
+    assert response.raw_payload is not None
+    assert response.raw_payload["data"][0]["nav"] == "892.45600"
+    assert "raw_payload" not in response.model_dump()
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "NaN", "Infinity", "not-a-number"])
