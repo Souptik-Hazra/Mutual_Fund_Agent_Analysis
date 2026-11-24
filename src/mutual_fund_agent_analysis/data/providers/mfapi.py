@@ -76,6 +76,8 @@ class MFAPINavResponse(BaseModel):
 class MFAPIClient:
     """Small synchronous HTTP client with explicit timeouts and bounded retries."""
 
+    source = "mfapi"
+
     def __init__(
         self,
         base_url: str = "https://api.mfapi.in",
