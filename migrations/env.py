@@ -4,9 +4,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import mutual_fund_agent_analysis.models  # noqa: F401
 from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.database.base import Base
-import mutual_fund_agent_analysis.models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
