@@ -511,11 +511,13 @@ docker compose up -d db
 alembic upgrade head
 ```
 
-Run the API:
+Run the API locally:
 
 ```bash
 uvicorn mutual_fund_agent_analysis.main:app --reload
 ```
+
+Alternatively, start the complete Docker Compose stack with `docker compose up --build`. The one-shot `migrate` service applies Alembic migrations before the API starts.
 
 - API documentation: http://localhost:8000/docs
 - Liveness: http://localhost:8000/api/v1/health/live
@@ -529,7 +531,7 @@ Find a scheme code using the [MFAPI scheme search endpoint](https://api.mfapi.in
 mfa-sync-nav 125497 --start-date 2020-01-01
 ```
 
-The command validates the provider response and upserts scheme metadata and NAV observations into PostgreSQL. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
+The command validates the provider response and upserts scheme metadata and source-specific NAV observations into PostgreSQL. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
 
 ### Quality checks
 
