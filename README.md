@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Planning / initial setup. The capabilities described below are the intended product scope; they should not be interpreted as already implemented.
+> **Project status:** Foundation and the first NAV-ingestion vertical slice are implemented on the current development branch. The broader analytics, benchmark verification, holdings, social/news integrations, agent workflows, and frontend remain planned roadmap work.
 
 ## Table of Contents
 
