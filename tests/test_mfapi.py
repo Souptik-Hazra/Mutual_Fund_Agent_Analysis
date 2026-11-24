@@ -66,3 +66,24 @@ def test_nav_history_rejects_scheme_code_mismatch() -> None:
     with MFAPIClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(ValueError, match="does not match"):
             client.get_nav_history(125497)
+
+
+def test_rate_limit_respects_retry_after_header(monkeypatch) -> None:
+    import mutual_fund_agent_analysis.data.providers.mfapi as mfapi_module
+
+    sleeps: list[float] = []
+    calls = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429, headers={"Retry-After": "0.25"})
+        return httpx.Response(200, json=[])
+
+    monkeypatch.setattr(mfapi_module.time, "sleep", sleeps.append)
+    with MFAPIClient(transport=httpx.MockTransport(handler)) as client:
+        assert client.search_schemes("HDFC") == []
+
+    assert calls == 2
+    assert sleeps == [0.25]
