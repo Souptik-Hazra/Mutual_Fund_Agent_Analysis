@@ -3,6 +3,7 @@
 Example:
     mfa-sync-nav 125497 --start-date 2020-01-01
 """
+
 import argparse
 import logging
 from datetime import date

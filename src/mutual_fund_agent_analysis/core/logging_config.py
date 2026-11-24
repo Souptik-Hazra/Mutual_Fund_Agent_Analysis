@@ -1,4 +1,5 @@
 """Central logging configuration."""
+
 import logging
 
 from mutual_fund_agent_analysis.core.config import get_settings

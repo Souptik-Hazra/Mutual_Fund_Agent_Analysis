@@ -1,4 +1,5 @@
 """Lazy LangChain chat-model factory for supported providers."""
+
 from typing import Literal
 
 from langchain_core.language_models.chat_models import BaseChatModel

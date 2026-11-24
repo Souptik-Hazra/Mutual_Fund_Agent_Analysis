@@ -1,4 +1,5 @@
 """Liveness and readiness endpoints."""
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 

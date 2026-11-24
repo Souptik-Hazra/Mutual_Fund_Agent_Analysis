@@ -1,4 +1,5 @@
 """Health endpoint tests."""
+
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 

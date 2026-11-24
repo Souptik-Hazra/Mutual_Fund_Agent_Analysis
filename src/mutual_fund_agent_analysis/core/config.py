@@ -1,4 +1,5 @@
 """Typed application settings loaded from environment variables."""
+
 from functools import lru_cache
 from typing import Literal
 
@@ -17,9 +18,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "test", "production"] = "development"
     log_level: str = "INFO"
     api_v1_prefix: str = "/api/v1"
-    database_url: str = (
-        "postgresql+psycopg://mfa:mfa_dev_password@localhost:5432/mutual_fund_agent"
-    )
+    database_url: str = "postgresql+psycopg://mfa:mfa_dev_password@localhost:5432/mutual_fund_agent"
     llm_provider: Literal["gemini", "groq", "openai"] = "gemini"
     gemini_api_key: SecretStr | None = None
     gemini_model: str | None = None

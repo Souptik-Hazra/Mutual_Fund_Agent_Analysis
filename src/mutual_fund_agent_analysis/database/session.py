@@ -1,4 +1,5 @@
 """Database engine, sessions, and connection checks."""
+
 from collections.abc import Generator
 from functools import lru_cache
 

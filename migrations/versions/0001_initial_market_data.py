@@ -4,6 +4,7 @@ Revision ID: 0001_initial_market_data
 Revises:
 Create Date: 2026-11-25
 """
+
 from alembic import op
 from sqlalchemy import (
     BigInteger,

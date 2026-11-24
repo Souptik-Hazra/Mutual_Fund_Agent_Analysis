@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+
 from fastapi import FastAPI
 
 from mutual_fund_agent_analysis import __version__

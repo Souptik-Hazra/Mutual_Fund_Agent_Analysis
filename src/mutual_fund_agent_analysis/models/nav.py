@@ -1,4 +1,5 @@
 """Historical mutual fund NAV observations."""
+
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -25,9 +26,7 @@ class NavObservation(Base):
     """One source-reported NAV value per scheme and valuation date."""
 
     __tablename__ = "nav_observations"
-    __table_args__ = (
-        CheckConstraint("nav > 0", name="ck_nav_observations_positive_nav"),
-    )
+    __table_args__ = (CheckConstraint("nav > 0", name="ck_nav_observations_positive_nav"),)
 
     scheme_code: Mapped[int] = mapped_column(
         BigInteger,

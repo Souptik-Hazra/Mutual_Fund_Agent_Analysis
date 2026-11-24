@@ -1,4 +1,5 @@
 """Contract tests for the MFAPI adapter."""
+
 from datetime import date
 from decimal import Decimal
 
