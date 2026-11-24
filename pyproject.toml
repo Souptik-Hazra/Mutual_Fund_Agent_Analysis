@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mutual-fund-agent-analysis"
+version = "0.1.0"
+description = "AI-assisted mutual fund research and market intelligence platform."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "alembic>=1.14,<2",
+  "fastapi>=0.115,<1",
+  "langchain-core>=0.3,<2",
+  "langchain-google-genai>=2,<4",
+  "langchain-groq>=0.3,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.7,<3",
+  "sqlalchemy>=2.0,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+openai = ["langchain-openai>=0.3,<2"]
+dev = ["httpx>=0.28,<1", "pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.9,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mutual_fund_agent_analysis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
