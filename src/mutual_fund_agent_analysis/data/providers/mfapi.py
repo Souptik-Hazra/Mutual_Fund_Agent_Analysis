@@ -4,7 +4,8 @@ MFAPI is treated as an upstream convenience provider. Store source metadata and
 validate every response; AMFI remains the primary reference for NAV verification.
 """
 import time
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -112,7 +113,22 @@ class MFAPIClient:
                 )
                 if not retryable or attempt == 2:
                     raise
-                time.sleep(0.5 * (2**attempt))
+                retry_after = None
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+                    header = exc.response.headers.get("Retry-After")
+                    if header:
+                        try:
+                            retry_after = float(header)
+                        except ValueError:
+                            try:
+                                retry_date = parsedate_to_datetime(header)
+                                if retry_date.tzinfo is None:
+                                    retry_date = retry_date.replace(tzinfo=UTC)
+                                retry_after = (retry_date - datetime.now(UTC)).total_seconds()
+                            except (TypeError, ValueError, OverflowError):
+                                retry_after = None
+                delay = retry_after if retry_after is not None else 0.5 * (2**attempt)
+                time.sleep(min(max(delay, 0.0), 30.0))
         if last_error is not None:
             raise last_error
         raise RuntimeError("MFAPI request failed without an exception.")
