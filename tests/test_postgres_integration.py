@@ -14,6 +14,7 @@ from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPINavResponse
 from mutual_fund_agent_analysis.data.repositories.nav_repository import upsert_nav_response
 from mutual_fund_agent_analysis.data.services.nav_sync import sync_scheme_nav
+from mutual_fund_agent_analysis.database.session import check_database_connection
 from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation
 
 
@@ -76,6 +77,12 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "alembic_version" in tables
     source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
+    check_database_connection()
+    command.downgrade(config, "0001_initial_market_data")
+    with pytest.raises(RuntimeError, match="migrations are not current"):
+        check_database_connection()
+    command.upgrade(config, "head")
+    check_database_connection()
 
 
 def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
