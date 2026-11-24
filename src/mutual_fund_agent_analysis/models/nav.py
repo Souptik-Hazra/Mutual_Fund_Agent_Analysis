@@ -29,9 +29,7 @@ class NavObservation(Base):
     __tablename__ = "nav_observations"
     __table_args__ = (
         CheckConstraint("nav > 0", name="ck_nav_observations_positive_nav"),
-        PrimaryKeyConstraint(
-            "scheme_code", "nav_date", "source", name="pk_nav_observations"
-        ),
+        PrimaryKeyConstraint("scheme_code", "nav_date", "source", name="pk_nav_observations"),
     )
 
     scheme_code: Mapped[int] = mapped_column(
