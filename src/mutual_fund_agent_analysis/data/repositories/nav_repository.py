@@ -1,6 +1,6 @@
 """Idempotent PostgreSQL upserts for schemes, NAVs, and reconciliation results."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -20,7 +20,7 @@ from mutual_fund_agent_analysis.models import (
 )
 
 
-def _reconcile_dates(session: Session, scheme_code: int, nav_dates: set) -> None:
+def _reconcile_dates(session: Session, scheme_code: int, nav_dates: set[date]) -> None:
     if not nav_dates:
         return
     observations = session.scalars(
