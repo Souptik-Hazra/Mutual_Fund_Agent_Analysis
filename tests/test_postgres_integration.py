@@ -19,7 +19,7 @@ from mutual_fund_agent_analysis.database.session import (
     get_engine,
     get_session_factory,
 )
-from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation
+from mutual_fund_agent_analysis.models import MutualFundScheme, NavObservation, ProviderSyncRun
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +82,7 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     tables = inspect(migrated_postgres).get_table_names()
     assert "mutual_fund_schemes" in tables
     assert "nav_observations" in tables
+    assert "provider_sync_runs" in tables
     assert "alembic_version" in tables
     source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
@@ -108,6 +109,12 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         ).all()
         values = {row.source: row.nav for row in rows}
         assert values == {"mfapi": 25.75, "amfi": 25.50}
+        sync_runs = session.scalars(
+            select(ProviderSyncRun).where(ProviderSyncRun.scheme_code == 991234)
+        ).all()
+        assert len(sync_runs) == 3
+        assert sync_runs[0].response_payload["meta"]["scheme_code"] == 991234
+        assert sync_runs[0].observation_count == 1
 
 
 def test_postgres_upsert_does_not_erase_optional_scheme_metadata(
