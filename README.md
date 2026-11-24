@@ -73,7 +73,9 @@ Time frequency and analysis duration are separate controls.
 
 For example, a user may request **monthly observations over five years** or **daily observations over three months**.
 
-The application must use actual available observations. Mutual fund NAV is generally published on business days, not every calendar day. Weekends and holidays must not be represented as fabricated NAV observations. For period boundaries, the calculation engine should use a documented, consistent observation-selection rule and expose the actual dates used.
+The application must use actual available observations. Mutual fund NAV is generally published on business days, not every calendar day. Weekends and holidays must not be represented as fabricated NAV observations. For period boundaries, use a documented rule (for example, the latest valid NAV on or before the requested boundary) and expose the actual observation dates used. Missing observations must not be silently forward-filled for return calculations.
+
+**Keep frequency separate from lookback duration.** "Monthly observations over five years" is not the same as "five-year return." Calendar-year returns should use the last available NAV in each calendar year and the preceding year-end NAV. A trailing one-year return should use the selected end date and the corresponding observation around one year earlier.
 
 ## Multi-Fund Comparison
 
@@ -84,8 +86,9 @@ Users should be able to select multiple schemes and compare them side by side.
 - Scheme selection and removal.
 - Common start and end dates.
 - Daily, weekly, monthly, quarterly, or yearly frequency.
-- Growth / IDCW plan identification.
+- Scheme, plan, and option identification (including Direct / Regular and Growth / IDCW).
 - Metric selection.
+- A consistent total-return methodology for IDCW options; raw NAV change alone is not a fair total-return comparison when distributions have been paid.
 - Benchmark selection where a suitable benchmark is available.
 - Exportable tables and charts.
 
@@ -111,7 +114,7 @@ Users should be able to select multiple schemes and compare them side by side.
 - Risk-versus-return plot.
 - Metric comparison table with sorting and highlighting.
 
-Raw NAV values must not be compared directly across schemes because their starting NAV levels differ. Comparisons must align observations to a common date range and disclose missing observations. Benchmarks should use suitable total-return index data when available; price-index comparisons can omit reinvested dividends.
+Raw NAV values must not be compared directly across schemes because their starting NAV levels differ. Comparisons must align observations to a common date range and disclose missing observations. Compare like with like: identify the same scheme category, plan type, option, and relevant benchmark. For IDCW options, use a defensible total-return series that accounts for distributions and reinvestment assumptions; do not compare raw IDCW NAV returns with Growth-option returns as though they were equivalent. Benchmarks should use suitable Total Return Index (TRI) data when available; price-index comparisons omit reinvested dividends. If a comparable TRI series is unavailable, disclose that limitation.
 
 ## Portfolio and Stock Intelligence
 
@@ -160,13 +163,13 @@ The platform should analyze public discussions on **Reddit** and **X (Twitter)**
 - Reddit-versus-X divergence.
 - Stock-level sentiment and portfolio-exposure-weighted fund-level sentiment.
 
-A fund-level social sentiment measure may be calculated as a weighted aggregation of stock-level signals using the relevant portfolio weights. It must be labelled as an experimental indicator, disclose coverage and missing holdings, and never be presented as a measure of the fund's actual NAV or intrinsic value.
+A fund-level social sentiment measure may be calculated as a weighted aggregation of stock-level signals using the relevant portfolio weights. It must be labelled as an experimental indicator, disclose coverage and missing holdings, and never be presented as a measure of the fund's actual NAV or intrinsic value. The calculation should use holdings effective for the relevant period, not current holdings applied retrospectively. Distinguish the volume of discussion from sentiment, and avoid treating likes, reposts, or upvotes as proof that a claim is credible.
 
 Historical sentiment analysis is limited by the historical data accessible through each provider and by the date collection began.
 
 ## News and Upcoming Events
 
-The News & Event Radar should distinguish between what has happened, what is officially scheduled, what has been reported, and what is merely circulating.
+The News & Event Radar should distinguish between what has happened, what is officially scheduled, what has been reported, and what is merely circulating. The system cannot know future news before it is published; it can monitor scheduled events, developing stories, and public claims that are already circulating.
 
 ### Event and news categories
 
@@ -210,23 +213,19 @@ Use **LangGraph** for orchestration and **LangChain** for model and tool integra
 
 ### Proposed agents
 
-| Agent | Responsibilities |
+| Agent / component | Responsibilities |
 |---|---|
-| Supervisor / Router | Understand intent, plan tasks, route agents, and manage shared state |
-| Fund Discovery Agent | Search schemes and retrieve scheme metadata |
-| Performance Agent | Calculate returns, rolling performance, and benchmark comparisons |
-| Risk Agent | Calculate volatility, risk-adjusted metrics, and drawdowns |
-| Portfolio Agent | Analyze holdings, sector exposure, concentration, and overlap |
-| Fund Comparison Agent | Coordinate aligned multi-fund comparisons |
-| SIP Analysis Agent | Calculate historical SIP cash flows, XIRR, and scenarios |
-| Reddit Intelligence Agent | Analyze permitted Reddit posts and comments |
-| X Intelligence Agent | Analyze permitted public X posts |
-| Sentiment & Event Agent | Extract sentiment, topics, claims, and event signals |
-| News & Calendar Agent | Retrieve news, filings, and scheduled events |
-| Document Research Agent | Retrieve evidence from fund documents using RAG |
-| Research Synthesis Agent | Produce sourced reports from validated tool outputs |
+| Supervisor / Router | Understand intent, plan tasks, route work, and manage shared state |
+| Fund Research Agent | Coordinate scheme discovery and call performance, risk, comparison, and SIP tools |
+| Portfolio Intelligence Agent | Retrieve holdings and coordinate exposure, concentration, and overlap analysis |
+| Social Intelligence Agent | Coordinate Reddit/X collection, entity resolution, sentiment, and topic analysis |
+| News & Event Agent | Retrieve official filings, scheduled events, news, and developing claims |
+| Document Research Agent | Retrieve evidence from factsheets, scheme documents, and disclosures using RAG |
+| Research Synthesis Agent | Produce sourced reports from validated quantitative and qualitative outputs |
 
-Not every request should invoke every agent. A simple CAGR query should use the performance tool; a multi-fund risk comparison should invoke performance, risk, and comparison components; a complete research request may invoke portfolio, social, news, and document agents as well.
+**These agents call deterministic services; the services are not separate LLM agents.** Implement returns, risk metrics, benchmark alignment, SIP cash flows, portfolio overlap, and sentiment aggregation as ordinary tested Python modules exposed as tools. This avoids unnecessary LLM calls, reduces latency and cost, and makes numerical results reproducible.
+
+Not every request should invoke every agent. A simple CAGR query should call the performance calculation service directly. A multi-fund risk comparison should call the relevant performance and risk services. A complete research request may additionally invoke portfolio, social, news, and document research components.
 
 ### LLM responsibilities
 
@@ -270,9 +269,9 @@ Potential sources to evaluate:
 | Source | Intended use |
 |---|---|
 | [AMFI](https://www.amfiindia.com/) | Indian mutual fund NAV files and scheme-related information |
-| [MFAPI](https://www.mfapi.in/docs/) | Convenient scheme lookup and historical NAV API |
+| [MFAPI](https://www.mfapi.in/docs/) | Convenient third-party scheme lookup and historical NAV API; validate against official NAV data |
 | [SEBI](https://www.sebi.gov.in/) | Regulations, circulars, and official disclosures |
-| [NSE India](https://www.nseindia.com/) | Exchange filings, corporate announcements, event information, and market data |
+| [NSE India](https://www.nseindia.com/) | Exchange filings, corporate announcements, event information, and benchmark data where accessible |
 | [BSE India](https://www.bseindia.com/) | Exchange announcements and corporate filings |
 | AMC websites | Factsheets, monthly portfolios, scheme documents, and fund disclosures |
 | [Reddit API](https://www.reddit.com/dev/api/) | Permitted public post and comment data |
@@ -281,7 +280,9 @@ Potential sources to evaluate:
 | [MOSPI](https://www.mospi.gov.in/) | Official economic statistics |
 | News/search providers | Financial news discovery and source retrieval |
 
-API availability, access tiers, pricing, rate limits, attribution, retention, and permitted use must be checked before implementation. Do not assume that every source offers a free API or unrestricted historical access.
+AMFI should be treated as the primary reference for mutual fund NAV information; MFAPI is a convenient third-party integration, not the authoritative source. Benchmark TRI history, AMC portfolio disclosures, expense ratios, and scheme metadata require separate acquisition and validation workflows. Exchange websites may provide useful public disclosures but do not necessarily provide a stable, unrestricted API for every dataset.
+
+API availability, access tiers, pricing, rate limits, attribution, retention, and permitted use must be checked before implementation. Do not assume that every source offers a free API or unrestricted historical access. Record the source and effective date for every dataset, and build adapters so that one provider can be replaced without rewriting analytics.
 
 ## Quantitative Analytics
 
@@ -315,7 +316,15 @@ API availability, access tiers, pricing, rate limits, attribution, retention, an
 - Holdings and allocation changes.
 - Exposure-weighted social and event indicators.
 
-Every metric should document its return convention, frequency, annualization factor, risk-free rate (where applicable), benchmark, observation count, date range, and missing-data treatment.
+Every metric should document its return convention, observation frequency, annualization convention, risk-free rate (where applicable), benchmark, observation count, date range, and missing-data treatment. Define these conventions centrally and use them consistently across single-fund and multi-fund analysis:
+
+- Calculate returns from an explicitly selected NAV or total-return series; account for distributions when comparing IDCW options.
+- Annualize volatility and risk-adjusted ratios using the observation frequency and a documented convention; do not apply a daily annualization factor to monthly returns.
+- Calculate Sharpe and Sortino using a dated risk-free-rate series or a clearly disclosed assumption.
+- Calculate Alpha and Beta against an appropriate, aligned benchmark return series; document the regression window and frequency.
+- State the confidence level, lookback window, and historical or parametric method for VaR/CVaR.
+- Distinguish calendar-year returns from trailing-period returns and CAGR.
+- Treat insufficient history, missing benchmark observations, and stale data as explicit limitations rather than filling them silently.
 
 ## Data and System Architecture
 
@@ -467,7 +476,7 @@ Only configure providers that are actually used. Keep `.env` out of version cont
 
 ## Initial Build Priority
 
-Start with the foundation, NAV ingestion, and a verified financial analytics engine. Implement daily/monthly/yearly analysis and multi-fund comparison before adding the AI agents. Then add portfolio holdings, social intelligence, upcoming-news monitoring, and document RAG as separate subsystems.
+Start by validating the data sources and scheme identifiers, then build NAV ingestion and a verified financial analytics engine. Implement single-fund analysis and daily/weekly/monthly/quarterly/yearly views, followed by multi-fund comparison. Add portfolio holdings and event/news ingestion next. Introduce LangGraph only after the core Python services and APIs work reliably; then add social intelligence and document RAG as separate subsystems. This keeps the first release useful even before every API or LLM integration is available.
 
 The central design principle is:
 
