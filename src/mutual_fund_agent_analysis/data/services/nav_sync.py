@@ -1,4 +1,5 @@
 """NAV synchronization orchestration."""
+
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -14,7 +15,11 @@ def sync_scheme_nav(
     end_date: date | None = None,
     client: MFAPIClient | None = None,
 ) -> int:
-    """Fetch a scheme's NAV history, validate it, then atomically upsert it."""
+    """Fetch a scheme's NAV history and upsert it atomically.
+
+    A savepoint is used when the caller already owns a transaction, so this
+    service does not commit or invalidate the caller's surrounding unit of work.
+    """
     owns_client = client is None
     provider = client or MFAPIClient()
     try:
@@ -23,5 +28,6 @@ def sync_scheme_nav(
         if owns_client:
             provider.close()
 
-    with session.begin():
+    transaction = session.begin_nested() if session.in_transaction() else session.begin()
+    with transaction:
         return upsert_nav_response(session, response)
