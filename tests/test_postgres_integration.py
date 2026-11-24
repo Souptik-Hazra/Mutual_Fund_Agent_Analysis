@@ -127,3 +127,9 @@ def test_sync_uses_savepoint_inside_caller_transaction(migrated_postgres: Engine
 
     with Session(migrated_postgres) as session:
         assert session.get(MutualFundScheme, 991235) is not None
+
+
+def test_postgres_repository_rejects_invalid_source(migrated_postgres: Engine) -> None:
+    with Session(migrated_postgres) as session:
+        with pytest.raises(ValueError, match="source must contain"):
+            upsert_nav_response(session, make_response(), source=" ")
