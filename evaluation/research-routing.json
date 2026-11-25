@@ -1,0 +1,14 @@
+[
+  {"question":"Show CAGR and volatility for my fund","scheme_codes":[125497],"expected_intents":["fund"]},
+  {"question":"Compare benchmark returns for these schemes","scheme_codes":[125497,120503],"expected_intents":["fund"]},
+  {"question":"What are the top holdings and sector allocation?","scheme_codes":[125497],"expected_intents":["portfolio"]},
+  {"question":"Compare overlap between the two portfolios","scheme_codes":[125497,120503],"expected_intents":["portfolio"]},
+  {"question":"Any recent company announcements or board meeting events?","scheme_codes":[125497],"expected_intents":["events"]},
+  {"question":"Show event exposure for my fund","scheme_codes":[125497],"expected_intents":["events"]},
+  {"question":"What is the Reddit sentiment and discussion volume?","scheme_codes":[],"expected_intents":["social"]},
+  {"question":"Is community sentiment bullish or bearish?","scheme_codes":[125497],"expected_intents":["social"]},
+  {"question":"Search the scheme factsheet PDF","scheme_codes":[125497],"expected_intents":["documents"]},
+  {"question":"Find expense ratio details in the SID document","scheme_codes":[],"expected_intents":["documents"]},
+  {"question":"Analyse fund performance and its sector holdings","scheme_codes":[125497],"expected_intents":["fund","portfolio"]},
+  {"question":"Summarize news and portfolio exposure","scheme_codes":[125497],"expected_intents":["portfolio","events"]}
+]
