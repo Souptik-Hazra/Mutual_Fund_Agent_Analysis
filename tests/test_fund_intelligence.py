@@ -142,6 +142,9 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
     assert result["peer_count"] == 2
     assert result["selected_fund"]["cagr_rank"] == 1
     assert result["selected_fund"]["sharpe_ratio_rank"] == 1
+    limited = fund_intelligence.analyze_category_peers(Session(), 1, max_peers=1)
+    assert limited["cohort_truncated"] is True
+    assert limited["peer_count"] == 1
 
 
 def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
