@@ -8,11 +8,17 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.data.providers.contracts import NavResponse
+from mutual_fund_agent_analysis.data.services.intelligence import (
+    add_entity_alias,
+    add_entity_identifier,
+    create_entity,
+)
 from mutual_fund_agent_analysis.data.services.nav_reconciliation import (
     NAV_RECONCILIATION_TOLERANCE,
     build_reconciliation,
 )
 from mutual_fund_agent_analysis.models import (
+    DataSource,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -106,6 +112,28 @@ def upsert_nav_response(
         },
     )
     session.execute(scheme_statement)
+
+    source_key = (
+        normalized_source if session.get(DataSource, normalized_source) is not None else None
+    )
+    entity = create_entity(
+        session,
+        "scheme",
+        f"{metadata.scheme_name} [{metadata.scheme_code}]",
+    )
+    add_entity_alias(
+        session, entity.entity_id, metadata.scheme_name,
+        alias_type="provider_name", source_key=source_key, is_primary=True,
+    )
+    add_entity_identifier(
+        session, entity.entity_id, "AMFI_SCHEME_CODE", str(metadata.scheme_code),
+        source_key=source_key, is_primary=True,
+    )
+    for isin in (metadata.isin_growth, metadata.isin_div_reinvestment):
+        if isin:
+            add_entity_identifier(
+                session, entity.entity_id, "ISIN", isin, source_key=source_key,
+            )
 
     fetched_at = datetime.now(UTC)
     nav_values = [
