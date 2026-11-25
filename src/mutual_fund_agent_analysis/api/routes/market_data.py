@@ -149,9 +149,14 @@ def sync_twelvedata_quote(
 
 class SecurityCorporateEvent(BaseModel):
     title: str = Field(min_length=3, max_length=500)
-    event_type: Literal["results", "board_meeting", "dividend", "record_date", "split", "bonus", "merger", "acquisition", "fundraising", "management", "regulatory", "filing", "other"] = "other"
+    event_type: Literal[
+        "results", "board_meeting", "dividend", "record_date", "split", "bonus",
+        "merger", "acquisition", "fundraising", "management", "regulatory", "filing", "other",
+    ] = "other"
     event_date: date | None = None
-    status: Literal["confirmed", "scheduled", "reported", "unverified", "speculative", "disproved", "outdated"] = "reported"
+    status: Literal[
+        "confirmed", "scheduled", "reported", "unverified", "speculative", "disproved", "outdated"
+    ] = "reported"
     source_url: AnyHttpUrl | None = None
 
 
@@ -191,7 +196,11 @@ class SecurityObservationInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_observation(self) -> "SecurityObservationInput":
-        if not self.security_key.strip() or not self.security_name.strip() or not self.source_key.strip():
+        if (
+            not self.security_key.strip()
+            or not self.security_name.strip()
+            or not self.source_key.strip()
+        ):
             raise ValueError("security_key, security_name and source_key cannot be blank.")
         if self.observed_at.tzinfo is None or self.observed_at.utcoffset() is None:
             raise ValueError("observed_at must include a timezone.")
@@ -214,7 +223,9 @@ def ingest_security_observation(
     """Persist a dated, source-attributed security observation without treating it as verified."""
     source = session.get(DataSource, payload.source_key)
     if source is None or not source.enabled:
-        raise HTTPException(status_code=422, detail="source_key must reference an enabled data source.")
+        raise HTTPException(
+            status_code=422, detail="source_key must reference an enabled data source."
+        )
     canonical = payload.model_dump(mode="json")
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
     row = SecurityMarketObservation(
@@ -233,9 +244,16 @@ def ingest_security_observation(
         day_low=payload.day_low,
         volume=payload.volume,
         market_status=payload.market_status,
-        fundamentals_json={key: str(value) if value is not None else None for key, value in payload.fundamentals.items()},
+        fundamentals_json={
+            key: str(value) if value is not None else None
+            for key, value in payload.fundamentals.items()
+        },
         corporate_events_json=[
-            {**event.model_dump(mode="json"), "source_key": payload.source_key, "verification_status": "unverified"}
+            {
+                **event.model_dump(mode="json"),
+                "source_key": payload.source_key,
+                "verification_status": "unverified",
+            }
             for event in payload.corporate_events
         ],
         content_hash=digest,
@@ -246,7 +264,9 @@ def ingest_security_observation(
         session.refresh(row)
     except IntegrityError as exc:
         session.rollback()
-        raise HTTPException(status_code=409, detail="Duplicate or conflicting security observation.") from exc
+        raise HTTPException(
+            status_code=409, detail="Duplicate or conflicting security observation."
+        ) from exc
     return {
         "observation_id": row.observation_id,
         "security_key": row.security_key,
@@ -255,7 +275,10 @@ def ingest_security_observation(
         "fundamentals_as_of": row.fundamentals_as_of,
         "content_hash": row.content_hash,
         "verification_status": "unverified",
-        "message": "Stored as an immutable source-attributed observation; verify the source before relying on it.",
+        "message": (
+            "Stored as an immutable source-attributed observation; "
+            "verify the source before relying on it."
+        ),
     }
 
 
