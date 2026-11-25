@@ -12,6 +12,7 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_alias,
     add_entity_identifier,
     create_entity,
+    create_entity_relationship,
 )
 from mutual_fund_agent_analysis.data.services.nav_reconciliation import (
     NAV_RECONCILIATION_TOLERANCE,
@@ -145,6 +146,21 @@ def upsert_nav_response(
             add_entity_identifier(
                 session, entity.entity_id, "ISIN", isin, source_key=source_key,
             )
+    if metadata.fund_house:
+        amc = create_entity(session, "amc", metadata.fund_house)
+        add_entity_alias(
+            session, amc.entity_id, metadata.fund_house,
+            alias_type="provider_name", is_primary=True,
+        )
+        create_entity_relationship(
+            session,
+            entity.entity_id,
+            amc.entity_id,
+            "managed_by",
+            source_key=source_key,
+            verification_status="unverified",
+            metadata={"provider_scheme_code": metadata.scheme_code},
+        )
 
     fetched_at = datetime.now(UTC)
     nav_values = [
