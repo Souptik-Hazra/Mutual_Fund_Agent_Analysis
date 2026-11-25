@@ -32,7 +32,10 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
 )
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import (
-    DataSource, EntityEvidenceLink, EvidenceRecord, ResearchEntity,
+    DataSource,
+    EntityEvidenceLink,
+    EvidenceRecord,
+    ResearchEntity,
 )
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
