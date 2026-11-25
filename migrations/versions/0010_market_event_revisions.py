@@ -4,8 +4,8 @@ Revision ID: 0010_market_event_revisions
 Revises: 0009_metadata_and_distributions
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0010_market_event_revisions"
