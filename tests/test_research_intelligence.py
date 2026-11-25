@@ -284,7 +284,6 @@ def test_event_revision_archiver_preserves_prior_source_state():
     assert session.added == [revision]
 
 
-
 def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
     from types import SimpleNamespace
 

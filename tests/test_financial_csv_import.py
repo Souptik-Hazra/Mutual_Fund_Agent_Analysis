@@ -210,9 +210,7 @@ def test_distribution_import_tracks_corrections_and_never_attests_coverage():
         session.refresh(previous)
         assert previous.status == "revised"
         current = session.scalar(
-            select(DistributionObservation).where(
-                DistributionObservation.revision == 2
-            )
+            select(DistributionObservation).where(DistributionObservation.revision == 2)
         )
         assert current.status == "active"
         assert current.amount_per_unit == Decimal("1.50")

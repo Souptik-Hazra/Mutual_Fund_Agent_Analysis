@@ -103,7 +103,6 @@ def test_xirr_handles_leap_year_day_count() -> None:
     assert xnpv(result, cash_flows).copy_abs() < Decimal("1e-18")
 
 
-
 def test_xirr_reports_non_convergence_instead_of_returning_last_midpoint(monkeypatch):
     from mutual_fund_agent_analysis.analytics import cashflows
 
