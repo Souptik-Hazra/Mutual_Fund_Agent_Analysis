@@ -32,11 +32,18 @@ def assess_return_coverage(
 ) -> ReturnCoverage:
     """Summarize calendar spacing and flag long gaps without filling observations."""
     points = normalize_returns(returns)
-    if isinstance(periods_per_year, bool) or not isinstance(periods_per_year, int) or periods_per_year <= 0:
+    if (
+        isinstance(periods_per_year, bool)
+        or not isinstance(periods_per_year, int)
+        or periods_per_year <= 0
+    ):
         raise ValueError("periods_per_year must be a positive integer.")
     if len(points) < 2:
         return ReturnCoverage(len(points), None, None, 0, None, "insufficient")
-    gaps = [(right.date - left.date).days for left, right in zip(points, points[1:], strict=False)]
+    gaps = [
+        (right.date - left.date).days
+        for left, right in zip(points, points[1:], strict=False)
+    ]
     ordered = sorted(gaps)
     middle = len(ordered) // 2
     median = (
@@ -49,7 +56,11 @@ def assess_return_coverage(
     long_gaps = sum(gap > threshold for gap in gaps)
     span_days = (points[-1].date - points[0].start_date).days
     expected_count = Decimal(span_days) * Decimal(periods_per_year) / Decimal("365.25")
-    coverage = min(Decimal("1"), Decimal(len(points)) / expected_count) if expected_count else None
+    coverage = (
+        min(Decimal("1"), Decimal(len(points)) / expected_count)
+        if expected_count
+        else None
+    )
     inferred = "irregular"
     for name, minimum, maximum in (
         ("daily", 1, 7),
