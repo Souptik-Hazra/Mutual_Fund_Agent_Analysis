@@ -338,3 +338,137 @@ def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
     assert incomplete["weight_coverage_pct"] == Decimal("60")
     assert incomplete["hhi_0_to_1"] is None
     assert incomplete["hhi_coverage_sufficient"] is False
+
+
+
+def test_rss_adapter_rejects_entity_declarations_and_non_https_links(monkeypatch):
+    import httpx
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-length": "100"}
+
+        def raise_for_status(self):
+            return None
+
+        def iter_bytes(self):
+            yield b'<!DOCTYPE feed [<!ENTITY x "expanded">]><rss><channel/></rss>'
+
+    class FakeStream:
+        def __enter__(self):
+            return FakeResponse()
+
+        def __exit__(self, *_args):
+            return None
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def stream(self, *_args, **_kwargs):
+            return FakeStream()
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+    with pytest.raises(ValueError, match="entity declarations"):
+        fetch_feed("https://www.nseindia.com/feed.xml", "www.nseindia.com")
+
+
+def test_social_source_requires_source_specific_evaluated_sentiment_model():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import create_social_post
+
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=True,
+        terms_url="https://www.redditinc.com/policies",
+        metadata_json={"retention_days": 30, "evaluated_sentiment_models": []},
+    )
+
+    class StubSession:
+        def __init__(self):
+            self.added = []
+
+        def get(self, model, _key):
+            return source if model is DataSource else None
+
+        def scalar(self, _statement):
+            return None
+
+        def add(self, row):
+            self.added.append(row)
+
+    payload = SocialPostInput(
+        source_key="reddit",
+        external_id="post-1",
+        content_hash="a" * 64,
+        published_at=datetime.now(UTC),
+        sentiment_label="positive",
+        sentiment_score=Decimal("0.7"),
+        sentiment_model="unreviewed-model",
+        expires_at=datetime.now(UTC) + __import__("datetime").timedelta(days=1),
+    )
+    with pytest.raises(ValueError, match="not registered as evaluated"):
+        create_social_post(StubSession(), payload)
+
+
+def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(monkeypatch):
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import create_social_post
+
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=True,
+        metadata_json={"retention_days": 30},
+    )
+    monkeypatch.setattr(
+        "mutual_fund_agent_analysis.core.config.get_settings",
+        lambda: SimpleNamespace(social_retention_days=30),
+    )
+
+    class StubSession:
+        def __init__(self):
+            self.added = []
+
+        def get(self, model, _key):
+            return source if model is DataSource else None
+
+        def scalar(self, _statement):
+            return None
+
+        def add(self, row):
+            self.added.append(row)
+
+        def commit(self):
+            return None
+
+        def refresh(self, _row):
+            return None
+
+    session = StubSession()
+    payload = SocialPostInput(
+        source_key="reddit",
+        external_id="post-2",
+        content_hash="b" * 64,
+        text_excerpt="Do not persist this post text",
+        expires_at=datetime.now(UTC) + __import__("datetime").timedelta(days=2),
+        metadata={"subreddit": "investing", "text": "raw text", "content": "raw body"},
+    )
+    row = create_social_post(session, payload)
+    assert row.text_excerpt is None
+    assert row.metadata_json == {"subreddit": "investing"}
