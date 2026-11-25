@@ -34,7 +34,10 @@ class SecurityMarketObservation(Base):
     __tablename__ = "security_market_observations"
     __table_args__ = (
         UniqueConstraint(
-            "source_key", "security_key", "observed_at", "content_hash",
+            "source_key",
+            "security_key",
+            "observed_at",
+            "content_hash",
             name="uq_security_market_observation_version",
         ),
         CheckConstraint("last_price > 0", name="ck_security_market_price_positive"),
