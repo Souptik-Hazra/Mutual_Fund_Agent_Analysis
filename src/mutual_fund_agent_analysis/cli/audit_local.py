@@ -58,9 +58,9 @@ def build_coverage_report(session: Session) -> dict[str, Any]:
             "nav_reconciliations": _count(session, NavReconciliation),
             "nav_conflicts": int(
                 session.scalar(
-                    select(func.count()).select_from(NavReconciliation).where(
-                        NavReconciliation.status == "conflict"
-                    )
+                    select(func.count())
+                    .select_from(NavReconciliation)
+                    .where(NavReconciliation.status == "conflict")
                 )
                 or 0
             ),
@@ -74,9 +74,7 @@ def build_coverage_report(session: Session) -> dict[str, Any]:
             "registered_sources": _count(session, DataSource),
             "scheme_metadata_observations": _count(session, SchemeMetadataObservation),
             "distribution_observations": _count(session, DistributionObservation),
-            "distribution_coverage_attestations": _count(
-                session, DistributionCoverageAttestation
-            ),
+            "distribution_coverage_attestations": _count(session, DistributionCoverageAttestation),
         },
         "ranges": {
             "reconciled_nav": {
@@ -154,11 +152,7 @@ def _probe_amfi(code: int, start: date, end: date) -> dict[str, Any]:
         "scheme_code": response.meta.scheme_code,
         "scheme_name": response.meta.scheme_name,
         "observation_count": len(response.data),
-        "raw_chunks": (
-            len(response.raw_payload.get("chunks", []))
-            if response.raw_payload
-            else 0
-        ),
+        "raw_chunks": (len(response.raw_payload.get("chunks", [])) if response.raw_payload else 0),
     }
 
 

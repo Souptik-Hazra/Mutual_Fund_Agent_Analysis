@@ -12,10 +12,7 @@ from mutual_fund_agent_analysis.analytics.series import (
 
 
 def points(*items: tuple[str, str]) -> list[PricePoint]:
-    return [
-        PricePoint(date.fromisoformat(day), Decimal(value))
-        for day, value in items
-    ]
+    return [PricePoint(date.fromisoformat(day), Decimal(value)) for day, value in items]
 
 
 def test_daily_frequency_preserves_all_real_observations():

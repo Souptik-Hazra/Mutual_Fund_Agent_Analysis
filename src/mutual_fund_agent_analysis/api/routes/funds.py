@@ -134,9 +134,7 @@ def list_schemes(
         filters.append(MutualFundScheme.option_type == "growth")
     elif option == "idcw":
         filters.append(
-            MutualFundScheme.option_type.in_(
-                ["idcw_payout", "idcw_reinvestment", "idcw_transfer"]
-            )
+            MutualFundScheme.option_type.in_(["idcw_payout", "idcw_reinvestment", "idcw_transfer"])
         )
     for condition in filters:
         statement = statement.where(condition)

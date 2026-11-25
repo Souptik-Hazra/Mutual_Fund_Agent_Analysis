@@ -54,9 +54,7 @@ def reinvested_distribution_index(
     with localcontext() as context:
         context.prec = 36
         first_date, first_nav = ordered[0]
-        output.append(
-            TotalReturnPoint(first_date, first_nav, Decimal("0"), nav_index, total_index)
-        )
+        output.append(TotalReturnPoint(first_date, first_nav, Decimal("0"), nav_index, total_index))
         for previous, current in zip(ordered, ordered[1:], strict=False):
             day, nav = current
             distribution = distributions.get(day, Decimal("0"))

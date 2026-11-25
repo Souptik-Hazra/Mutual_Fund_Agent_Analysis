@@ -100,6 +100,7 @@ def get_coverage_audit(
     session: Annotated[Session, Depends(get_db)],
 ) -> CoverageAuditResponse:
     """Return database row counts, coverage windows, and latest provider-sync time."""
+
     def count(model: Any) -> int:
         return int(session.scalar(select(func.count()).select_from(model)) or 0)
 
@@ -121,9 +122,9 @@ def get_coverage_audit(
         "reconciled_nav_dates": count(NavReconciliation),
         "nav_conflicts": int(
             session.scalar(
-                select(func.count()).select_from(NavReconciliation).where(
-                    NavReconciliation.status == "conflict"
-                )
+                select(func.count())
+                .select_from(NavReconciliation)
+                .where(NavReconciliation.status == "conflict")
             )
             or 0
         ),
@@ -362,8 +363,9 @@ def list_distribution_observations(
     if not include_superseded:
         statement = statement.where(DistributionObservation.status == "active")
     rows = session.scalars(
-        statement.order_by(DistributionObservation.ex_date, DistributionObservation.revision)
-        .limit(limit)
+        statement.order_by(DistributionObservation.ex_date, DistributionObservation.revision).limit(
+            limit
+        )
     ).all()
     return [DistributionObservationResponse.model_validate(item) for item in rows]
 
@@ -408,9 +410,7 @@ def add_distribution_coverage_attestation(
         external_id=request.external_id,
         source_url=source_url,
         content_hash=payload_hash,
-        **request.model_dump(
-            exclude={"source_key", "external_id", "source_url", "metadata"}
-        ),
+        **request.model_dump(exclude={"source_key", "external_id", "source_url", "metadata"}),
         metadata_json=request.metadata,
     )
     session.add(record)
@@ -549,8 +549,8 @@ def get_idcw_total_return(
             return blocked(
                 "At least one in-range distribution is not verified against an enabled official source."
             )
-        distributions[item.ex_date] = (
-            distributions.get(item.ex_date, Decimal("0")) + Decimal(item.amount_per_unit)
+        distributions[item.ex_date] = distributions.get(item.ex_date, Decimal("0")) + Decimal(
+            item.amount_per_unit
         )
 
     try:
@@ -583,7 +583,8 @@ def get_idcw_total_return(
             }
             for item in points
         ],
-        limitations=limitations + [
+        limitations=limitations
+        + [
             "Coverage is based on the stored source attestation; the application does not independently discover omitted distributions."
         ],
     )

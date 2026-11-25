@@ -98,6 +98,7 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
         and evidence_present,
     }
 
+
 def evaluate_evidence_quality(
     response: dict[str, Any],
     *,

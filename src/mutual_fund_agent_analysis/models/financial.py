@@ -35,7 +35,9 @@ class SchemeMetadataObservation(Base):
     __tablename__ = "scheme_metadata_observations"
     __table_args__ = (
         UniqueConstraint(
-            "scheme_code", "source_key", "content_hash",
+            "scheme_code",
+            "source_key",
+            "content_hash",
             name="uq_scheme_metadata_source_hash",
         ),
         CheckConstraint(
@@ -104,7 +106,10 @@ class DistributionObservation(Base):
     __tablename__ = "distribution_observations"
     __table_args__ = (
         UniqueConstraint(
-            "scheme_code", "source_key", "external_id", "revision",
+            "scheme_code",
+            "source_key",
+            "external_id",
+            "revision",
             name="uq_distribution_source_revision",
         ),
         CheckConstraint("amount_per_unit > 0", name="ck_distribution_amount_positive"),
@@ -170,7 +175,10 @@ class DistributionCoverageAttestation(Base):
     __tablename__ = "distribution_coverage_attestations"
     __table_args__ = (
         UniqueConstraint(
-            "scheme_code", "source_key", "external_id", "content_hash",
+            "scheme_code",
+            "source_key",
+            "external_id",
+            "content_hash",
             name="uq_distribution_coverage_attestation",
         ),
         CheckConstraint("end_date >= start_date", name="ck_distribution_coverage_date_range"),

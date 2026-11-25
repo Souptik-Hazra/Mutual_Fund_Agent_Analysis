@@ -13,9 +13,9 @@ class SchemeMetadataObservationCreate(BaseModel):
     valid_from: date | None = None
     valid_to: date | None = None
     plan_type: Literal["direct", "regular", "unknown"] | None = None
-    option_type: Literal[
-        "growth", "idcw_payout", "idcw_reinvestment", "idcw_transfer", "unknown"
-    ] | None = None
+    option_type: (
+        Literal["growth", "idcw_payout", "idcw_reinvestment", "idcw_transfer", "unknown"] | None
+    ) = None
     lifecycle_type: Literal["open_ended", "close_ended", "interval", "unknown"] | None = None
     expense_ratio: Decimal | None = Field(default=None, ge=0, le=100)
     expense_ratio_effective_date: date | None = None

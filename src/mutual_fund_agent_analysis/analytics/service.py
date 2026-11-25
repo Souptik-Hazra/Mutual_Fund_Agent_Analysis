@@ -142,9 +142,7 @@ def _build_report(
         periods_per_year = FREQUENCY_PERIODS_PER_YEAR[frequency]
     prices = resample_prices(prices, frequency)
     benchmark_prices = (
-        resample_prices(benchmark_prices, frequency)
-        if benchmark_prices is not None
-        else None
+        resample_prices(benchmark_prices, frequency) if benchmark_prices is not None else None
     )
     if len(prices) < 2:
         raise ValueError("At least two NAV observations are required for fund analytics.")

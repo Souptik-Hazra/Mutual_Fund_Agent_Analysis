@@ -14,7 +14,6 @@ FREQUENCY_PERIODS_PER_YEAR = {
 }
 
 
-
 @dataclass(frozen=True, slots=True)
 class PricePoint:
     date: date
