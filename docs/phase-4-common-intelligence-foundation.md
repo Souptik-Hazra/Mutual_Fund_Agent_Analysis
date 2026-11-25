@@ -43,8 +43,8 @@ All endpoints are under /api/v1/intelligence.
 ## Important invariants
 
 1. A canonical entity is unique by entity type and normalized name.
-2. A namespaced identifier is unique by namespace and normalized value.
-3. Alias collisions across entities are legal and reported as ambiguous.
+2. A namespaced identifier is unique by namespace and normalized value; at most one primary identifier is allowed per entity and namespace.
+3. Alias collisions across entities are legal and reported as ambiguous; each entity can have at most one primary alias.
 4. Resolution is deterministic and exact; no fuzzy or LLM identity matching is performed.
 5. Identifier and alias validity intervals are inclusive and evaluated against as_of.
 6. Source authority is metadata, not a substitute for evidence verification.
