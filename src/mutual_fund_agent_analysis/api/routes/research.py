@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -539,10 +540,20 @@ def collect_social_posts(
     if source not in {"reddit", "x"}:
         raise HTTPException(status_code=422, detail="source must be reddit or x.")
     registry = session.get(DataSource, source)
-    if registry is None or not registry.enabled:
+    if registry is None or not registry.enabled or registry.source_type != "social":
         raise HTTPException(
             status_code=403,
-            detail="Social source is disabled. Review API terms and enable it explicitly.",
+            detail="Social source is disabled or incorrectly classified. Review API terms before enabling it.",
+        )
+    metadata = registry.metadata_json if isinstance(registry.metadata_json, dict) else {}
+    if (
+        not registry.terms_url
+        or metadata.get("terms_reviewed") is not True
+        or metadata.get("access_confirmed") is not True
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Social collection requires a recorded terms review, confirmed API access, and terms URL.",
         )
     try:
         retention_days = source_social_retention_days(
@@ -578,6 +589,13 @@ def collect_social_posts(
         }
     except SocialProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        upstream_status = exc.response.status_code
+        if upstream_status in {401, 403}:
+            raise HTTPException(status_code=403, detail="Social provider denied access; verify API credentials and plan permissions.") from exc
+        if upstream_status == 429:
+            raise HTTPException(status_code=429, detail="Social provider rate limit reached; retry after the provider reset window.") from exc
+        raise HTTPException(status_code=502, detail="Social provider returned an unsuccessful response.") from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Social provider request failed.") from exc
 
