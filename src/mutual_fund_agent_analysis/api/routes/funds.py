@@ -249,7 +249,6 @@ def compare_selected_funds(
     return FundComparisonResponse.model_validate(payload)
 
 
-
 @router.post(
     "/schemes/{scheme_code}/sip-simulation",
     response_model=SipSimulationResponse,
@@ -277,9 +276,7 @@ def run_sip_simulation(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return SipSimulationResponse.model_validate(
-        {"scheme_code": scheme_code, **asdict(result)}
-    )
+    return SipSimulationResponse.model_validate({"scheme_code": scheme_code, **asdict(result)})
 
 
 @router.get(
@@ -300,9 +297,7 @@ def list_investor_transactions(
         raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
     if session.get(MutualFundScheme, scheme_code) is None:
         raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
-    statement = select(InvestorTransaction).where(
-        InvestorTransaction.scheme_code == scheme_code
-    )
+    statement = select(InvestorTransaction).where(InvestorTransaction.scheme_code == scheme_code)
     if start_date:
         statement = statement.where(InvestorTransaction.transaction_date >= start_date)
     if end_date:
@@ -311,7 +306,9 @@ def list_investor_transactions(
         statement.order_by(
             InvestorTransaction.transaction_date,
             InvestorTransaction.transaction_id,
-        ).limit(limit).offset(offset)
+        )
+        .limit(limit)
+        .offset(offset)
     ).all()
     return [InvestorTransactionResponse.model_validate(row) for row in rows]
 
@@ -374,9 +371,7 @@ def get_investor_returns(
     _validate_scheme_code(scheme_code)
     if session.get(MutualFundScheme, scheme_code) is None:
         raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
-    nav_statement = select(NavReconciliation).where(
-        NavReconciliation.scheme_code == scheme_code
-    )
+    nav_statement = select(NavReconciliation).where(NavReconciliation.scheme_code == scheme_code)
     if as_of_date is not None:
         nav_statement = nav_statement.where(NavReconciliation.nav_date == as_of_date)
     latest = session.scalars(
@@ -411,14 +406,10 @@ def get_investor_returns(
         for item in records
     ]
     try:
-        report = calculate_investor_returns(
-            inputs, latest.nav_date, Decimal(latest.canonical_nav)
-        )
+        report = calculate_investor_returns(inputs, latest.nav_date, Decimal(latest.canonical_nav))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return InvestorReturnsResponse.model_validate(
-        {"scheme_code": scheme_code, **asdict(report)}
-    )
+    return InvestorReturnsResponse.model_validate({"scheme_code": scheme_code, **asdict(report)})
 
 
 @router.get(
