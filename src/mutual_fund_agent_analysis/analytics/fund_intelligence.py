@@ -38,7 +38,7 @@ def analyze_category_peers(
         MutualFundScheme.plan_type == selected.plan_type,
         MutualFundScheme.option_type == selected.option_type,
     ]
-    peers = session.scalars(
+    peer_rows = session.scalars(
         select(MutualFundScheme)
         .where(*filters)
         .order_by(
@@ -46,8 +46,10 @@ def analyze_category_peers(
             MutualFundScheme.scheme_name,
             MutualFundScheme.scheme_code,
         )
-        .limit(max_peers)
+        .limit(max_peers + 1)
     ).all()
+    cohort_truncated = len(peer_rows) > max_peers
+    peers = peer_rows[:max_peers]
     ranked = []
     excluded = []
     for peer in peers:
@@ -107,6 +109,8 @@ def analyze_category_peers(
             "option_type": selected.option_type,
         },
         "peer_count": len(ranked),
+        "peer_limit": max_peers,
+        "cohort_truncated": cohort_truncated,
         "excluded_peer_count": len(excluded),
         "benchmark_code": benchmark_code,
         "benchmark_source": benchmark_source if benchmark_code else None,
