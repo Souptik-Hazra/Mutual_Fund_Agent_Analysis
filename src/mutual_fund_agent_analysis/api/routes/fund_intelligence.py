@@ -61,7 +61,7 @@ class MarketObservationRequest(BaseModel):
     def require_timezone(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("observed_at must include a timezone offset.")
-        if value.astimezone(UTC) > datetime.now(UTC) + timedelta(minutes=5):
+        if value.astimezone(UTC) > datetime.now(UTC):
             raise ValueError("observed_at cannot be in the future.")
         return value
 
