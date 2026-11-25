@@ -152,7 +152,10 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
     sector_rows.sort(key=lambda x: x["exposure_inr"], reverse=True)
     return {
         "scheme_codes": scheme_codes,
-        "valuation_basis": "Investor transaction units multiplied by latest accepted reconciled NAV.",
+        "valuation_basis": (
+            "Investor transaction units multiplied by latest accepted "
+            "reconciled NAV."
+        ),
         "total_valued_portfolio_inr": total,
         "valued_funds": [
             {
@@ -175,5 +178,9 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
             "selected_fund_count": len(scheme_codes),
             "is_complete": not excluded and not warnings,
         },
-        "warning": "Equity look-through uses dated AMC disclosures and investor-ledger-derived fund values. It is not a live holdings feed; missing or partial disclosures understate exposure.",
+        "warning": (
+            "Equity look-through uses dated AMC disclosures and investor-ledger-derived "
+            "fund values. It is not a live holdings feed; missing or partial disclosures "
+            "understate exposure."
+        ),
     }
