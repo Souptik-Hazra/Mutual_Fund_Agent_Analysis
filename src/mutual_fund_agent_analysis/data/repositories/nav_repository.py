@@ -19,6 +19,8 @@ from mutual_fund_agent_analysis.data.services.nav_reconciliation import (
 )
 from mutual_fund_agent_analysis.models import (
     DataSource,
+    EntityIdentifier,
+    ResearchEntity,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -116,18 +118,27 @@ def upsert_nav_response(
     source_key = (
         normalized_source if session.get(DataSource, normalized_source) is not None else None
     )
-    entity = create_entity(
-        session,
-        "scheme",
-        f"{metadata.scheme_name} [{metadata.scheme_code}]",
+    entity = session.scalar(
+        select(ResearchEntity)
+        .join(EntityIdentifier, EntityIdentifier.entity_id == ResearchEntity.entity_id)
+        .where(
+            EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+            EntityIdentifier.normalized_value == str(metadata.scheme_code),
+        )
     )
+    if entity is None:
+        entity = create_entity(
+            session,
+            "scheme",
+            f"{metadata.scheme_name} [{metadata.scheme_code}]",
+        )
+        add_entity_identifier(
+            session, entity.entity_id, "AMFI_SCHEME_CODE", str(metadata.scheme_code),
+            source_key=source_key, is_primary=True,
+        )
     add_entity_alias(
         session, entity.entity_id, metadata.scheme_name,
-        alias_type="provider_name", source_key=source_key, is_primary=True,
-    )
-    add_entity_identifier(
-        session, entity.entity_id, "AMFI_SCHEME_CODE", str(metadata.scheme_code),
-        source_key=source_key, is_primary=True,
+        alias_type="provider_name", is_primary=True,
     )
     for isin in (metadata.isin_growth, metadata.isin_div_reinvestment):
         if isin:
