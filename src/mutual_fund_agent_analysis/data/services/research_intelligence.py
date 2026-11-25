@@ -486,6 +486,12 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
     evidence = session.get(EvidenceRecord, payload.evidence_id) if payload.evidence_id else None
     if payload.evidence_id and evidence is None:
         raise ValueError("Unknown evidence_id.")
+    if evidence is not None and evidence.source_key != payload.source_key:
+        raise ValueError("Event source_key must match the linked evidence source.")
+    if payload.published_at is not None and (
+        payload.published_at.tzinfo is None or payload.published_at.utcoffset() is None
+    ):
+        raise ValueError("published_at must include a timezone offset.")
     if payload.status in {"confirmed", "scheduled", "disproved"} and evidence is None:
         raise ValueError("Confirmed, scheduled, and disproved events require a linked evidence record.")
     if payload.status in {"reported", "unverified", "speculative"} and evidence is None and not payload.canonical_url:
@@ -555,6 +561,10 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     expires_at = payload.expires_at
     if expires_at.tzinfo is None or expires_at.utcoffset() is None:
         raise ValueError("Social post expiry must include a timezone.")
+    if payload.published_at is not None and (
+        payload.published_at.tzinfo is None or payload.published_at.utcoffset() is None
+    ):
+        raise ValueError("Social post published_at must include a timezone offset.")
     expires_at = expires_at.astimezone(timezone.utc)
     if expires_at <= now:
         raise ValueError("Social post expiry must be in the future.")
