@@ -129,6 +129,14 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "entity_evidence_links" in tables
     assert "entity_relationships" in tables
     assert "alembic_version" in tables
+    alias_indexes = {
+        item["name"] for item in inspect(migrated_postgres).get_indexes("entity_aliases")
+    }
+    identifier_indexes = {
+        item["name"] for item in inspect(migrated_postgres).get_indexes("entity_identifiers")
+    }
+    assert "uq_entity_aliases_primary" in alias_indexes
+    assert "uq_entity_identifiers_primary" in identifier_indexes
     with Session(migrated_postgres) as session:
         scheme_identifier = session.scalar(
             select(EntityIdentifier).where(
