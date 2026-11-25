@@ -88,7 +88,7 @@ def search_chunks(query: str, limit: int, scheme_code: int | None = None) -> lis
             })
             if len(results) >= limit:
                 break
-        return results
+        return results if results else None
     except Exception:
         logger.exception("Qdrant semantic search failed; falling back to lexical retrieval.")
         return None
