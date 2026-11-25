@@ -580,7 +580,6 @@ def test_rss_event_date_is_not_inferred_from_publication_date():
     assert _parse_event_date(explicit_event_date) == date(2026, 11, 20)
 
 
-
 def test_security_observation_source_url_must_match_registered_https_host():
     source = SimpleNamespace(base_url="https://www.nseindia.com")
     assert _validate_registered_source_url(
