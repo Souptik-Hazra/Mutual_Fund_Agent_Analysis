@@ -1,5 +1,11 @@
 """Deterministic mutual-fund performance and risk analytics."""
 
+from mutual_fund_agent_analysis.analytics.cashflows import (
+    CashFlow,
+    normalize_cash_flows,
+    xirr,
+    xnpv,
+)
 from mutual_fund_agent_analysis.analytics.benchmark import (
     BenchmarkMetrics,
     align_returns,
@@ -38,6 +44,7 @@ from mutual_fund_agent_analysis.analytics.service import (
 )
 
 __all__ = [
+    "CashFlow",
     "BenchmarkMetrics",
     "DrawdownMetrics",
     "FundAnalyticsReport",
@@ -60,10 +67,13 @@ __all__ = [
     "compare_funds",
     "load_benchmark_prices",
     "load_fund_prices",
+    "normalize_cash_flows",
     "normalize_prices",
     "normalize_returns",
     "period_returns",
     "rolling_returns",
     "trailing_return",
     "trailing_return_details",
+    "xirr",
+    "xnpv",
 ]
