@@ -1,4 +1,5 @@
 """Persist portfolio, event, social, and document intelligence."""
+
 from alembic import op
 from sqlalchemy import text
 
@@ -11,6 +12,7 @@ depends_on = None
 def upgrade() -> None:
     import mutual_fund_agent_analysis.models  # noqa: F401
     from mutual_fund_agent_analysis.database.base import Base
+
     names = (
         "portfolio_snapshots",
         "portfolio_holdings",
@@ -24,7 +26,8 @@ def upgrade() -> None:
         tables=[Base.metadata.tables[name] for name in names],
         checkfirst=True,
     )
-    op.get_bind().execute(text("""
+    op.get_bind().execute(
+        text("""
         INSERT INTO data_sources (
             source_key, display_name, source_type, authority_tier, is_official,
             base_url, attribution_required, enabled, metadata
@@ -33,12 +36,14 @@ def upgrade() -> None:
             1, true, NULL, false, true,
             '{"domain":"portfolio_disclosure","role":"primary_scheme_disclosure"}'::jsonb
         ) ON CONFLICT (source_key) DO NOTHING
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:
     import mutual_fund_agent_analysis.models  # noqa: F401
     from mutual_fund_agent_analysis.database.base import Base
+
     names = (
         "document_chunks",
         "research_documents",

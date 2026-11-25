@@ -46,11 +46,13 @@ def test_portfolio_import_requires_effective_date_and_content_hash():
             scheme_code=100,
             source_key="amc_disclosures",
             content_hash="bad",
-            holdings=[{
-                "security_key": "INE123A01016",
-                "security_name": "Example Ltd",
-                "asset_class": "equity",
-            }],
+            holdings=[
+                {
+                    "security_key": "INE123A01016",
+                    "security_name": "Example Ltd",
+                    "asset_class": "equity",
+                }
+            ],
         )
 
 

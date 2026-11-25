@@ -1,4 +1,5 @@
 """Purge social records whose provider retention expiry has passed."""
+
 # ruff: noqa: E501
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     purge_expired_social_posts,

@@ -1,4 +1,5 @@
 """Research intelligence request and response contracts."""
+
 # ruff: noqa: E501
 from datetime import date, datetime
 from decimal import Decimal
@@ -12,7 +13,9 @@ class HoldingInput(BaseModel):
     isin: str | None = Field(default=None, max_length=20)
     security_name: str = Field(min_length=1, max_length=300)
     sector: str | None = Field(default=None, max_length=160)
-    asset_class: Literal["equity", "debt", "cash", "derivative", "reit_invit", "gold", "other"] = "equity"
+    asset_class: Literal["equity", "debt", "cash", "derivative", "reit_invit", "gold", "other"] = (
+        "equity"
+    )
     quantity: Decimal | None = Field(default=None, ge=0)
     market_value: Decimal | None = Field(default=None, ge=0)
     weight_pct: Decimal | None = Field(default=None, ge=0, le=100)
@@ -48,8 +51,25 @@ class EventInput(BaseModel):
     evidence_id: int | None = Field(default=None, gt=0)
     title: str = Field(min_length=3, max_length=500)
     summary: str | None = None
-    event_type: Literal["results", "board_meeting", "dividend", "record_date", "split", "bonus", "merger", "acquisition", "fundraising", "management", "regulatory", "macro", "filing", "other"] = "other"
-    status: Literal["confirmed", "scheduled", "reported", "unverified", "speculative", "disproved", "outdated"] = "reported"
+    event_type: Literal[
+        "results",
+        "board_meeting",
+        "dividend",
+        "record_date",
+        "split",
+        "bonus",
+        "merger",
+        "acquisition",
+        "fundraising",
+        "management",
+        "regulatory",
+        "macro",
+        "filing",
+        "other",
+    ] = "other"
+    status: Literal[
+        "confirmed", "scheduled", "reported", "unverified", "speculative", "disproved", "outdated"
+    ] = "reported"
     event_date: date | None = None
     published_at: datetime | None = None
     canonical_url: HttpUrl | None = None
@@ -135,6 +155,7 @@ class DocumentSearchResponse(BaseModel):
     query: str
     results: list[dict[str, Any]]
     retrieval_mode: str
+
 
 class DocumentAskRequest(BaseModel):
     query: str = Field(min_length=3, max_length=1000)
