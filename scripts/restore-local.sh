@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -102,14 +103,13 @@ SOURCE_QDRANT_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.a
   exit 1
 }
 
-TARGET_DB_NAME="$(docker compose exec -T db sh -lc 'printf "%s" "$POSTGRES_DB"')"
+TARGET_DB_NAME="$(docker compose exec -T db printenv POSTGRES_DB)"
 [[ "$TARGET_DB_NAME" == "$DB_NAME" ]] || {
   printf 'Backup database is %s, but the Compose db target is %s. Refusing to restore to a different database.\n' \
     "$DB_NAME" "$TARGET_DB_NAME" >&2
   exit 1
 }
-docker compose exec -T db sh -lc \
-  'pg_restore --list' < "$PAYLOAD/postgres.dump" >/dev/null
+docker compose exec -T db pg_restore --list < "$PAYLOAD/postgres.dump" >/dev/null
 
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 QDRANT_API_KEY="${QDRANT_API_KEY:-}"
@@ -168,8 +168,9 @@ if [[ "$ASSUME_YES" != "true" ]]; then
 fi
 
 printf 'Restoring PostgreSQL database %s ...\n' "$DB_NAME"
-docker compose exec -T db sh -lc \
-  'pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
+TARGET_DB_USER="$(docker compose exec -T db printenv POSTGRES_USER)"
+docker compose exec -T db pg_restore --clean --if-exists --no-owner --no-privileges \
+  --exit-on-error --username="$TARGET_DB_USER" --dbname="$TARGET_DB_NAME" \
   < "$PAYLOAD/postgres.dump"
 
 if [[ "$QDRANT_INCLUDED" == "true" ]]; then
