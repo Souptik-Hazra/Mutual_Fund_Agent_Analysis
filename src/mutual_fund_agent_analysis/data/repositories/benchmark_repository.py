@@ -77,7 +77,7 @@ def upsert_benchmark_response(
         )
     add_entity_alias(
         session, entity.entity_id, response.benchmark_name,
-        alias_type="publisher_name", is_primary=True,
+        alias_type="publisher_name", source_key=source_key, is_primary=True,
     )
 
     fetched_at = datetime.now(UTC)
