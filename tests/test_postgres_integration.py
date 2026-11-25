@@ -26,11 +26,11 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkObservation,
     BenchmarkSyncRun,
     EntityIdentifier,
-    ResearchEntity,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
     ProviderSyncRun,
+    ResearchEntity,
 )
 
 
