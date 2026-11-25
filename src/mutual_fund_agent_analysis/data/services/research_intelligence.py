@@ -464,9 +464,17 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             # Unchanged RSS refreshes never downgrade a manually verified event status.
             updated += 1
     session.commit()
-    return {"source_key": source_key, "feed_url": feed_url, "fetched": len(items),
-            "created": created, "updated": updated,
-            "status_policy": "RSS items are stored as reported, never automatically confirmed."}
+    return {
+        "source_key": source_key,
+        "feed_url": feed_url,
+        "fetched": len(items),
+        "created": created,
+        "updated": updated,
+        "terms_reviewed_at": source.metadata_json.get("reviewed_at"),
+        "status_policy": "RSS items are stored as reported; unchanged refreshes preserve manual verification.",
+        "event_date_policy": "Only explicit feed event/effective date fields are used; publication time is not substituted.",
+        "entity_link_policy": "Source-aware exact aliases; ambiguous or unmatched headlines remain unlinked.",
+    }
 
 
 def create_market_event(session: Session, payload: Any) -> MarketEvent:
@@ -874,9 +882,12 @@ def fund_social_sentiment(
         )).all()
         weight_by_entity: dict[int, Decimal] = defaultdict(lambda: D("0"))
         for row in holdings:
-            if row.company_entity_id is not None and row.weight_pct is not None:
+            if row.asset_class == "equity" and row.company_entity_id is not None and row.weight_pct is not None:
                 weight_by_entity[row.company_entity_id] += row.weight_pct
-        total_weight = sum((row.weight_pct or D("0") for row in holdings), D("0"))
+        total_weight = sum(
+            (row.weight_pct or D("0") for row in holdings if row.asset_class == "equity"),
+            D("0"),
+        )
         total_weight_days += total_weight * days
         relevant = [
             post for post in posts
@@ -912,7 +923,12 @@ def fund_social_sentiment(
         "total_weight_days": total_weight_days,
         "intervals": intervals,
         "coverage_start_date": max(start, snapshots[0].effective_date),
-        "method": "time-weighted company sentiment using disclosure-effective portfolio weights",
+        "method": "time-weighted company sentiment using disclosure-effective equity weights",
+        "eligible_asset_class": "equity",
+        "source_counts": {
+            key: sum(1 for post in posts if post.source_key == key)
+            for key in sorted({post.source_key for post in posts})
+        },
         "warning": "Experimental discussion indicator; it is not a NAV, return, or investment recommendation.",
     }
 
