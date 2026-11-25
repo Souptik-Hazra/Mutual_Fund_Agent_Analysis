@@ -112,7 +112,15 @@ class NiftyIndicesClient:
                     row.get("Date") or row.get("date") or row.get("HistoricalDate")
                     or row.get("historicalDate")
                 )
-                observation_date = datetime.strptime(raw_date.strip(), "%d %b %Y").date()
+                raw_date = raw_date.strip()
+                for date_format in ("%d %b %Y", "%d-%b-%Y"):
+                    try:
+                        observation_date = datetime.strptime(raw_date, date_format).date()
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    raise ValueError(f"Unsupported Nifty date format: {raw_date!r}")
                 tri_value = (
                     row.get("TotalReturnsIndex") or row.get("totalReturnsIndex")
                     or row.get("Total Returns Index") or row.get("TRI")
