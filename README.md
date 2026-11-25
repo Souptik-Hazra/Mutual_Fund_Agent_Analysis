@@ -533,6 +533,33 @@ mfa-sync-nav 125497 --start-date 2020-01-01
 
 The command validates the provider response, upserts scheme metadata and source-specific NAV observations, and records the original provider payload in `provider_sync_runs`. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
 
+### Import source-attributed scheme metadata and IDCW declarations
+
+Register each source in the local `data_sources` table before importing. Record its true official status, base URL, terms URL and enabled state. The default import status is **unverified**; use `--verification-status verified` only after manually checking every row against the original official AMC/AMFI document. The CLI validates the source registry and URL host, but it cannot independently prove that a disclosure is complete or authentic.
+
+Metadata CSV header:
+
+```csv
+scheme_code,source_url,valid_from,valid_to,plan_type,option_type,lifecycle_type,expense_ratio,expense_ratio_effective_date,benchmark_code,launch_date,closure_date,verification_note,metadata_json
+```
+
+IDCW CSV header:
+
+```csv
+scheme_code,source_url,external_id,revision,supersedes_distribution_id,ex_date,record_date,payment_date,amount_per_unit,option_type,status,published_at,metadata_json
+```
+
+Run the importers:
+
+```bash
+mfa-import-scheme-metadata data/scheme-metadata.csv --source-key amc-official
+mfa-import-idcw data/idcw-distributions.csv --source-key amc-official
+```
+
+Use `--verification-status verified` only after manual source validation and only when the registered source is enabled, official, and has a matching `base_url`. For a correction, create a new distribution revision and set `supersedes_distribution_id` to the active prior record. Imports are idempotent; conflicting reuse of an existing revision is rejected.
+
+**CSV import does not assert complete date coverage.** The IDCW total-return API remains blocked until a separate verified coverage attestation is created for the exact scheme, source and requested date interval. Review the imported rows and original notice before creating that attestation.
+
 ### Quality checks
 
 ```bash

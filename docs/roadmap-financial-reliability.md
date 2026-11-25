@@ -64,7 +64,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Research and register authoritative distribution sources, including ex-date, record/payment date, per-unit amount, applicable option, and source provenance.
 - [x] Add versioned distribution observations with idempotent ingestion, supersession revisions, source hashes and conflict audit.
 - [x] Implement a documented reinvested-distribution total-return methodology using the ex-date NAV convention and reconciled NAVs; source coverage attestation is a separate gate.
-- [ ] Keep Growth NAV returns, IDCW payout cash-flow returns, and reinvested IDCW total returns distinct.
+- [x] Keep Growth NAV returns, IDCW payout cash-flow indices, and reinvested IDCW total returns distinct, with separate basis labels and methodology.
 - [x] Document taxes/exit loads and investor timing as excluded from the scheme-level index; support revised/cancelled distribution records. Investor-specific tax outcomes are not assumed.
 - [ ] Add fund/benchmark comparison safeguards so a price/NAV-only series is not mislabelled as total return.
 - [x] Surface missing distribution coverage and reject total-return requests without a stored verified official-source attestation covering the requested interval.
@@ -211,3 +211,8 @@ Still gated by real-world source inputs and acceptance evidence: execute `mfa-au
 ### Event revision history
 
 The implementation branch adds `market_event_revisions` to retain prior event states during manual event updates and changed RSS source observations. Previous status, dates, URL, confidence, metadata and evidence provenance are stored in a JSON-safe snapshot. Historical RSS revisions remain labelled as source-reported; the adapter does not promote them to confirmed events.
+
+
+### CSV source ingestion commands (2026-11-25)
+
+Two local, bounded CSV commands now import effective-dated scheme metadata and versioned IDCW notices. They are idempotent, source-attributed, host-validated and default to unverified. Verified status is allowed only for enabled official registered sources and requires an explicit operator choice. No completeness attestation is inferred from imported rows.

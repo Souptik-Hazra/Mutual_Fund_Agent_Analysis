@@ -27,7 +27,7 @@ Additional deterministic tests cover same-day cash-flow aggregation, leap-year a
 
 `scheme_metadata_observations` and `distribution_observations` retain source URLs, content hashes, effective dates, verification status and correction revisions. Distribution records are append-only by revision; a correction supersedes the former active revision.
 
-The reinvested index applies `(ex-date NAV + distribution per unit) / prior NAV`, reinvesting on the ex-date at the published ex-date NAV. The API is `GET /api/v1/schemes/{scheme_code}/idcw-total-return`. It returns a blocked state unless the caller supplies an explicit complete-coverage attestation tied to an enabled official source. It also blocks unresolved/unverified distribution observations and NAV conflicts.
+The reinvested index applies `(ex-date NAV + distribution per unit) / prior NAV`, reinvesting on the ex-date at the published ex-date NAV. The separate payout index adds cumulative per-unit distribution cash without reinvestment or interest. The API is `GET /api/v1/schemes/{scheme_code}/idcw-total-return`. It returns a blocked state unless a persisted coverage-attestation record is verified, tied to an enabled official source, and covers the full requested interval. It also blocks unresolved/unverified distribution observations and NAV conflicts.
 
 This is a scheme-level pre-tax methodology, not an investor-specific return. Taxes, exit loads and actual investor reinvestment timing are excluded. The source coverage attestation is a manual assertion and is not independently discovered from the NAV feed.
 
@@ -86,3 +86,11 @@ The importer continues to accept normalized CSV/XLSX holdings and requires expli
 ## Event correction history
 
 The active event record remains the current view. When a manual event update or an RSS source refresh replaces an existing event state, the prior event fields and a JSON-safe evidence snapshot are appended to `market_event_revisions`. The history route is `GET /api/v1/events/{event_id}/revisions`. RSS observations continue to be stored as reported, not automatically confirmed.
+
+
+### Local CSV import commands
+
+- `mfa-import-scheme-metadata metadata.csv --source-key <registered-source-key>`
+- `mfa-import-idcw distributions.csv --source-key <registered-source-key>`
+
+Both commands accept a `source_url` column or a shared `--source-url`, default to `unverified`, check the registered source and matching URL host, validate dates/fields, and skip exact duplicate metadata rows or distribution revisions. The optional `--verification-status verified` flag is intended only after manual review against the official original notice; it additionally requires an enabled official source with a registered base URL. IDCW imports never create a coverage attestation. Column headers and use guidance are documented in the README section “Import source-attributed scheme metadata and IDCW declarations”.
