@@ -5,6 +5,7 @@ from mutual_fund_agent_analysis.models.benchmark import (
     BenchmarkObservation,
     BenchmarkSyncRun,
 )
+from mutual_fund_agent_analysis.models.investor import InvestorTransaction
 from mutual_fund_agent_analysis.models.intelligence import (
     DataSource,
     EntityAlias,
@@ -38,6 +39,7 @@ __all__ = [
     "EntityRelationship",
     "EvidenceRecord",
     "MutualFundScheme",
+    "InvestorTransaction",
     "NavObservation",
     "NavReconciliation",
     "ProviderSyncRun",
