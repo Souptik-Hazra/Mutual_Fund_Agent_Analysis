@@ -652,8 +652,8 @@ navs = [
 ]
 print(absolute_return(navs))
 print(cagr(navs))
-daily_returns = period_returns(navs)
-print(calculate_risk_metrics(daily_returns, periods_per_year=252))
+sample_returns = period_returns(navs)
+print(calculate_risk_metrics(sample_returns, periods_per_year=2))
 print(calculate_drawdown(navs))
 ```
 
@@ -662,7 +662,7 @@ print(calculate_drawdown(navs))
 - Inputs must be positive, finite prices with unique dates. They are sorted chronologically; duplicate dates are rejected.
 - Returns are calculated between consecutive available observations. The package does not invent missing trading-day values or forward-fill NAV/benchmark series. If a source has missing sessions, the multi-session return is still treated as one observation; callers must validate coverage before applying a daily annualization factor.
 - Rolling/trailing windows use calendar anniversaries (a leap-day anchor maps to February 28) and the closest observed value on or before the anchor date. `trailing_return_details` reports the target anchor, actual observation date, and staleness in days; callers may set `max_staleness_days` to reject stale anchors. CAGR uses 365.25 days per year.
-- Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 52 weekly, 12 monthly, 4 quarterly, or 1 yearly). Common frequencies are checked against median calendar spacing. The report includes median/max interval, long-gap count, and an estimated coverage ratio; these diagnostics do not fill missing observations.
+- Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 52 weekly, 12 monthly, 4 quarterly, 2 semiannual, or 1 yearly). Common frequencies are checked against median calendar spacing. The report includes median/max interval, long-gap count, and an estimated coverage ratio; these diagnostics do not fill missing observations.
 - The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers; the report retains the assumption used.
 - Sharpe and Sortino are undefined when their respective denominators are zero or fewer than two return observations are available; these return `None`, not infinity.
 - Beta and alpha use only exact common return intervals (both start and end dates). No date interpolation or forward-fill is performed. Benchmark output reports the fund/benchmark observation counts and aligned coverage ratio. Beta/alpha are undefined with fewer than two aligned observations or zero benchmark variance.
