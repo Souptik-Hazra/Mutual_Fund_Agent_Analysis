@@ -230,9 +230,9 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         {
                             "type": "portfolio_disclosure",
                             "scheme_code": code,
-                            "source_key": snapshot.source_key,
-                            "canonical_url": snapshot.document_url,
-                            "retrieved_at": snapshot.retrieved_at,
+                            "source_key": getattr(snapshot, "source_key", None),
+                            "canonical_url": getattr(snapshot, "document_url", None),
+                            "retrieved_at": getattr(snapshot, "retrieved_at", None),
                             "verification_status": "unverified",
                             "effective_date": snapshot.effective_date,
                             "content_hash": snapshot.content_hash,
