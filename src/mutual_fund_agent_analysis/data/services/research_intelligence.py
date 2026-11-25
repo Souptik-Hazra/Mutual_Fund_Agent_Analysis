@@ -817,6 +817,7 @@ def store_document(
         chunk_rows.append({
             "text": chunk, "chunk_index": index, "page_number": page_number,
             "scheme_code": scheme_code, "content_hash": digest, "source_key": source_key,
+            "canonical_url": canonical_url,
         })
         session.add(DocumentChunk(
             document_id=document.document_id, chunk_index=index, page_number=page_number,
