@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "0006_common_intelligence_foundation"
+revision = "0006_common_intel"
 down_revision = "0005_benchmark_tri"
 branch_labels = None
 depends_on = None
