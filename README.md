@@ -627,7 +627,7 @@ It accepts dated `Decimal` observations and does not make database, network, or 
 The current API exposes:
 
 - Absolute point-to-point return and date-aware CAGR (365.25-day year).
-- Consecutive-observation returns, 1Y/3Y/5Y rolling returns, trailing returns, and calendar-year returns.
+- Consecutive-observation returns, 1Y/3Y/5Y rolling returns, trailing returns, and completed calendar-year returns (an incomplete latest year is excluded).
 - Annualized sample volatility, downside deviation, Sharpe, and Sortino ratios.
 - Exact-date fund/benchmark return alignment, beta, arithmetic annualized Jensen alpha, and excess return.
 - Maximum drawdown, peak/trough dates, recovery date, trough-to-recovery duration, and underwater duration.
@@ -665,7 +665,7 @@ print(calculate_drawdown(navs))
 - Rolling/trailing windows use calendar anniversaries (a leap-day anchor maps to February 28) and the closest observed value on or before the anchor date. CAGR uses 365.25 days per year.
 - Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 12 for monthly observations).
 - The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers.
-- Sharpe and Sortino are undefined when their respective denominators are zero; these return `None`, not infinity.
+- Sharpe and Sortino are undefined when their respective denominators are zero or fewer than two return observations are available; these return `None`, not infinity.
 - Beta and alpha use only exact common return dates. No date interpolation or forward-fill is performed. Beta/alpha are undefined with fewer than two aligned observations or zero benchmark variance.
 - Jensen alpha is arithmetic and annualized by multiplying the mean periodic CAPM intercept by the periods per year; it is not CAGR alpha. Reported annualized fund and benchmark returns are arithmetic mean returns multiplied by the periods per year, not geometric annualized returns.
 - NAV price returns do not include cash distributions. Growth-option NAVs are the intended input for total-return comparisons; IDCW cash flows require a distribution-aware total-return series or cash-flow methodology.
