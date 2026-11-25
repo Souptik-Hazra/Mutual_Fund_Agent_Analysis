@@ -213,9 +213,12 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         {
                             "type": "portfolio_disclosure",
                             "scheme_code": code,
+                            "source_key": snapshot.source_key,
+                            "canonical_url": snapshot.document_url,
+                            "retrieved_at": snapshot.retrieved_at,
+                            "verification_status": "unverified",
                             "effective_date": snapshot.effective_date,
                             "content_hash": snapshot.content_hash,
-                            "document_url": snapshot.document_url,
                         }
                     )
                 results[intent] = {
@@ -238,9 +241,12 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             {
                                 "type": "portfolio_disclosure",
                                 "scheme_code": code,
+                                "source_key": snapshot.source_key,
+                                "canonical_url": snapshot.document_url,
+                                "retrieved_at": snapshot.retrieved_at,
+                                "verification_status": "unverified",
                                 "effective_date": snapshot.effective_date,
                                 "content_hash": snapshot.content_hash,
-                                "document_url": snapshot.document_url,
                             }
                         )
                 for security in security_data.get("securities", []):
