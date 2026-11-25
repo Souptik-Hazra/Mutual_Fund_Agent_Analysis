@@ -298,15 +298,9 @@ def compare_funds(
         select(MutualFundScheme).where(MutualFundScheme.scheme_code.in_(codes))
     ).all()
     option_by_code = {row.scheme_code: row.option_type for row in scheme_rows}
-    unclassified_codes = [
-        code
-        for code in codes
-        if option_by_code.get(code) in {None, "unknown"}
-    ]
+    unclassified_codes = [code for code in codes if option_by_code.get(code) in {None, "unknown"}]
     known_options = {
-        option_by_code[code]
-        for code in codes
-        if option_by_code.get(code) not in {None, "unknown"}
+        option_by_code[code] for code in codes if option_by_code.get(code) not in {None, "unknown"}
     }
     if len(known_options) > 1:
         raise ValueError(

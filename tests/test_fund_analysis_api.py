@@ -206,7 +206,6 @@ def test_single_fund_endpoint_serializes_analytics_report(monkeypatch) -> None:
     assert response.json()["observation_count"] == 2
 
 
-
 def test_comparison_rejects_growth_and_idcw_option_mismatch(monkeypatch):
     from mutual_fund_agent_analysis.analytics import service as analytics_service
 
