@@ -30,7 +30,9 @@ from mutual_fund_agent_analysis.analytics.series import (
 )
 from mutual_fund_agent_analysis.analytics.service import (
     FundAnalyticsReport,
+    FundComparisonReport,
     analyze_fund,
+    compare_funds,
     load_benchmark_prices,
     load_fund_prices,
 )
@@ -39,6 +41,7 @@ __all__ = [
     "BenchmarkMetrics",
     "DrawdownMetrics",
     "FundAnalyticsReport",
+    "FundComparisonReport",
     "PricePoint",
     "ReturnCoverage",
     "ReturnPoint",
@@ -54,6 +57,7 @@ __all__ = [
     "calculate_risk_metrics",
     "calendar_year_returns",
     "cagr",
+    "compare_funds",
     "load_benchmark_prices",
     "load_fund_prices",
     "normalize_prices",

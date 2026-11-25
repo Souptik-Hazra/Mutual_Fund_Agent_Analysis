@@ -1,4 +1,4 @@
-"""Database-backed orchestration for deterministic single-fund analytics."""
+"""Database-backed orchestration for deterministic single- and multi-fund analytics."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -50,6 +50,18 @@ class FundAnalyticsReport:
     benchmark_source: str | None
     nav_conflict_dates: tuple[date, ...]
     calendar_year_as_of_date: date | None
+
+
+@dataclass(frozen=True, slots=True)
+class FundComparisonReport:
+    """Comparison over an identical set of NAV dates for every selected fund."""
+
+    scheme_codes: tuple[int, ...]
+    observation_count: int
+    start_date: date
+    end_date: date
+    funds: tuple[FundAnalyticsReport, ...]
+    benchmark_code: str | None
 
 
 def load_fund_prices(
@@ -105,26 +117,17 @@ def load_benchmark_prices(
     return [PricePoint(row.observation_date, Decimal(row.tri_value)) for row in rows]
 
 
-def analyze_fund(
-    session: Session,
+def _build_report(
     scheme_code: int,
-    benchmark_code: str | None = None,
-    start_date: date | None = None,
-    end_date: date | None = None,
-    annual_risk_free_rate: Decimal = Decimal("0"),
-    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
-    benchmark_source: str = "niftyindices",
-    allow_nav_conflicts: bool = False,
-    calendar_year_as_of_date: date | None = None,
+    prices: list[PricePoint],
+    conflicts: tuple[date, ...],
+    benchmark_code: str | None,
+    benchmark_source: str,
+    benchmark_prices: list[PricePoint] | None,
+    annual_risk_free_rate: Decimal,
+    periods_per_year: int,
+    calendar_year_as_of_date: date | None,
 ) -> FundAnalyticsReport:
-    """Run deterministic analytics and retain explicit calendar-year completion context."""
-    prices, conflicts = load_fund_prices(
-        session,
-        scheme_code,
-        start_date,
-        end_date,
-        allow_nav_conflicts,
-    )
     if len(prices) < 2:
         raise ValueError("At least two NAV observations are required for fund analytics.")
     if calendar_year_as_of_date is not None and (
@@ -135,16 +138,14 @@ def analyze_fund(
     fund_returns = period_returns(prices)
     benchmark_metrics = None
     if benchmark_code is not None:
-        benchmark_prices = load_benchmark_prices(
-            session,
-            benchmark_code,
-            prices[0].date,
-            prices[-1].date,
-            benchmark_source,
+        benchmark_returns = (
+            period_returns(benchmark_prices)
+            if benchmark_prices is not None and len(benchmark_prices) >= 2
+            else []
         )
         benchmark_metrics = calculate_benchmark_metrics(
             fund_returns,
-            period_returns(benchmark_prices) if len(benchmark_prices) >= 2 else [],
+            benchmark_returns,
             annual_risk_free_rate,
             periods_per_year,
         )
@@ -173,4 +174,122 @@ def analyze_fund(
         benchmark_source=benchmark_source if benchmark_code is not None else None,
         nav_conflict_dates=conflicts,
         calendar_year_as_of_date=calendar_year_as_of_date,
+    )
+
+
+def analyze_fund(
+    session: Session,
+    scheme_code: int,
+    benchmark_code: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    annual_risk_free_rate: Decimal = Decimal("0"),
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
+    benchmark_source: str = "niftyindices",
+    allow_nav_conflicts: bool = False,
+    calendar_year_as_of_date: date | None = None,
+) -> FundAnalyticsReport:
+    """Run deterministic analytics and retain explicit calendar-year completion context."""
+    prices, conflicts = load_fund_prices(
+        session, scheme_code, start_date, end_date, allow_nav_conflicts
+    )
+    benchmark_prices = (
+        load_benchmark_prices(
+            session, benchmark_code, prices[0].date, prices[-1].date, benchmark_source
+        )
+        if benchmark_code is not None
+        else None
+    )
+    return _build_report(
+        scheme_code,
+        prices,
+        conflicts,
+        benchmark_code,
+        benchmark_source,
+        benchmark_prices,
+        annual_risk_free_rate,
+        periods_per_year,
+        calendar_year_as_of_date,
+    )
+
+
+def compare_funds(
+    session: Session,
+    scheme_codes: list[int] | tuple[int, ...],
+    benchmark_code: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    annual_risk_free_rate: Decimal = Decimal("0"),
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
+    benchmark_source: str = "niftyindices",
+    allow_nav_conflicts: bool = False,
+    calendar_year_as_of_date: date | None = None,
+) -> FundComparisonReport:
+    """Compare 2–5 schemes using the exact intersection of their available NAV dates.
+
+    When a benchmark is selected, its available TRI dates are also intersected.
+    No price or benchmark series is forward-filled or interpolated.
+    """
+    codes = tuple(scheme_codes)
+    if not 2 <= len(codes) <= 5:
+        raise ValueError("Comparison requires between two and five distinct schemes.")
+    if len(codes) != len(set(codes)):
+        raise ValueError("Comparison scheme codes must be unique.")
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise ValueError("start_date must be on or before end_date.")
+
+    loaded: dict[int, tuple[list[PricePoint], tuple[date, ...]]] = {
+        code: load_fund_prices(session, code, start_date, end_date, allow_nav_conflicts)
+        for code in codes
+    }
+    common_dates = set(point.date for point in loaded[codes[0]][0])
+    for code in codes[1:]:
+        common_dates.intersection_update(point.date for point in loaded[code][0])
+
+    benchmark_prices: list[PricePoint] | None = None
+    if benchmark_code is not None:
+        earliest = max(points[0].date for points, _ in loaded.values())
+        latest = min(points[-1].date for points, _ in loaded.values())
+        if earliest > latest:
+            raise ValueError("Selected funds have no overlapping date range.")
+        benchmark_prices = load_benchmark_prices(
+            session, benchmark_code, earliest, latest, benchmark_source
+        )
+        common_dates.intersection_update(point.date for point in benchmark_prices)
+
+    ordered_dates = sorted(common_dates)
+    if len(ordered_dates) < 2:
+        raise ValueError("Selected funds do not have at least two common observation dates.")
+    date_set = set(ordered_dates)
+    aligned_benchmark = (
+        [point for point in benchmark_prices if point.date in date_set]
+        if benchmark_prices is not None
+        else None
+    )
+    reports = []
+    for code in codes:
+        source_prices, conflicts = loaded[code]
+        aligned_prices = [point for point in source_prices if point.date in date_set]
+        aligned_conflicts = tuple(day for day in conflicts if day in date_set)
+        reports.append(
+            _build_report(
+                code,
+                aligned_prices,
+                aligned_conflicts,
+                benchmark_code,
+                benchmark_source,
+                aligned_benchmark,
+                annual_risk_free_rate,
+                periods_per_year,
+                calendar_year_as_of_date,
+            )
+        )
+
+    return FundComparisonReport(
+        scheme_codes=codes,
+        observation_count=len(ordered_dates),
+        start_date=ordered_dates[0],
+        end_date=ordered_dates[-1],
+        funds=tuple(reports),
+        benchmark_code=benchmark_code,
     )

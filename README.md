@@ -556,7 +556,7 @@ The central design principle is:
 NAV ingestion supports two adapters behind one provider-neutral contract:
 
 - \`mfapi\`: convenient scheme-specific historical JSON API.
-- \`amfi\`: AMFI's public historical NAV report, fetched in windows of at most 31 days.
+- \`amfi\`: AMFI's public historical NAV report, fetched in windows of at most 7 days.
 
 AMFI history is retrieved from \`https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx\`
 using the \`tp=1\` open-ended-scheme report. The adapter parses the observed eight-column
@@ -676,3 +676,47 @@ Run the analytics tests with:
 ```bash
 pytest tests/test_analytics.py
 ```
+
+
+## Fund analysis API (Phase 3)
+
+The Phase 3 backend exposes a scheme explorer and deterministic single-/multi-fund analysis. All analysis reads canonical reconciled NAVs; unresolved NAV conflicts are rejected unless the caller explicitly opts in. The API never fabricates missing NAV or TRI observations.
+
+### Scheme discovery and explorer
+
+- `GET /api/v1/schemes/discover?q=HDFC` searches MFAPI's scheme directory. This is an upstream lookup and does not write to PostgreSQL.
+- `GET /api/v1/schemes?q=HDFC&fund_house=...&category=...&scheme_type=...&plan=direct&option=growth&limit=25&offset=0` filters the locally ingested scheme catalogue.
+- `GET /api/v1/schemes/{scheme_code}` returns cached scheme metadata and the latest reconciled NAV/status.
+
+The local explorer is intentionally backed by the database, so it only lists schemes already ingested through the NAV sync workflow. Use discovery to identify a scheme code, then ingest its NAV history before requesting analytics.
+
+### Single-fund analysis
+
+`GET /api/v1/schemes/{scheme_code}/analytics` accepts optional `start_date`, `end_date`, `benchmark_code`, `benchmark_source`, `annual_risk_free_rate`, `periods_per_year`, `allow_nav_conflicts`, and `calendar_year_as_of_date` query parameters. The response includes point-to-point return, CAGR, rolling and completed calendar-year returns, risk metrics, drawdown/recovery, benchmark attribution, and data-conflict provenance.
+
+Example:
+
+```http
+GET /api/v1/schemes/125497/analytics?start_date=2020-01-01&benchmark_code=NIFTY%2050&periods_per_year=252
+```
+
+### Multi-fund comparison
+
+`POST /api/v1/schemes/compare` accepts 2–5 unique scheme codes and a shared date range, optional benchmark, annual risk-free rate, annualization frequency, and NAV-conflict policy. Each fund is evaluated on the exact intersection of available NAV dates across all selected funds. When a benchmark is selected, TRI dates are also intersected. The response reports the common date range and observation count. No forward filling, interpolation, or raw-NAV-level comparison is performed.
+
+Example request:
+
+```json
+{
+  "scheme_codes": [125497, 120503],
+  "start_date": "2021-01-01",
+  "end_date": "2026-11-25",
+  "benchmark_code": "NIFTY 50",
+  "annual_risk_free_rate": "0",
+  "periods_per_year": 252
+}
+```
+
+### Phase 3 boundaries
+
+This phase delivers backend API contracts and services, not a React dashboard. Expense ratios, AUM, fund-manager history, holdings, IDCW distribution-aware total returns, SIP/XIRR, and agent-generated narratives are not included because the current normalized database does not yet contain the required source data or workflows. Add those only with their own verified data models and methodology.
