@@ -64,28 +64,28 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
     """Check structured assistant response completeness and evidence coverage."""
     results = response.get("results") or {}
     citations = response.get("citations") or []
-    result_groups = len(results)
-    citation_groups = {
+    expected_types = {
+        "fund": "financial_data",
+        "portfolio": "portfolio_disclosure",
+        "events": "market_event",
+        "social": "social_aggregation",
+        "documents": "document_chunk",
+    }
+    citation_types = {
         citation.get("type") for citation in citations if isinstance(citation, dict)
     }
     missing_groups = [
         group for group in results
-        if group not in citation_groups and not any(
-            citation.get("type") in {
-                "financial_data", "portfolio_disclosure", "market_event",
-                "social_aggregation", "document_chunk",
-            }
-            for citation in citations if isinstance(citation, dict)
-        )
+        if expected_types.get(group) not in citation_types
     ]
+    answer_nonempty = bool(str(response.get("answer", "")).strip())
+    evidence_present = not results or not missing_groups
     return {
-        "answer_nonempty": bool(str(response.get("answer", "")).strip()),
-        "result_group_count": result_groups,
+        "answer_nonempty": answer_nonempty,
+        "result_group_count": len(results),
         "citation_count": len(citations),
         "has_structured_results": isinstance(results, dict),
-        "evidence_present": bool(citations) if result_groups else True,
+        "evidence_present": evidence_present,
         "missing_citation_groups": missing_groups,
-        "grounding_contract_passed": bool(str(response.get("answer", "")).strip())
-        and isinstance(results, dict)
-        and (bool(citations) if result_groups else True),
+        "grounding_contract_passed": answer_nonempty and isinstance(results, dict) and evidence_present,
     }
