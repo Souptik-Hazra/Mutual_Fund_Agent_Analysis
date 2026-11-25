@@ -731,14 +731,14 @@ All endpoints are under `/api/v1/intelligence`:
 
 - `GET /sources`: list registered sources and authority metadata.
 - `POST /entities`, `GET /entities/{entity_id}`: create or retrieve canonical entities.
-- `POST /entities/{entity_id}/aliases`: register a source-aware alias and its validity interval.
-- `POST /entities/{entity_id}/identifiers`: register a unique namespaced identifier.
+- `POST /entities/{entity_id}/aliases`, `GET /entities/{entity_id}/aliases`: register and list source-aware aliases and validity intervals.
+- `POST /entities/{entity_id}/identifiers`, `GET /entities/{entity_id}/identifiers`: register and list unique namespaced identifiers.
 - `POST /evidence`: record source references, publication/retrieval/effective dates, content hash, verification status, and confidence.
 - `POST /entities/{entity_id}/evidence/{evidence_id}`: link evidence to an entity.
-- `GET /entities/{entity_id}/evidence`: retrieve linked evidence.
+- `GET /entities/{entity_id}/evidence?limit=50&offset=0`: retrieve linked evidence with bounded pagination.
 - `POST /entities/{entity_id}/relationships`, `GET /entities/{entity_id}/relationships`: manage typed, temporal links between entities.
 - `POST /resolve`: resolve exact identifiers first and exact aliases second.
 
-The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. It also backfills canonical identities for existing schemes and benchmarks. New NAV and benchmark ingestion maintains those identities and identifiers. NAV ingestion also registers AMC entities and an unverified `managed_by` relationship from the provider's fund-house field. NAV and benchmark sync runs now create hashed evidence references linked to their canonical entities while keeping full provider payloads in the existing audit tables. The original NAV/benchmark schemas and provider-sync audit records remain intact.
+The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. It also backfills canonical identities for existing schemes, AMCs, and benchmarks, including unverified scheme-to-AMC relationships. New NAV and benchmark ingestion maintains those identities and identifiers. NAV ingestion also registers AMC entities and an unverified `managed_by` relationship from the provider's fund-house field. NAV and benchmark sync runs now create hashed evidence references linked to their canonical entities while keeping full provider payloads in the existing audit tables. The original NAV/benchmark schemas and provider-sync audit records remain intact.
 
 See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.md).
