@@ -24,6 +24,7 @@ from mutual_fund_agent_analysis.analytics import (
     trailing_return,
 )
 
+
 def prices(*items: tuple[str, str]) -> list[PricePoint]:
     return [PricePoint(date.fromisoformat(day), Decimal(value)) for day, value in items]
 
