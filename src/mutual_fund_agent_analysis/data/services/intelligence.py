@@ -429,7 +429,7 @@ def create_entity_relationship(
         "metadata_json": metadata or {},
     }
     if existing:
-        if existing.verification_status != "unverified":
+        if verification_status == "unverified" and existing.verification_status != "unverified":
             values["verification_status"] = existing.verification_status
         if evidence_id is None:
             values["evidence_id"] = existing.evidence_id
