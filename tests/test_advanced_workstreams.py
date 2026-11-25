@@ -48,9 +48,7 @@ def test_security_observation_requires_timezone_aware_timestamp():
 
 def test_security_observation_rejects_future_fundamentals_date():
     with pytest.raises(ValidationError, match="cannot be after observed_at"):
-        SecurityObservationInput(
-            **valid_security_observation(fundamentals_as_of="2026-12-01")
-        )
+        SecurityObservationInput(**valid_security_observation(fundamentals_as_of="2026-12-01"))
 
 
 def test_security_router_selects_underlying_security_specialist():
