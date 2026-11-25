@@ -271,7 +271,7 @@ export default function App() {
             </div>
             <p className="muted">Cohort: {data.peer_definition?.scheme_type || "—"} · {data.peer_definition?.plan_type || "—"} · {data.peer_definition?.option_type || "—"} · benchmark {data.benchmark_code || "not selected"}</p>
             <div className="table-wrap"><table><thead><tr><th>Scheme</th><th>CAGR</th><th>Volatility</th><th>Sharpe</th><th>Max drawdown</th><th>Rank</th></tr></thead><tbody>{data.peers?.map((peer) => <tr key={peer.scheme_code}><td>{peer.scheme_name}<small>{peer.scheme_code} · {peer.fund_house || "—"}</small></td><td>{percent(peer.cagr)}</td><td>{percent(peer.annualized_volatility)}</td><td>{money(peer.sharpe_ratio)}</td><td>{percent(peer.maximum_drawdown)}</td><td>{peer.cagr_rank ?? "—"}</td></tr>)}</tbody></table></div>
-            <p className="muted">{data.excluded_peer_count} peer(s) excluded for insufficient NAV history. Rankings are descriptive, not recommendations.</p>
+            <p className="muted">{data.excluded_peer_count} peer(s) excluded for insufficient NAV history. {data.cohort_truncated ? `Ranking is limited to the first ${data.peer_limit} matching peers and is not a complete category-wide rank. ` : ""}Rankings are descriptive, not recommendations.</p>
           </Panel>}
           {data?.items && <Panel title={`Underlying equity status · holdings as of ${data.holdings_as_of}`}>
             <p className="muted">Disclosure status: {data.snapshot_status || "unknown"} · This is the latest available AMC disclosure, not a live fund portfolio.</p>
