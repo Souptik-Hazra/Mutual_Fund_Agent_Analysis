@@ -105,7 +105,7 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
         sum((w * w for w in weights), D("0"))
         if weights and D("99") <= weight_coverage <= D("101")
         else None
-    ))
+    )
     sectors: dict[str, Decimal] = defaultdict(lambda: D("0"))
     assets: dict[str, Decimal] = defaultdict(lambda: D("0"))
     for row in rows:
