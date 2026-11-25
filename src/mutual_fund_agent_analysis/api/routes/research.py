@@ -6,7 +6,7 @@ import hashlib
 import io
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
