@@ -11,7 +11,11 @@ from mutual_fund_agent_analysis.api.schemas.research import (
     SocialPostInput,
 )
 from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
-from mutual_fund_agent_analysis.data.services.research_intelligence import split_document
+from mutual_fund_agent_analysis.data.services.research_intelligence import (
+    source_social_retention_days,
+    split_document,
+)
+from mutual_fund_agent_analysis.models import DataSource
 
 
 def test_document_split_preserves_page_markers_and_overlap():
@@ -81,3 +85,49 @@ def test_event_status_is_explicit_and_validated():
 def test_rss_adapter_rejects_non_allowlisted_host_before_network_call():
     with pytest.raises(ValueError, match="registered source host"):
         fetch_feed("https://example.com/feed.xml", "www.nseindia.com")
+
+
+
+def test_social_retention_uses_source_override_and_global_fallback():
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=False,
+        metadata_json={"retention_days": 12},
+    )
+    assert source_social_retention_days(source, 30) == 12
+
+    source.metadata_json = {}
+    assert source_social_retention_days(source, 30) == 30
+
+
+@pytest.mark.parametrize("value", [0, -1, 366, True, 12.5, "12"])
+def test_social_retention_rejects_invalid_source_override(value):
+    source = DataSource(
+        source_key="x",
+        display_name="X",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=False,
+        metadata_json={"retention_days": value},
+    )
+    with pytest.raises(ValueError, match="retention_days"):
+        source_social_retention_days(source, 30)
+
+
+def test_social_retention_rejects_invalid_global_fallback():
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=False,
+        metadata_json={},
+    )
+    with pytest.raises(ValueError, match="Default social retention"):
+        source_social_retention_days(source, 0)
