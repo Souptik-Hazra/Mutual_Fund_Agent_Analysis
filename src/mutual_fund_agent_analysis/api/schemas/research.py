@@ -134,3 +134,8 @@ class DocumentSearchResponse(BaseModel):
     query: str
     results: list[dict[str, Any]]
     retrieval_mode: str
+
+class DocumentAskRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=1000)
+    scheme_code: int | None = Field(default=None, gt=0)
+    top_k: int = Field(default=6, ge=1, le=15)
