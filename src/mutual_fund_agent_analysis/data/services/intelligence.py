@@ -11,7 +11,13 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.intelligence import (
-    DataSource, EntityAlias, EntityEvidenceLink, EntityIdentifier, EvidenceRecord, ResearchEntity,
+    DataSource,
+    EntityAlias,
+    EntityEvidenceLink,
+    EntityIdentifier,
+    EntityRelationship,
+    EvidenceRecord,
+    ResearchEntity,
 )
 
 ENTITY_TYPES = {
