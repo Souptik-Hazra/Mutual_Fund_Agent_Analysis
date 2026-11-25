@@ -30,6 +30,7 @@ Outputs include top holdings, sector/asset allocation, weight coverage, HHI when
 
 - `market_events` stores event type, status, event date, publication time, source, entity link, evidence link and supersession metadata.
 - `POST /api/v1/events` accepts a normalized event with source/evidence references.
+- `GET /api/v1/events/fund-exposure/{scheme_code}` maps company and sector events to the holdings snapshot effective on the event date.
 - `GET /api/v1/events` filters by date, status and canonical entity.
 - `POST /api/v1/events/collect/{source_key}?feed_url=...` ingests RSS/Atom from an enabled registered source.
 - RSS feed URLs must use HTTPS and the exact host configured in that source's `data_sources.base_url`; redirects are disabled. Configure a verified feed URL for the relevant exchange/regulator source before calling the endpoint.
@@ -42,6 +43,7 @@ Outputs include top holdings, sector/asset allocation, weight coverage, HHI when
 - Reddit and X source rows remain disabled by default. Enable only after reviewing the applicable developer terms, API tier, retention, attribution and deletion requirements. Add approved credentials to environment variables.
 - `POST /api/v1/social/posts` accepts a normalized post and optional externally evaluated sentiment label/score/model.
 - `GET /api/v1/social/analytics` aggregates discussion volume and supplied sentiment scores.
+- `GET /api/v1/social/funds/{scheme_code}/sentiment?start_date=...&end_date=...` time-weights scored company sentiment by the fund holdings effective when each post was published and returns coverage.
 - Collection currently stores identifiers, URLs, hashes, timestamps and engagement metadata, not post text. A configurable expiry (`SOCIAL_RETENTION_DAYS`, default 30 days) is applied to collected posts. Set it to a period permitted by each provider's current terms.
 - The collector does not fabricate sentiment. Collected posts are marked `not_scored`; connect and evaluate a finance sentiment classifier before using sentiment analytics. Do not interpret discussion volume or engagement as credibility or a NAV predictor.
 
