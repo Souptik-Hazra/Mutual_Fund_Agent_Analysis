@@ -125,6 +125,10 @@ def test_comparison_uses_exact_shared_dates() -> None:
     session = Mock()
     session.scalars.return_value.all.side_effect = [
         [
+            SimpleNamespace(scheme_code=100, option_type="growth"),
+            SimpleNamespace(scheme_code=200, option_type="growth"),
+        ],
+        [
             SimpleNamespace(
                 nav_date=date(2024, 1, 1), canonical_nav=Decimal("100"), status="matched"
             ),
@@ -145,10 +149,6 @@ def test_comparison_uses_exact_shared_dates() -> None:
             SimpleNamespace(
                 nav_date=date(2024, 1, 4), canonical_nav=Decimal("60"), status="matched"
             ),
-        ],
-        [
-            SimpleNamespace(scheme_code=100, option_type="growth"),
-            SimpleNamespace(scheme_code=200, option_type="growth"),
         ],
     ]
     result = compare_funds(session, [100, 200])
