@@ -58,21 +58,23 @@ def analyze_category_peers(
         except ValueError as exc:
             excluded.append({"scheme_code": peer.scheme_code, "reason": str(exc)})
             continue
-        ranked.append({
-            "scheme_code": peer.scheme_code,
-            "scheme_name": peer.scheme_name,
-            "fund_house": peer.fund_house,
-            "category": peer.scheme_category,
-            "cagr": report.cagr,
-            "absolute_return": report.absolute_return,
-            "annualized_volatility": report.risk.annualized_volatility,
-            "sharpe_ratio": report.risk.sharpe_ratio,
-            "maximum_drawdown": report.drawdown.maximum_drawdown,
-            "benchmark": asdict(report.benchmark) if report.benchmark else None,
-            "observation_count": report.observation_count,
-            "start_date": report.start_date,
-            "end_date": report.end_date,
-        })
+        ranked.append(
+            {
+                "scheme_code": peer.scheme_code,
+                "scheme_name": peer.scheme_name,
+                "fund_house": peer.fund_house,
+                "category": peer.scheme_category,
+                "cagr": report.cagr,
+                "absolute_return": report.absolute_return,
+                "annualized_volatility": report.risk.annualized_volatility,
+                "sharpe_ratio": report.risk.sharpe_ratio,
+                "maximum_drawdown": report.drawdown.maximum_drawdown,
+                "benchmark": asdict(report.benchmark) if report.benchmark else None,
+                "observation_count": report.observation_count,
+                "start_date": report.start_date,
+                "end_date": report.end_date,
+            }
+        )
     if not any(row["scheme_code"] == scheme_code for row in ranked):
         raise ValueError(
             "Selected scheme has insufficient reconciled NAV history for peer analysis."
@@ -137,7 +139,7 @@ def compare_disclosed_equity(
             select(PortfolioSnapshot)
             .where(
                 PortfolioSnapshot.scheme_code == code,
-                PortfolioSnapshot.status.in_([ "complete", "partial" ]),
+                PortfolioSnapshot.status.in_(["complete", "partial"]),
             )
             .order_by(
                 PortfolioSnapshot.effective_date.desc(),
@@ -159,7 +161,7 @@ def compare_disclosed_equity(
         }
     pairwise = []
     for index, left_code in enumerate(scheme_codes):
-        for right_code in scheme_codes[index + 1:]:
+        for right_code in scheme_codes[index + 1 :]:
             left = holdings_by_fund[left_code]
             right = holdings_by_fund[right_code]
             common = sorted(set(left) & set(right))
@@ -170,21 +172,23 @@ def compare_disclosed_equity(
                 ),
                 Decimal("0"),
             )
-            pairwise.append({
-                "scheme_a": left_code,
-                "scheme_b": right_code,
-                "overlap_pct": overlap,
-                "common_security_count": len(common),
-                "common_securities": [
-                    {
-                        "security_key": key,
-                        "security_name": left[key].security_name,
-                        "weight_a_pct": left[key].weight_pct,
-                        "weight_b_pct": right[key].weight_pct,
-                    }
-                    for key in common
-                ],
-            })
+            pairwise.append(
+                {
+                    "scheme_a": left_code,
+                    "scheme_b": right_code,
+                    "overlap_pct": overlap,
+                    "common_security_count": len(common),
+                    "common_securities": [
+                        {
+                            "security_key": key,
+                            "security_name": left[key].security_name,
+                            "weight_a_pct": left[key].weight_pct,
+                            "weight_b_pct": right[key].weight_pct,
+                        }
+                        for key in common
+                    ],
+                }
+            )
     aggregate = defaultdict(
         lambda: {
             "name": "",
@@ -200,10 +204,7 @@ def compare_disclosed_equity(
             item["equal_weight_exposure_pct"] += Decimal(holding.weight_pct) / Decimal(
                 len(scheme_codes)
             )
-    exposure = [
-        {"security_key": key, **value}
-        for key, value in aggregate.items()
-    ]
+    exposure = [{"security_key": key, **value} for key, value in aggregate.items()]
     exposure.sort(key=lambda row: row["equal_weight_exposure_pct"], reverse=True)
     return {
         "scheme_codes": scheme_codes,
