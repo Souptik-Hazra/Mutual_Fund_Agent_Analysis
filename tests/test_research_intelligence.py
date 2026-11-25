@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -69,7 +69,7 @@ def test_event_status_is_explicit_and_validated():
         title="Quarterly results announced",
         event_type="results",
         status="reported",
-        published_at=datetime(2026, 11, 1, tzinfo=timezone.utc),
+        published_at=datetime(2026, 11, 1, tzinfo=UTC),
     )
     assert event.status == "reported"
     with pytest.raises(ValidationError):
