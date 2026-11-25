@@ -64,4 +64,8 @@ def normalize_returns(points: Iterable[ReturnPoint]) -> list[ReturnPoint]:
     intervals = [(point.start_date, point.date) for point in result]
     if len(intervals) != len(set(intervals)):
         raise ValueError("Duplicate return observation intervals are not allowed.")
-    return sorted(result, key=lambda point: (point.start_date, point.date))
+    ordered = sorted(result, key=lambda point: (point.start_date, point.date))
+    for previous, current in zip(ordered, ordered[1:], strict=False):
+        if current.start_date < previous.date:
+            raise ValueError("Return observation intervals must not overlap.")
+    return ordered
