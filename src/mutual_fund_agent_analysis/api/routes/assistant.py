@@ -41,6 +41,7 @@ def _sse(event: str, payload: dict[str, Any]) -> str:
     encoded = json.dumps(jsonable_encoder(payload), ensure_ascii=False, default=str)
     return f"event: {event}\ndata: {encoded}\n\n"
 
+
 @router.post("/research/stream")
 def stream_research(
     request: ResearchAssistantRequest,
