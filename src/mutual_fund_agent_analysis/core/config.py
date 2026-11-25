@@ -1,11 +1,18 @@
 """Typed application settings loaded from environment variables."""
+
 from functools import lru_cache
 from typing import Literal
+
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 class Settings(BaseSettings):
     """Runtime configuration. Secrets are never logged or exposed in API responses."""
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore")
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
+    )
     app_name: str = "Mutual Fund Agent Analysis"
     app_env: Literal["development", "test", "production"] = "development"
     log_level: str = "INFO"
@@ -32,11 +39,14 @@ class Settings(BaseSettings):
     social_retention_days: int = Field(default=30, ge=1, le=365)
     twelve_data_api_key: SecretStr | None = None
     twelve_data_exchange_access_confirmed: bool = False
+
     @model_validator(mode="after")
     def validate_production_database_url(self) -> "Settings":
         if self.app_env == "production" and "mfa_dev_password" in self.database_url:
             raise ValueError("DATABASE_URL must be explicitly configured for production")
         return self
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
