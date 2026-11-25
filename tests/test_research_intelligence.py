@@ -97,7 +97,8 @@ def test_social_retention_uses_source_override_and_global_fallback():
         authority_tier=5,
         is_official=False,
         enabled=False,
-        metadata_json={"retention_days": 12},
+        terms_url="https://terms.example/reddit",
+        metadata_json={"retention_days": 12, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25"},
     )
     assert source_social_retention_days(source, 30) == 12
 
@@ -392,7 +393,7 @@ def test_social_source_requires_source_specific_evaluated_sentiment_model():
         is_official=False,
         enabled=True,
         terms_url="https://www.redditinc.com/policies",
-        metadata_json={"retention_days": 30, "evaluated_sentiment_models": []},
+        metadata_json={"retention_days": 30, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25", "evaluated_sentiment_models": []},
     )
 
     class StubSession:
@@ -434,7 +435,8 @@ def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(mon
         authority_tier=5,
         is_official=False,
         enabled=True,
-        metadata_json={"retention_days": 30},
+        terms_url="https://terms.example/reddit",
+        metadata_json={"retention_days": 30, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25"},
     )
     monkeypatch.setattr(
         "mutual_fund_agent_analysis.core.config.get_settings",
