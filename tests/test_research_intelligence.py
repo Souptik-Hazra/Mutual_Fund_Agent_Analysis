@@ -31,6 +31,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
 from mutual_fund_agent_analysis.database.base import Base
 from mutual_fund_agent_analysis.models import DataSource, DocumentChunk, ResearchDocument
 
+
 def test_document_split_preserves_page_markers_and_overlap():
     text = "[Page 1]\n" + ("alpha " * 350) + "\n[Page 2]\n" + ("beta " * 350)
     chunks = split_document(text, chunk_size=500, overlap=80)
