@@ -41,7 +41,7 @@ def test_amfi_history_parses_legacy_six_column_layout() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=report)
 
-    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), minimum_report_bytes=0) as client:
         response = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
 
     assert response.meta.scheme_name == "HDFC Top 100 Fund"
@@ -59,7 +59,7 @@ def test_amfi_skips_zero_nav_and_non_data_lines() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=report)
 
-    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), minimum_report_bytes=0) as client:
         response = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 27))
 
     assert len(response.data) == 1
@@ -72,7 +72,7 @@ def test_amfi_rejects_duplicate_dates() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=report)
 
-    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), minimum_report_bytes=0) as client:
         with pytest.raises(ValueError, match="duplicate NAV date"):
             client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
 
@@ -108,7 +108,7 @@ def test_amfi_default_chunk_is_seven_days() -> None:
         assert (chunk_end - chunk_start).days <= 6
         return httpx.Response(200, text=row)
 
-    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), minimum_report_bytes=0) as client:
         client.get_nav_history(125497, date(2024, 10, 1), date(2024, 10, 15))
 
     assert len(requests) == 3
@@ -128,7 +128,7 @@ def test_amfi_retries_http_200_stub_response(monkeypatch) -> None:
         return httpx.Response(200, text=HISTORY_ROW)
 
     monkeypatch.setattr(amfi_module.time, "sleep", sleeps.append)
-    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), minimum_report_bytes=0) as client:
         result = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
 
     assert len(result.data) == 1
