@@ -152,3 +152,66 @@ def test_security_grounding_contract_requires_market_observation_citation():
         {"answer": "Unsupported stock analysis.", "results": {"security": {}}, "citations": []}
     )
     assert missing["grounding_contract_passed"] is False
+
+
+def test_quote_only_observation_does_not_erase_older_fundamentals_or_events():
+    from datetime import date
+    from types import SimpleNamespace
+
+    latest_quote = SimpleNamespace(
+        security_key="INE002A01018",
+        isin="INE002A01018",
+        security_name="Example Industries",
+        symbol="EXAMPLE",
+        exchange="NSE",
+        observed_at=datetime(2026, 11, 25, 10, 0, tzinfo=UTC),
+        observation_id=2,
+        last_price=Decimal("130"),
+        change_pct=Decimal("2"),
+        day_high=None,
+        day_low=None,
+        volume=None,
+        market_status="trading",
+        retrieved_at=datetime(2026, 11, 25, 10, 1, tzinfo=UTC),
+        source_key="quote_provider",
+        source_url="https://example.com/quote",
+        fundamentals_as_of=None,
+        fundamentals_json={},
+        corporate_events_json=[],
+        content_hash="b" * 64,
+    )
+    older_fundamentals = SimpleNamespace(
+        **{
+            **latest_quote.__dict__,
+            "observed_at": datetime(2026, 10, 1, 10, 0, tzinfo=UTC),
+            "observation_id": 1,
+            "last_price": Decimal("120"),
+            "source_key": "fundamentals_provider",
+            "source_url": "https://example.com/fundamentals",
+            "fundamentals_as_of": date(2026, 9, 30),
+            "fundamentals_json": {"pe_ratio": "22.5"},
+            "corporate_events_json": [{"title": "Board meeting", "verification_status": "unverified"}],
+            "content_hash": "a" * 64,
+        }
+    )
+
+    class SequentialSession:
+        def __init__(self):
+            self.calls = 0
+
+        def scalars(self, _statement):
+            self.calls += 1
+            rows = [latest_quote, older_fundamentals] if self.calls == 1 else []
+
+            class Result:
+                def all(self):
+                    return rows
+
+            return Result()
+
+    result = security_profile(SequentialSession(), "INE002A01018")
+
+    assert result["market"]["last_price"] == Decimal("130")
+    assert result["fundamentals"]["metrics"]["pe_ratio"] == "22.5"
+    assert result["fundamentals"]["source_key"] == "fundamentals_provider"
+    assert result["corporate_events"][0]["title"] == "Board meeting"
