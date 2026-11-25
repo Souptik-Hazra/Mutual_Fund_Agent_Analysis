@@ -582,12 +582,14 @@ def test_rss_event_date_is_not_inferred_from_publication_date():
 
 def test_security_observation_source_url_must_match_registered_https_host():
     source = SimpleNamespace(base_url="https://www.nseindia.com")
-    assert _validate_registered_source_url(
-        source, "https://www.nseindia.com/api/filings"
-    ) == "https://www.nseindia.com/api/filings"
-    assert _validate_registered_source_url(
-        source, "https://feeds.nseindia.com/announcements"
-    ) == "https://feeds.nseindia.com/announcements"
+    assert (
+        _validate_registered_source_url(source, "https://www.nseindia.com/api/filings")
+        == "https://www.nseindia.com/api/filings"
+    )
+    assert (
+        _validate_registered_source_url(source, "https://feeds.nseindia.com/announcements")
+        == "https://feeds.nseindia.com/announcements"
+    )
     for candidate in (
         "http://www.nseindia.com/filings",
         "https://nseindia.com.attacker.example/filings",
