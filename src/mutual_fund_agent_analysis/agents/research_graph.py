@@ -308,7 +308,8 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
                     HumanMessage(
                         content=(
                             f"Question: {request.question}\nRetrieved evidence JSON: {evidence}\n"
-                            f"Available source reference IDs: {json.dumps(citations, default=str)}\n"
+                            "Available source reference IDs: "
+                            f"{json.dumps(citations, default=str)}\n"
                             "Summarize the evidence concisely. Do not fabricate citation IDs."
                         )
                     ),
