@@ -1,6 +1,7 @@
 """Offline routing and response-grounding evaluation; no LLM or network calls."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -103,8 +104,6 @@ def evaluate_evidence_quality(
     require_citations: bool | None = None,
 ) -> dict[str, Any]:
     """Measure citation provenance, verification and temporal anomalies."""
-    from datetime import datetime, timezone
-
     citations = response.get("citations") or []
     if not isinstance(citations, list):
         citations = []
@@ -118,7 +117,7 @@ def evaluate_evidence_quality(
 
     def parse_timestamp(value: Any) -> datetime:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
 
     for citation in citations:
         if not isinstance(citation, dict):

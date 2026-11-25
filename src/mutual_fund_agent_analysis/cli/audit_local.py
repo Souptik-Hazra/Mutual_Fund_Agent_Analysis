@@ -151,7 +151,11 @@ def _probe_amfi(code: int, start: date, end: date) -> dict[str, Any]:
         "scheme_code": response.meta.scheme_code,
         "scheme_name": response.meta.scheme_name,
         "observation_count": len(response.data),
-        "raw_chunks": len(response.raw_payload.get("chunks", [])) if response.raw_payload else 0,
+        "raw_chunks": (
+            len(response.raw_payload.get("chunks", []))
+            if response.raw_payload
+            else 0
+        ),
     }
 
 
@@ -170,7 +174,11 @@ def _probe_nifty(code: str, start: date, end: date) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Audit local mutual-fund data coverage.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/local-coverage-audit.json"))
-    parser.add_argument("--live", action="store_true", help="Make bounded, read-only provider requests.")
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Make bounded, read-only provider requests.",
+    )
     parser.add_argument("--scheme-code", type=int)
     parser.add_argument("--benchmark-code")
     parser.add_argument("--start-date", type=date.fromisoformat)

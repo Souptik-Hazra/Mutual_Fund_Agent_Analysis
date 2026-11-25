@@ -4,8 +4,11 @@ Revision ID: 0009_metadata_and_distributions
 Revises: 0008_investor_ledger
 """
 
-from alembic import op
+# ruff: noqa: E501
+# fmt: off
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0009_metadata_and_distributions"

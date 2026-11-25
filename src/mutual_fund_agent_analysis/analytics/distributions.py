@@ -1,9 +1,9 @@
 """Conservative reinvested-IDCW total-return calculation."""
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, localcontext
-from collections.abc import Mapping, Sequence
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,11 +40,17 @@ def reinvested_distribution_index(
     if dates != sorted(set(dates)):
         raise ValueError("NAV observations must have unique, ascending dates.")
     if any(not value.is_finite() or value <= 0 for _, value in ordered):
-        raise ValueError("NAV values must be finite and greater than zero.")
+        raise ValueError(
+            "NAV values must be finite and greater than zero."
+        )
     if any(day not in set(dates[1:]) for day in distributions):
-        raise ValueError("Each distribution ex-date must have an NAV observation after the base date.")
+        raise ValueError(
+            "Each distribution ex-date must have an NAV observation after the base date."
+        )
     if any(not amount.is_finite() or amount < 0 for amount in distributions.values()):
-        raise ValueError("Distribution amounts must be finite and non-negative.")
+        raise ValueError(
+            "Distribution amounts must be finite and non-negative."
+        )
 
     output: list[TotalReturnPoint] = []
     nav_index = base_value

@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -14,7 +15,6 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
-    JSON,
     Numeric,
     String,
     UniqueConstraint,
