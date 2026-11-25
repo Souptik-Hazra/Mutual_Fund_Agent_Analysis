@@ -154,7 +154,7 @@ def upsert_nav_response(
         amc = create_entity(session, "amc", metadata.fund_house)
         add_entity_alias(
             session, amc.entity_id, metadata.fund_house,
-            alias_type="provider_name", is_primary=True,
+            alias_type="provider_name", source_key=source_key, is_primary=True,
         )
         create_entity_relationship(
             session,
