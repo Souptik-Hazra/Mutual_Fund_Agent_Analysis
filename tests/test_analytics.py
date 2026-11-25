@@ -257,3 +257,13 @@ def test_risk_metrics_require_two_observations_for_ratios() -> None:
     assert result.annualized_downside_deviation is None
     assert result.sharpe_ratio is None
     assert result.sortino_ratio is None
+
+
+
+def test_drawdown_recovery_is_none_when_series_never_declines() -> None:
+    result = calculate_drawdown(
+        prices(("2024-01-01", "100"), ("2024-01-02", "110"), ("2024-01-03", "120"))
+    )
+    assert result.maximum_drawdown == Decimal("0")
+    assert result.recovery_date is None
+    assert result.recovery_duration_days is None
