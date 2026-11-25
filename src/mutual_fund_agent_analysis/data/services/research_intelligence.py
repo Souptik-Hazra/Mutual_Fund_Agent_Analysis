@@ -347,6 +347,8 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             if evidence.content_hash != digest:
                 evidence.verification_status = "unverified"
             evidence.content_hash = digest
+            evidence.retrieved_at = datetime.now(timezone.utc)
+            evidence.verification_status = "unverified"
         event_type = "other"
         title_lower = item["title"].lower()
         for term, category in (
@@ -363,7 +365,7 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
         values = {
             "evidence_id": evidence.evidence_id, "title": item["title"],
             "summary": item["summary"], "event_type": event_type, "status": "reported",
-            "event_date": item["published_at"].date() if item["published_at"] else None,
+            "event_date": item.get("event_date"),
             "published_at": item["published_at"], "canonical_url": item["url"],
             "metadata_json": {"ingestion": "rss_atom", "feed_url": feed_url},
         }
@@ -450,24 +452,63 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
 
 
 def create_social_post(session: Session, payload: Any) -> SocialPost:
+    """Persist only minimal social metadata under an enforced source retention policy."""
+    from datetime import timedelta
+    from mutual_fund_agent_analysis.core.config import get_settings
+
     source = session.get(DataSource, payload.source_key)
-    if source is None or not source.enabled:
-        raise ValueError("Social source is not registered and enabled. Enable it only after API/terms review.")
+    if source is None or not source.enabled or source.source_type != "social":
+        raise ValueError("Social source is not registered, enabled, and classified as social.")
     if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
         raise ValueError("Unknown related_entity_id.")
-    if payload.expires_at <= datetime.now(timezone.utc):
+
+    now = datetime.now(timezone.utc)
+    expires_at = payload.expires_at
+    if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+        raise ValueError("Social post expiry must include a timezone.")
+    expires_at = expires_at.astimezone(timezone.utc)
+    if expires_at <= now:
         raise ValueError("Social post expiry must be in the future.")
+    retention_days = source_social_retention_days(source, get_settings().social_retention_days)
+    if expires_at > now + timedelta(days=retention_days, minutes=2):
+        raise ValueError("Social post expiry exceeds the source-specific retention policy.")
+
+    digest = str(payload.content_hash).lower()
+    if not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Social content_hash must be a SHA-256 hexadecimal digest.")
+    if payload.canonical_url:
+        from urllib.parse import urlparse
+        parsed_url = urlparse(str(payload.canonical_url))
+        allowed_hosts = {"reddit.com", "www.reddit.com"} if payload.source_key == "reddit" else {"x.com", "www.x.com", "twitter.com"}
+        if parsed_url.scheme != "https" or parsed_url.hostname not in allowed_hosts:
+            raise ValueError("Social canonical_url must be an HTTPS URL on the matching provider domain.")
+
+    scored_fields = (payload.sentiment_label, payload.sentiment_score, payload.sentiment_model)
+    if any(value is not None for value in scored_fields) and not all(value is not None for value in scored_fields):
+        raise ValueError("Sentiment label, score, and evaluated model must be supplied together.")
+
     row = session.scalar(select(SocialPost).where(
         SocialPost.source_key == payload.source_key, SocialPost.external_id == payload.external_id
     ))
+    metadata = payload.metadata if isinstance(payload.metadata, dict) else {}
+    # Never retain post text, excerpts, or provider payloads in JSON metadata.
+    metadata = {
+        key: value for key, value in metadata.items()
+        if str(key).casefold() not in {"text", "full_text", "text_excerpt", "excerpt", "raw_content", "content", "body"}
+    }
     values = {
         "related_entity_id": payload.related_entity_id,
         "canonical_url": str(payload.canonical_url) if payload.canonical_url else None,
-        "text_excerpt": None, "content_hash": payload.content_hash,
-        "published_at": payload.published_at, "engagement_count": payload.engagement_count,
-        "sentiment_label": payload.sentiment_label, "sentiment_score": payload.sentiment_score,
-        "sentiment_model": payload.sentiment_model, "is_spam": payload.is_spam,
-        "expires_at": payload.expires_at, "metadata_json": payload.metadata,
+        "text_excerpt": None,
+        "content_hash": digest,
+        "published_at": payload.published_at,
+        "engagement_count": payload.engagement_count,
+        "sentiment_label": payload.sentiment_label,
+        "sentiment_score": payload.sentiment_score,
+        "sentiment_model": payload.sentiment_model,
+        "is_spam": payload.is_spam,
+        "expires_at": expires_at,
+        "metadata_json": metadata,
     }
     if row is None:
         row = SocialPost(source_key=payload.source_key, external_id=payload.external_id, **values)
@@ -478,7 +519,6 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     session.commit()
     session.refresh(row)
     return row
-
 
 def social_analytics(session: Session, entity_id: int | None, start: date | None, end: date | None) -> dict[str, Any]:
     stmt = select(SocialPost).where(SocialPost.is_spam.is_(False)).where(
