@@ -128,8 +128,7 @@ def analyze_fund(
     if len(prices) < 2:
         raise ValueError("At least two NAV observations are required for fund analytics.")
     if calendar_year_as_of_date is not None and (
-        type(calendar_year_as_of_date) is not date
-        or calendar_year_as_of_date < prices[-1].date
+        type(calendar_year_as_of_date) is not date or calendar_year_as_of_date < prices[-1].date
     ):
         raise ValueError("calendar_year_as_of_date must be a date on or after the latest NAV.")
 
