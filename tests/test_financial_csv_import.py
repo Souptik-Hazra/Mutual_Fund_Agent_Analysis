@@ -109,7 +109,6 @@ def test_csv_reader_accepts_utf8_bom_and_rejects_missing_file(tmp_path):
         read_csv_rows(tmp_path / "missing.csv")
 
 
-
 def _import_session():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
