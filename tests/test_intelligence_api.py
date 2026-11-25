@@ -11,6 +11,7 @@ def test_intelligence_routes_are_registered():
     assert "/api/v1/intelligence/sources" in paths
     assert "/api/v1/intelligence/entities" in paths
     assert "/api/v1/intelligence/resolve" in paths
+    assert "/api/v1/intelligence/entities/{entity_id}/relationships" in paths
 
 
 def test_entity_create_request_rejects_blank_name():
