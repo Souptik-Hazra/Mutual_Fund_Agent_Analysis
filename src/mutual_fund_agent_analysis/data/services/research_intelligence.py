@@ -282,7 +282,7 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     values = {
         "related_entity_id": payload.related_entity_id,
         "canonical_url": str(payload.canonical_url) if payload.canonical_url else None,
-        "text_excerpt": payload.text_excerpt, "content_hash": payload.content_hash,
+        "text_excerpt": None, "content_hash": payload.content_hash,
         "published_at": payload.published_at, "engagement_count": payload.engagement_count,
         "sentiment_label": payload.sentiment_label, "sentiment_score": payload.sentiment_score,
         "sentiment_model": payload.sentiment_model, "is_spam": payload.is_spam,
@@ -300,7 +300,9 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
 
 
 def social_analytics(session: Session, entity_id: int | None, start: date | None, end: date | None) -> dict[str, Any]:
-    stmt = select(SocialPost).where(SocialPost.is_spam.is_(False))
+    stmt = select(SocialPost).where(SocialPost.is_spam.is_(False)).where(
+        (SocialPost.expires_at.is_(None)) | (SocialPost.expires_at > datetime.now().astimezone())
+    )
     if entity_id:
         stmt = stmt.where(SocialPost.related_entity_id == entity_id)
     if start:
