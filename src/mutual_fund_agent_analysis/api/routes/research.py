@@ -542,6 +542,7 @@ def list_events(
         )
     return {"count": len(items), "offset": offset, "limit": limit, "items": items}
 
+
 @router.post("/social/posts", status_code=status.HTTP_201_CREATED)
 def ingest_social_post(
     payload: SocialPostInput, session: Annotated[Session, Depends(get_db)]
