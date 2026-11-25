@@ -554,6 +554,14 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     source = session.get(DataSource, payload.source_key)
     if source is None or not source.enabled or source.source_type != "social":
         raise ValueError("Social source is not registered, enabled, and classified as social.")
+    source_metadata = source.metadata_json if isinstance(source.metadata_json, dict) else {}
+    if (
+        not source.terms_url
+        or source_metadata.get("terms_reviewed") is not True
+        or source_metadata.get("access_confirmed") is not True
+        or not source_metadata.get("reviewed_at")
+    ):
+        raise ValueError("Social source requires a recorded terms review, confirmed API access, and terms URL.")
     if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
         raise ValueError("Unknown related_entity_id.")
 
@@ -586,7 +594,7 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     if any(value is not None for value in scored_fields) and not all(value is not None for value in scored_fields):
         raise ValueError("Sentiment label, score, and evaluated model must be supplied together.")
     if payload.sentiment_model is not None:
-        approved_models = (source.metadata_json or {}).get("evaluated_sentiment_models", [])
+        approved_models = source_metadata.get("evaluated_sentiment_models", [])
         if not isinstance(approved_models, list) or payload.sentiment_model not in approved_models:
             raise ValueError("Sentiment model is not registered as evaluated for this source.")
 
