@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -227,7 +227,8 @@ def ingest_security_observation(
     session: Annotated[Session, Depends(get_db)],
 ) -> dict:
     """Persist a dated, source-attributed security observation without treating it as verified."""
-    source = session.get(DataSource, payload.source_key)
+    source_key = payload.source_key.strip()
+    source = session.get(DataSource, source_key)
     if source is None or not source.enabled:
         raise HTTPException(
             status_code=422, detail="source_key must reference an enabled data source."
@@ -246,7 +247,7 @@ def ingest_security_observation(
         security_name=payload.security_name.strip(),
         symbol=payload.symbol.strip().upper() if payload.symbol else None,
         exchange=payload.exchange.strip().upper() if payload.exchange else None,
-        source_key=payload.source_key,
+        source_key=source_key,
         source_url=source_url,
         observed_at=payload.observed_at,
         fundamentals_as_of=payload.fundamentals_as_of,
@@ -263,7 +264,7 @@ def ingest_security_observation(
         corporate_events_json=[
             {
                 **event.model_dump(mode="json"),
-                "source_key": payload.source_key,
+                "source_key": source_key,
                 "verification_status": "unverified",
             }
             for event in payload.corporate_events
@@ -299,7 +300,7 @@ def get_security_intelligence(
     security_key: str,
     session: Annotated[Session, Depends(get_db)],
     as_of: date | None = None,
-    scheme_codes: list[int] | None = None,
+    scheme_codes: Annotated[list[int] | None, Query(max_length=20)] = None,
 ) -> dict:
     """Return dated stock intelligence and matching positions from the latest AMC disclosures."""
     try:
