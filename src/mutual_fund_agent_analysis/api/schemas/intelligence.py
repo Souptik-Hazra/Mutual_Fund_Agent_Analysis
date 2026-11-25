@@ -190,3 +190,43 @@ class EntityResolveResponse(BaseModel):
     matched_by: str | None
     entity: EntityResponse | None
     candidates: list[EntityResponse]
+
+
+class EntityRelationshipCreateRequest(BaseModel):
+    to_entity_id: int = Field(gt=0)
+    relation_type: str = Field(min_length=2, max_length=50)
+    source_key: str | None = Field(default=None, max_length=60)
+    evidence_id: int | None = Field(default=None, gt=0)
+    valid_from: date | None = None
+    valid_to: date | None = None
+    confidence: Decimal | None = Field(default=None, ge=0, le=1)
+    verification_status: Literal[
+        "unverified", "corroborated", "verified", "disputed", "retracted"
+    ] = "unverified"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.valid_from and self.valid_to and self.valid_to < self.valid_from:
+            raise ValueError("valid_to must be on or after valid_from.")
+        if not self.relation_type.strip():
+            raise ValueError("relation_type cannot be blank.")
+        return self
+
+
+class EntityRelationshipResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    relationship_id: int
+    from_entity_id: int
+    to_entity_id: int
+    relation_type: str
+    source_key: str | None
+    evidence_id: int | None
+    valid_from: date | None
+    valid_to: date | None
+    confidence: Decimal | None
+    verification_status: str
+    metadata_json: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
