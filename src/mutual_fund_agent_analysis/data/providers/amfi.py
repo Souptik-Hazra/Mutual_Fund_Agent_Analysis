@@ -101,8 +101,7 @@ class AMFIClient:
             and line.strip().split(";", 1)[0].isdigit()
             for line in report.splitlines()
         )
-        explicit_empty = "no data" in normalized or "no records" in normalized
-        return not has_data_row and not explicit_empty
+        return not has_data_row
 
     @staticmethod
     def _retry_delay(attempt: int, retry_after: str | None = None) -> float:
