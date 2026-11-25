@@ -199,7 +199,7 @@ def test_assistant_sse_encoder_emits_valid_named_json_event():
     from mutual_fund_agent_analysis.api.routes.assistant import _sse
 
     frame = _sse("progress", {"node": "plan", "intents": ["fund"]})
-    assert frame.startswith("event: progress\\n")
+    assert frame.startswith("event: progress\n")
     payload_line = next(line for line in frame.splitlines() if line.startswith("data: "))
     payload = json.loads(payload_line.removeprefix("data: "))
     assert payload["node"] == "plan"
