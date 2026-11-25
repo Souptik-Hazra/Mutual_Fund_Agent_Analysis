@@ -1,0 +1,362 @@
+"""Deterministic portfolio, event, social, and document intelligence services."""
+from __future__ import annotations
+
+import hashlib
+import re
+from collections import defaultdict
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from mutual_fund_agent_analysis.models import (
+    DataSource, DocumentChunk, EvidenceRecord, MarketEvent, MutualFundScheme,
+    PortfolioHolding, PortfolioSnapshot, ResearchDocument, ResearchEntity, SocialPost,
+)
+
+D = Decimal
+
+
+def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapshot:
+    """Idempotently persist one disclosure version and its normalized positions."""
+    if session.get(MutualFundScheme, payload.scheme_code) is None:
+        raise ValueError("Unknown scheme_code; ingest the scheme catalogue first.")
+    source = session.get(DataSource, payload.source_key)
+    if source is None or not source.enabled:
+        raise ValueError("Unknown or disabled source_key.")
+    if payload.related_entity_id if hasattr(payload, "related_entity_id") else False:
+        pass
+    existing = session.scalar(select(PortfolioSnapshot).where(
+        PortfolioSnapshot.scheme_code == payload.scheme_code,
+        PortfolioSnapshot.effective_date == payload.effective_date,
+        PortfolioSnapshot.source_key == payload.source_key,
+        PortfolioSnapshot.content_hash == payload.content_hash,
+    ))
+    if existing:
+        return existing
+    snapshot = PortfolioSnapshot(
+        scheme_code=payload.scheme_code, source_key=payload.source_key,
+        effective_date=payload.effective_date, published_at=payload.published_at,
+        document_url=str(payload.document_url) if payload.document_url else None,
+        content_hash=payload.content_hash, total_market_value=payload.total_market_value,
+        status=payload.status, metadata_json=payload.metadata,
+    )
+    session.add(snapshot)
+    session.flush()
+    for item in payload.holdings:
+        session.add(PortfolioHolding(
+            snapshot_id=snapshot.snapshot_id, security_key=item.security_key.strip().upper(),
+            isin=item.isin.strip().upper() if item.isin else None,
+            security_name=item.security_name.strip(), sector=item.sector,
+            asset_class=item.asset_class, quantity=item.quantity, market_value=item.market_value,
+            weight_pct=item.weight_pct, currency=item.currency.upper(), metadata_json=item.metadata,
+        ))
+    session.commit()
+    session.refresh(snapshot)
+    return snapshot
+
+
+def latest_snapshot(session: Session, scheme_code: int, as_of: date | None = None) -> PortfolioSnapshot | None:
+    stmt = select(PortfolioSnapshot).where(PortfolioSnapshot.scheme_code == scheme_code)
+    if as_of:
+        stmt = stmt.where(PortfolioSnapshot.effective_date <= as_of)
+    return session.scalar(stmt.order_by(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc()).limit(1))
+
+
+def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str, Any]:
+    rows = session.scalars(select(PortfolioHolding).where(
+        PortfolioHolding.snapshot_id == snapshot.snapshot_id
+    ).order_by(PortfolioHolding.weight_pct.desc().nullslast(), PortfolioHolding.security_name)).all()
+    known = [r for r in rows if r.weight_pct is not None]
+    weights = [r.weight_pct / D("100") for r in known]
+    hhi = sum((w * w for w in weights), D("0")) if weights else None
+    sectors: dict[str, Decimal] = defaultdict(lambda: D("0"))
+    assets: dict[str, Decimal] = defaultdict(lambda: D("0"))
+    for row in rows:
+        if row.weight_pct is not None:
+            assets[row.asset_class] += row.weight_pct
+            sectors[row.sector or "Unclassified"] += row.weight_pct
+    return {
+        "snapshot_id": snapshot.snapshot_id, "scheme_code": snapshot.scheme_code,
+        "source_key": snapshot.source_key, "effective_date": snapshot.effective_date,
+        "published_at": snapshot.published_at, "status": snapshot.status,
+        "content_hash": snapshot.content_hash, "total_market_value": snapshot.total_market_value,
+        "holdings_count": len(rows), "holdings": [{
+            "security_key": r.security_key, "isin": r.isin, "security_name": r.security_name,
+            "sector": r.sector, "asset_class": r.asset_class, "quantity": r.quantity,
+            "market_value": r.market_value, "weight_pct": r.weight_pct, "currency": r.currency,
+        } for r in rows],
+        "top_5": [{"security_key": r.security_key, "name": r.security_name, "weight_pct": r.weight_pct} for r in known[:5]],
+        "top_10": [{"security_key": r.security_key, "name": r.security_name, "weight_pct": r.weight_pct} for r in known[:10]],
+        "sector_allocation": [{"sector": k, "weight_pct": v} for k, v in sorted(sectors.items(), key=lambda x: x[1], reverse=True)],
+        "asset_allocation": [{"asset_class": k, "weight_pct": v} for k, v in sorted(assets.items(), key=lambda x: x[1], reverse=True)],
+        "hhi_0_to_1": hhi,
+        "weight_coverage_pct": sum((r.weight_pct for r in known), D("0")),
+        "disclosure_url": snapshot.document_url,
+    }
+
+
+def portfolio_history(session: Session, scheme_code: int) -> list[dict[str, Any]]:
+    rows = session.scalars(select(PortfolioSnapshot).where(
+        PortfolioSnapshot.scheme_code == scheme_code
+    ).order_by(PortfolioSnapshot.effective_date.desc())).all()
+    result = []
+    for snap in rows:
+        holdings = session.scalars(select(PortfolioHolding).where(
+            PortfolioHolding.snapshot_id == snap.snapshot_id
+        )).all()
+        result.append({
+            "snapshot_id": snap.snapshot_id, "effective_date": snap.effective_date,
+            "published_at": snap.published_at, "source_key": snap.source_key,
+            "status": snap.status, "holding_count": len(holdings),
+            "weight_coverage_pct": sum((h.weight_pct or D("0") for h in holdings), D("0")),
+        })
+    return result
+
+
+def compare_portfolios(session: Session, scheme_codes: list[int]) -> dict[str, Any]:
+    snapshots = {code: latest_snapshot(session, code) for code in scheme_codes}
+    if any(value is None for value in snapshots.values()):
+        missing = [code for code, value in snapshots.items() if value is None]
+        raise ValueError(f"No portfolio disclosure available for scheme(s): {missing}")
+    maps: dict[int, dict[str, Decimal]] = {}
+    names: dict[str, str] = {}
+    for code, snap in snapshots.items():
+        rows = session.scalars(select(PortfolioHolding).where(
+            PortfolioHolding.snapshot_id == snap.snapshot_id
+        )).all()
+        maps[code] = {}
+        for row in rows:
+            if row.weight_pct is not None:
+                maps[code][row.security_key] = row.weight_pct
+                names[row.security_key] = row.security_name
+    pairwise = []
+    for i, left in enumerate(scheme_codes):
+        for right in scheme_codes[i + 1:]:
+            common = set(maps[left]) & set(maps[right])
+            overlap = sum((min(maps[left][key], maps[right][key]) for key in common), D("0"))
+            pairwise.append({
+                "scheme_a": left, "scheme_b": right, "common_holding_count": len(common),
+                "overlap_pct": overlap, "common_securities": [
+                    {"security_key": key, "name": names[key], "weight_a": maps[left][key],
+                     "weight_b": maps[right][key]} for key in sorted(common)
+                ],
+            })
+    return {"as_of": {str(code): snapshots[code].effective_date for code in scheme_codes}, "pairwise_overlap": pairwise}
+
+
+def security_fund_exposure(session: Session, security_key: str) -> dict[str, Any]:
+    key = security_key.strip().upper()
+    latest_ids = select(
+        PortfolioSnapshot.scheme_code,
+        func.max(PortfolioSnapshot.effective_date).label("latest_date"),
+    ).group_by(PortfolioSnapshot.scheme_code).subquery()
+    stmt = (
+        select(PortfolioHolding, PortfolioSnapshot, MutualFundScheme)
+        .join(PortfolioSnapshot, PortfolioSnapshot.snapshot_id == PortfolioHolding.snapshot_id)
+        .join(MutualFundScheme, MutualFundScheme.scheme_code == PortfolioSnapshot.scheme_code)
+        .join(latest_ids, (latest_ids.c.scheme_code == PortfolioSnapshot.scheme_code) &
+              (latest_ids.c.latest_date == PortfolioSnapshot.effective_date))
+        .where(PortfolioHolding.security_key == key)
+        .order_by(PortfolioHolding.weight_pct.desc().nullslast())
+    )
+    rows = session.execute(stmt).all()
+    funds = [{
+        "scheme_code": h.scheme_code, "scheme_name": s.scheme_name,
+        "effective_date": p.effective_date, "weight_pct": h.weight_pct,
+        "market_value": h.market_value, "source_key": p.source_key,
+    } for h, p, s in rows]
+    return {"security_key": key, "funds": funds, "total_fund_count": len(funds)}
+
+
+def create_market_event(session: Session, payload: Any) -> MarketEvent:
+    if session.get(DataSource, payload.source_key) is None:
+        raise ValueError("Unknown source_key.")
+    if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
+        raise ValueError("Unknown related_entity_id.")
+    if payload.evidence_id and session.get(EvidenceRecord, payload.evidence_id) is None:
+        raise ValueError("Unknown evidence_id.")
+    event = MarketEvent(
+        source_key=payload.source_key, external_id=payload.external_id,
+        related_entity_id=payload.related_entity_id, evidence_id=payload.evidence_id,
+        title=payload.title, summary=payload.summary, event_type=payload.event_type,
+        status=payload.status, event_date=payload.event_date, published_at=payload.published_at,
+        canonical_url=str(payload.canonical_url) if payload.canonical_url else None,
+        confidence=payload.confidence, metadata_json=payload.metadata,
+    )
+    if payload.external_id:
+        existing = session.scalar(select(MarketEvent).where(
+            MarketEvent.source_key == payload.source_key,
+            MarketEvent.external_id == payload.external_id,
+        ))
+        if existing:
+            for field in ("title", "summary", "event_type", "status", "event_date", "published_at", "canonical_url", "confidence", "metadata_json"):
+                setattr(existing, field, getattr(event, field))
+            session.commit()
+            session.refresh(existing)
+            return existing
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return event
+
+
+def create_social_post(session: Session, payload: Any) -> SocialPost:
+    source = session.get(DataSource, payload.source_key)
+    if source is None or not source.enabled:
+        raise ValueError("Social source is not registered and enabled. Enable it only after API/terms review.")
+    if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
+        raise ValueError("Unknown related_entity_id.")
+    row = session.scalar(select(SocialPost).where(
+        SocialPost.source_key == payload.source_key, SocialPost.external_id == payload.external_id
+    ))
+    values = {
+        "related_entity_id": payload.related_entity_id,
+        "canonical_url": str(payload.canonical_url) if payload.canonical_url else None,
+        "text_excerpt": payload.text_excerpt, "content_hash": payload.content_hash,
+        "published_at": payload.published_at, "engagement_count": payload.engagement_count,
+        "sentiment_label": payload.sentiment_label, "sentiment_score": payload.sentiment_score,
+        "sentiment_model": payload.sentiment_model, "is_spam": payload.is_spam,
+        "expires_at": payload.expires_at, "metadata_json": payload.metadata,
+    }
+    if row is None:
+        row = SocialPost(source_key=payload.source_key, external_id=payload.external_id, **values)
+        session.add(row)
+    else:
+        for key, value in values.items():
+            setattr(row, key, value)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def social_analytics(session: Session, entity_id: int | None, start: date | None, end: date | None) -> dict[str, Any]:
+    stmt = select(SocialPost).where(SocialPost.is_spam.is_(False))
+    if entity_id:
+        stmt = stmt.where(SocialPost.related_entity_id == entity_id)
+    if start:
+        stmt = stmt.where(func.date(SocialPost.published_at) >= start)
+    if end:
+        stmt = stmt.where(func.date(SocialPost.published_at) <= end)
+    rows = session.scalars(stmt.order_by(SocialPost.published_at)).all()
+    distribution = {"positive": 0, "neutral": 0, "negative": 0}
+    total_score = D("0")
+    scored = 0
+    daily: dict[str, int] = defaultdict(int)
+    for row in rows:
+        if row.sentiment_label:
+            distribution[row.sentiment_label] += 1
+        if row.sentiment_score is not None:
+            total_score += row.sentiment_score
+            scored += 1
+        if row.published_at:
+            daily[row.published_at.date().isoformat()] += 1
+    return {
+        "from_date": start, "to_date": end, "post_count": len(rows),
+        "coverage_entity_count": len({r.related_entity_id for r in rows if r.related_entity_id}),
+        "average_sentiment": total_score / scored if scored else None,
+        "sentiment_distribution": distribution,
+        "discussion_volume_by_day": [{"date": k, "count": v} for k, v in sorted(daily.items())],
+    }
+
+
+def extract_pdf_text(content: bytes) -> tuple[str, int]:
+    """Extract text and page count from a PDF; scanned PDFs require OCR and are rejected."""
+    import fitz
+    document = fitz.open(stream=content, filetype="pdf")
+    pages = [page.get_text("text").strip() for page in document]
+    text = "\n\n".join(f"[Page {index + 1}]\n{value}" for index, value in enumerate(pages) if value)
+    if len(text.strip()) < 80:
+        raise ValueError("PDF has no usable embedded text; OCR is required for scanned documents.")
+    return text, len(document)
+
+
+def split_document(text: str, chunk_size: int = 1200, overlap: int = 180) -> list[str]:
+    """Create stable overlapping chunks while retaining page markers in extracted text."""
+    normalized = re.sub(r"\n{3,}", "\n\n", text).strip()
+    if not normalized:
+        return []
+    chunks, start = [], 0
+    while start < len(normalized):
+        end = min(start + chunk_size, len(normalized))
+        if end < len(normalized):
+            boundary = normalized.rfind("\n", start + chunk_size // 2, end)
+            if boundary > start:
+                end = boundary
+        chunks.append(normalized[start:end].strip())
+        if end >= len(normalized):
+            break
+        start = max(end - overlap, start + 1)
+    return [chunk for chunk in chunks if chunk]
+
+
+def store_document(
+    session: Session, *, source_key: str, title: str, media_type: str,
+    content: bytes, extracted_text: str, page_count: int,
+    scheme_code: int | None = None, related_entity_id: int | None = None,
+    published_at: datetime | None = None, effective_date: date | None = None,
+    canonical_url: str | None = None, original_filename: str | None = None,
+) -> ResearchDocument:
+    source = session.get(DataSource, source_key)
+    if source is None or not source.enabled:
+        raise ValueError("Unknown or disabled document source.")
+    if scheme_code and session.get(MutualFundScheme, scheme_code) is None:
+        raise ValueError("Unknown scheme_code.")
+    if related_entity_id and session.get(ResearchEntity, related_entity_id) is None:
+        raise ValueError("Unknown related_entity_id.")
+    digest = hashlib.sha256(content).hexdigest()
+    existing = session.scalar(select(ResearchDocument).where(
+        ResearchDocument.source_key == source_key, ResearchDocument.content_hash == digest
+    ))
+    if existing:
+        return existing
+    document = ResearchDocument(
+        source_key=source_key, scheme_code=scheme_code, related_entity_id=related_entity_id,
+        title=title, original_filename=original_filename, media_type=media_type,
+        canonical_url=canonical_url, content_hash=digest, published_at=published_at,
+        effective_date=effective_date, extracted_text=extracted_text, page_count=page_count,
+    )
+    session.add(document)
+    session.flush()
+    for index, chunk in enumerate(split_document(extracted_text)):
+        session.add(DocumentChunk(
+            document_id=document.document_id, chunk_index=index, chunk_text=chunk,
+            token_estimate=max(1, len(chunk) // 4),
+            metadata_json={"source_title": title, "content_hash": digest},
+        ))
+    session.commit()
+    session.refresh(document)
+    return document
+
+
+def search_documents(session: Session, query: str, scheme_code: int | None, limit: int = 8) -> dict[str, Any]:
+    terms = [term for term in re.findall(r"[a-zA-Z0-9]{3,}", query.lower())[:12]]
+    if not terms:
+        raise ValueError("Query must contain at least one searchable term.")
+    stmt = select(DocumentChunk, ResearchDocument).join(
+        ResearchDocument, ResearchDocument.document_id == DocumentChunk.document_id
+    )
+    if scheme_code:
+        stmt = stmt.where(ResearchDocument.scheme_code == scheme_code)
+    conditions = [func.lower(DocumentChunk.chunk_text).contains(term) for term in terms]
+    from sqlalchemy import or_
+    stmt = stmt.where(or_(*conditions))
+    rows = session.execute(stmt.limit(min(max(limit * 4, limit), 100))).all()
+    scored = []
+    for chunk, doc in rows:
+        haystack = chunk.chunk_text.lower()
+        score = sum(haystack.count(term) for term in terms)
+        scored.append((score, chunk, doc))
+    scored.sort(key=lambda item: (item[0], item[1].chunk_id), reverse=True)
+    results = [{
+        "score": score, "document_id": doc.document_id, "title": doc.title,
+        "source_key": doc.source_key, "content_hash": doc.content_hash,
+        "effective_date": doc.effective_date, "published_at": doc.published_at,
+        "page_number": chunk.page_number, "chunk_index": chunk.chunk_index,
+        "text": chunk.chunk_text,
+        "citation": {"document_id": doc.document_id, "chunk_id": chunk.chunk_id,
+                     "title": doc.title, "content_hash": doc.content_hash},
+    } for score, chunk, doc in scored[:limit]]
+    return {"query": query, "results": results, "retrieval_mode": "lexical_fallback"}
