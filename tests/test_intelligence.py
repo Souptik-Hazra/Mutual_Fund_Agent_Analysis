@@ -27,10 +27,18 @@ def session():
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(
         engine,
-        tables=[Base.metadata.tables[name] for name in (
-            "data_sources", "research_entities", "entity_aliases", "entity_identifiers",
-            "evidence_records", "entity_evidence_links", "entity_relationships",
-        )],
+        tables=[
+            Base.metadata.tables[name]
+            for name in (
+                "data_sources",
+                "research_entities",
+                "entity_aliases",
+                "entity_identifiers",
+                "evidence_records",
+                "entity_evidence_links",
+                "entity_relationships",
+            )
+        ],
     )
     with Session(engine) as db:
         db.add_all([
