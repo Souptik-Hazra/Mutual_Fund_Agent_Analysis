@@ -56,9 +56,7 @@ def load_fund_prices(
     allow_nav_conflicts: bool = False,
 ) -> tuple[list[PricePoint], tuple[date, ...]]:
     """Load canonical reconciled NAVs; conflicts are rejected unless explicitly allowed."""
-    statement = select(NavReconciliation).where(
-        NavReconciliation.scheme_code == scheme_code
-    )
+    statement = select(NavReconciliation).where(NavReconciliation.scheme_code == scheme_code)
     if start_date is not None:
         statement = statement.where(NavReconciliation.nav_date >= start_date)
     if end_date is not None:
