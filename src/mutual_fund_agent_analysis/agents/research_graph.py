@@ -205,7 +205,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     )
                 results[intent] = {
                     "snapshots": snapshots,
-                    "comparison": _jsonable(compare_portfolios(session, codes))
+                    "comparison": _jsonable(compare_portfolios(session, codes, request.end_date))
                     if len(codes) > 1 and len(snapshots) == len(codes)
                     else None,
                 }
@@ -234,22 +234,34 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "note": "Supply scheme_codes to map events to fund exposure."
                     }
             elif intent == "social":
-                if codes and request.start_date and request.end_date:
-                    results[intent] = [
-                        _jsonable(
-                            fund_social_sentiment(
-                                session, code, request.start_date, request.end_date
-                            )
+                if codes:
+                    if not request.start_date or not request.end_date:
+                        raise ValueError(
+                            "Fund-specific social sentiment requires both start_date and end_date."
                         )
-                        for code in codes
-                    ]
+                    results[intent] = {
+                        "scope": "fund_specific",
+                        "funds": [
+                            _jsonable(
+                                fund_social_sentiment(
+                                    session, code, request.start_date, request.end_date
+                                )
+                            )
+                            for code in codes
+                        ],
+                    }
                 else:
-                    results[intent] = _jsonable(
-                        social_analytics(session, None, request.start_date, request.end_date)
-                    )
+                    results[intent] = {
+                        "scope": "global",
+                        "aggregation": _jsonable(
+                            social_analytics(session, None, request.start_date, request.end_date)
+                        ),
+                    }
                 citations.append(
                     {
                         "type": "social_aggregation",
+                        "scope": "fund_specific" if codes else "global",
+                        "scheme_codes": codes or None,
                         "period_start": request.start_date,
                         "period_end": request.end_date,
                         "note": "Experimental discussion data; not a return predictor.",
