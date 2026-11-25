@@ -24,8 +24,8 @@ from mutual_fund_agent_analysis.database.session import (
 from mutual_fund_agent_analysis.models import (
     BenchmarkIndex,
     BenchmarkObservation,
-    DataSource,
     BenchmarkSyncRun,
+    DataSource,
     EntityAlias,
     EntityEvidenceLink,
     EntityIdentifier,
