@@ -224,6 +224,7 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         )
         assert manager_relationship is not None
         assert manager_relationship.verification_status == "unverified"
+        assert manager_relationship.evidence_id is not None
         sync_evidence = session.scalars(
             select(EvidenceRecord).where(
                 EvidenceRecord.source_key.in_(["amfi", "mfapi"]),
