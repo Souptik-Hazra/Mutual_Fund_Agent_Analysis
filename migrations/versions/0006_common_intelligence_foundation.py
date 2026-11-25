@@ -114,9 +114,12 @@ def upgrade() -> None:
     op.create_table(
         "entity_identifiers",
         Column("identifier_id", BigInteger(), Identity(), primary_key=True),
-        Column("entity_id", BigInteger(), ForeignKey(
-            "research_entities.entity_id", ondelete="CASCADE"
-        ), nullable=False),
+        Column(
+            "entity_id",
+            BigInteger(),
+            ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         Column("namespace", String(60), nullable=False),
         Column("identifier_value", String(160), nullable=False),
         Column("normalized_value", String(160), nullable=False),
