@@ -1,10 +1,9 @@
 """Contract tests for the AMFI historical NAV adapter."""
 
-from datetime import date, datetime
-from decimal import Decimal
-
 import httpx
 import pytest
+from datetime import date, datetime
+from decimal import Decimal
 
 from mutual_fund_agent_analysis.data.providers.amfi import AMFIClient
 
