@@ -260,7 +260,10 @@ class EntityRelationship(Base):
             name="ck_entity_relationships_confidence",
         ),
         UniqueConstraint(
-            "from_entity_id", "to_entity_id", "relation_type", "valid_from",
+            "from_entity_id",
+            "to_entity_id",
+            "relation_type",
+            "valid_from",
             name="uq_entity_relationship_identity",
         ),
         Index("ix_entity_relationships_from", "from_entity_id", "relation_type"),
