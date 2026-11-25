@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -210,6 +210,10 @@ class SecurityObservationInput(BaseModel):
             raise ValueError("last_price cannot exceed day_high.")
         if self.day_low is not None and self.last_price < self.day_low:
             raise ValueError("last_price cannot be below day_low.")
+        if self.observed_at > datetime.now(UTC) + timedelta(minutes=5):
+            raise ValueError("observed_at cannot be more than five minutes in the future.")
+        if self.fundamentals and self.fundamentals_as_of is None:
+            raise ValueError("fundamentals_as_of is required when fundamental metrics are supplied.")
         if self.fundamentals_as_of and self.fundamentals_as_of > self.observed_at.date():
             raise ValueError("fundamentals_as_of cannot be after observed_at.")
         return self
