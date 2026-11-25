@@ -17,22 +17,14 @@ from mutual_fund_agent_analysis.analytics.investor import (
     InvestorTransactionInput,
     calculate_investor_returns,
 )
+from mutual_fund_agent_analysis.analytics.series import period_returns
 from mutual_fund_agent_analysis.analytics.service import (
     analyze_fund,
     compare_funds,
     load_benchmark_prices,
     load_fund_prices,
 )
-from mutual_fund_agent_analysis.analytics.series import period_returns
 from mutual_fund_agent_analysis.analytics.sip import simulate_monthly_sip
-from mutual_fund_agent_analysis.api.schemas.investor import (
-    ActiveRiskResponse,
-    InvestorReturnsResponse,
-    InvestorTransactionCreate,
-    InvestorTransactionResponse,
-    SipSimulationRequest,
-    SipSimulationResponse,
-)
 from mutual_fund_agent_analysis.api.schemas.funds import (
     FundAnalyticsResponse,
     FundComparisonRequest,
@@ -41,6 +33,14 @@ from mutual_fund_agent_analysis.api.schemas.funds import (
     SchemeDiscoveryResponse,
     SchemePage,
     SchemeSummary,
+)
+from mutual_fund_agent_analysis.api.schemas.investor import (
+    ActiveRiskResponse,
+    InvestorReturnsResponse,
+    InvestorTransactionCreate,
+    InvestorTransactionResponse,
+    SipSimulationRequest,
+    SipSimulationResponse,
 )
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
 from mutual_fund_agent_analysis.database.session import get_db
