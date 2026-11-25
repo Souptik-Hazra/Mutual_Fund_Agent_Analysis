@@ -17,7 +17,7 @@ Create one canonical identity and provenance layer shared by fund, portfolio, ma
 - NAV and benchmark ingestion creates or updates canonical entities and stable identifiers; NAV ingestion also registers AMC entities and an explicitly unverified managed_by relationship from provider fund-house metadata.
 - Each new NAV and benchmark sync run is hashed, recorded as evidence metadata, and linked to its canonical scheme or benchmark entity. The original raw provider response remains in the existing append-only sync audit table; evidence records do not duplicate full provider payloads.
 - Migration backfills identities for already-ingested schemes, AMCs, and benchmarks, including unverified scheme-to-AMC relationships.
-- REST API for source listing, entity creation/read, alias and identifier registration/listing, evidence creation, entity-evidence linking, paginated evidence listing, relationship management, and identity resolution.
+- REST API for source listing, entity creation/search/read, alias and identifier registration/listing, evidence creation, entity-evidence linking, paginated evidence listing, relationship management, and identity resolution.
 
 ## API
 
@@ -27,6 +27,7 @@ All endpoints are under /api/v1/intelligence.
 |---|---|---|
 | GET | /sources | List registered sources and authority metadata |
 | POST | /entities | Create or retrieve a canonical entity |
+| GET | /entities?entity_type=scheme&q=HDFC&limit=50&offset=0 | Search and list canonical entities |
 | GET | /entities/{entity_id} | Read one entity |
 | POST | /entities/{entity_id}/aliases | Add or update a temporal alias |
 | GET | /entities/{entity_id}/aliases | List aliases for an entity |
