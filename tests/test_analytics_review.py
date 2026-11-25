@@ -179,3 +179,14 @@ def test_fund_loader_rejects_reversed_date_range_before_query() -> None:
             end_date=date(2024, 1, 1),
         )
     session.scalars.assert_not_called()
+
+
+def test_sample_volatility_matches_independent_two_point_reference() -> None:
+    observations = [
+        ReturnPoint(date(2024, 1, 2), Decimal("0.01"), date(2024, 1, 1)),
+        ReturnPoint(date(2024, 1, 3), Decimal("-0.01"), date(2024, 1, 2)),
+    ]
+    result = calculate_risk_metrics(observations, periods_per_year=252)
+    expected = Decimal("0.0504").sqrt()
+    assert result.annualized_volatility == pytest.approx(expected, abs=Decimal("1e-25"))
+    assert result.sharpe_ratio == Decimal("0")
