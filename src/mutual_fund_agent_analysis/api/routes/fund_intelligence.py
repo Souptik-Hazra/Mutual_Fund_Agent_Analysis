@@ -143,7 +143,10 @@ def _market_payload(row: SecurityMarketObservation | None) -> dict:
         signals.append(
             {
                 "field": "promoter_pledge_pct",
-                "message": "Promoter shares are reported as pledged; review the disclosed percentage.",
+                "message": (
+                    "Promoter shares are reported as pledged; "
+                    "review the disclosed percentage."
+                ),
             }
         )
     if row.market_status == "halted":
