@@ -204,3 +204,14 @@ def test_assistant_sse_encoder_emits_valid_named_json_event():
     payload = json.loads(payload_line.removeprefix("data: "))
     assert payload["node"] == "plan"
     assert payload["intents"] == ["fund"]
+
+
+
+def test_langgraph_compiles_with_explicit_start_and_end_nodes():
+    from mutual_fund_agent_analysis.agents.research_graph import build_research_graph
+
+    graph = build_research_graph()
+    nodes = graph.get_graph().nodes
+    assert "__start__" in nodes
+    assert "__end__" in nodes
+    assert {"plan", "specialist_agents", "synthesize"}.issubset(nodes)
