@@ -557,12 +557,28 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     row = session.scalar(select(SocialPost).where(
         SocialPost.source_key == payload.source_key, SocialPost.external_id == payload.external_id
     ))
-    metadata = payload.metadata if isinstance(payload.metadata, dict) else {}
-    # Never retain post text, excerpts, or provider payloads in JSON metadata.
-    metadata = {
-        key: value for key, value in metadata.items()
-        if str(key).casefold() not in {"text", "full_text", "text_excerpt", "excerpt", "raw_content", "content", "body"}
-    }
+    supplied_metadata = payload.metadata if isinstance(payload.metadata, dict) else {}
+    # Provider-specific allowlists prevent nested raw post text or unrelated payload fields
+    # from being retained accidentally.
+    if payload.source_key == "reddit":
+        metadata = {
+            key: supplied_metadata[key]
+            for key in ("subreddit", "kind")
+            if key in supplied_metadata and isinstance(supplied_metadata[key], (str, int, bool))
+        }
+    else:
+        metrics = supplied_metadata.get("public_metrics")
+        safe_metrics = (
+            {key: int(value) for key, value in metrics.items()
+             if key in {"like_count", "reply_count", "retweet_count", "quote_count"}
+             and isinstance(value, int) and not isinstance(value, bool) and value >= 0}
+            if isinstance(metrics, dict) else {}
+        )
+        metadata = {}
+        if isinstance(supplied_metadata.get("lang"), str):
+            metadata["lang"] = supplied_metadata["lang"][:12]
+        if safe_metrics:
+            metadata["public_metrics"] = safe_metrics
     values = {
         "related_entity_id": payload.related_entity_id,
         "canonical_url": str(payload.canonical_url) if payload.canonical_url else None,
