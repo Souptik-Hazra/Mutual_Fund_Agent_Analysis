@@ -117,6 +117,10 @@ def add_entity_alias(
         raise ValueError("alias_type must be a 1–30 character lowercase identifier.")
     if source_key and session.get(DataSource, source_key) is None:
         raise ValueError(f"Unknown source_key: {source_key!r}.")
+    if is_primary:
+        session.query(EntityAlias).filter(
+            EntityAlias.entity_id == entity_id, EntityAlias.is_primary.is_(True)
+        ).update({"is_primary": False}, synchronize_session="fetch")
     existing = session.scalar(
         select(EntityAlias).where(
             EntityAlias.entity_id == entity_id,
@@ -131,10 +135,6 @@ def add_entity_alias(
         existing.valid_to = valid_to
         existing.is_primary = is_primary
         return existing
-    if is_primary:
-        session.query(EntityAlias).filter(
-            EntityAlias.entity_id == entity_id, EntityAlias.is_primary.is_(True)
-        ).update({"is_primary": False}, synchronize_session="fetch")
     record = EntityAlias(
         entity_id=entity.entity_id, alias=alias.strip(), normalized_alias=normalized,
         alias_type=normalized_alias_type, source_key=source_key, valid_from=valid_from,
@@ -166,6 +166,12 @@ def add_entity_identifier(
         raise ValueError("identifier_value must not exceed 160 normalized characters.")
     if source_key and session.get(DataSource, source_key) is None:
         raise ValueError(f"Unknown source_key: {source_key!r}.")
+    if is_primary:
+        session.query(EntityIdentifier).filter(
+            EntityIdentifier.entity_id == entity_id,
+            EntityIdentifier.namespace == normalized_namespace,
+            EntityIdentifier.is_primary.is_(True),
+        ).update({"is_primary": False}, synchronize_session="fetch")
     existing = session.scalar(
         select(EntityIdentifier).where(
             EntityIdentifier.namespace == normalized_namespace,
@@ -423,6 +429,14 @@ def create_entity_relationship(
         "metadata_json": metadata or {},
     }
     if existing:
+        if existing.verification_status != "unverified":
+            values["verification_status"] = existing.verification_status
+        if evidence_id is None:
+            values["evidence_id"] = existing.evidence_id
+        if source_key is None:
+            values["source_key"] = existing.source_key
+        if confidence is None:
+            values["confidence"] = existing.confidence
         for key, value in values.items():
             setattr(existing, key, value)
         return existing
