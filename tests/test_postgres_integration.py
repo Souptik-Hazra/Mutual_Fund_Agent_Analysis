@@ -101,6 +101,21 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "benchmark_observations" in tables
     assert "benchmark_sync_runs" in tables
     assert "alembic_version" in tables
+    with Session(migrated_postgres) as session:
+        scheme_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+                EntityIdentifier.normalized_value == "880001",
+            )
+        )
+        benchmark_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "BENCHMARK_CODE",
+                EntityIdentifier.normalized_value == "MIGRATION_TEST",
+            )
+        )
+        assert scheme_identifier is not None
+        assert benchmark_identifier is not None
     source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
     check_database_connection()
