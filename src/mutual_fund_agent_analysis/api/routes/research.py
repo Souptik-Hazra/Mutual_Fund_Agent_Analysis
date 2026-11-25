@@ -47,6 +47,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models import (
     DataSource,
+    EvidenceRecord,
     MarketEvent,
     MarketEventRevision,
     PortfolioSnapshot,
