@@ -647,12 +647,20 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     session.refresh(row)
     return row
 
-def social_analytics(session: Session, entity_id: int | None, start: date | None, end: date | None) -> dict[str, Any]:
+def social_analytics(
+    session: Session,
+    entity_id: int | None,
+    start: date | None,
+    end: date | None,
+    source_key: str | None = None,
+) -> dict[str, Any]:
     stmt = select(SocialPost).where(SocialPost.is_spam.is_(False)).where(
         (SocialPost.expires_at.is_(None)) | (SocialPost.expires_at > datetime.now(timezone.utc))
     )
     if entity_id:
         stmt = stmt.where(SocialPost.related_entity_id == entity_id)
+    if source_key:
+        stmt = stmt.where(SocialPost.source_key == source_key)
     if start:
         stmt = stmt.where(func.date(SocialPost.published_at) >= start)
     if end:
