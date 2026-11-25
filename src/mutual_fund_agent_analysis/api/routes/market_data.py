@@ -232,6 +232,12 @@ def ingest_security_observation(
         raise HTTPException(
             status_code=422, detail="source_key must reference an enabled data source."
         )
+    source_url = str(payload.source_url) if payload.source_url else source.base_url
+    if not source_url:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide source_url or register a base_url for the enabled source.",
+        )
     canonical = payload.model_dump(mode="json")
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
     row = SecurityMarketObservation(
@@ -241,7 +247,7 @@ def ingest_security_observation(
         symbol=payload.symbol.strip().upper() if payload.symbol else None,
         exchange=payload.exchange.strip().upper() if payload.exchange else None,
         source_key=payload.source_key,
-        source_url=str(payload.source_url) if payload.source_url else None,
+        source_url=source_url,
         observed_at=payload.observed_at,
         fundamentals_as_of=payload.fundamentals_as_of,
         last_price=payload.last_price,
