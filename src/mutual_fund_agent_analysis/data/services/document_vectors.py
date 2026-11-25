@@ -31,6 +31,8 @@ def index_chunks(document_id: int, title: str, chunks: list[dict[str, Any]]) -> 
                     "page_number": row.get("page_number"),
                     "scheme_code": row.get("scheme_code"),
                     "content_hash": row["content_hash"],
+                    "source_key": row.get("source_key"),
+                    "canonical_url": row.get("canonical_url"),
                 },
             )
             for row in chunks
@@ -79,11 +81,15 @@ def search_chunks(query: str, limit: int, scheme_code: int | None = None) -> lis
                 "title": metadata.get("title"),
                 "page_number": metadata.get("page_number"),
                 "chunk_index": metadata.get("chunk_index"),
+                "source_key": metadata.get("source_key"),
+                "canonical_url": metadata.get("canonical_url"),
                 "text": document.page_content,
                 "citation": {
                     "document_id": metadata.get("document_id"),
                     "title": metadata.get("title"),
                     "content_hash": metadata.get("content_hash"),
+                    "source_key": metadata.get("source_key"),
+                    "canonical_url": metadata.get("canonical_url"),
                 },
             })
             if len(results) >= limit:
