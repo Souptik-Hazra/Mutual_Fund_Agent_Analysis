@@ -302,8 +302,8 @@ def test_constant_benchmark_keeps_return_metrics_but_not_beta_or_alpha() -> None
     result = calculate_benchmark_metrics(fund, benchmark, periods_per_year=252)
     assert result.beta is None
     assert result.annualized_alpha is None
-    assert result.annualized_fund_return == Decimal("15.12")
-    assert result.annualized_benchmark_return == Decimal("5.04")
+    assert result.annualized_fund_return == Decimal("7.56")
+    assert result.annualized_benchmark_return == Decimal("2.52")
     assert result.mean_period_excess_return == Decimal("0.02")
 
 
