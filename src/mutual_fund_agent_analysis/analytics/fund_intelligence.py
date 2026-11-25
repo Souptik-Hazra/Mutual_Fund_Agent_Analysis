@@ -5,7 +5,7 @@ from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.service import analyze_fund
@@ -25,6 +25,8 @@ def analyze_category_peers(
     """Rank funds only against same-category, same-plan and same-option peers."""
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be on or before end_date.")
+    if not 1 <= max_peers <= 500:
+        raise ValueError("max_peers must be between 1 and 500.")
     selected = session.get(MutualFundScheme, scheme_code)
     if selected is None:
         raise ValueError("Scheme not found in the local catalogue.")
@@ -32,15 +34,18 @@ def analyze_category_peers(
         raise ValueError("Scheme category is missing; category-relative ranking is unavailable.")
     filters = [
         MutualFundScheme.scheme_category == selected.scheme_category,
+        MutualFundScheme.scheme_type == selected.scheme_type,
         MutualFundScheme.plan_type == selected.plan_type,
         MutualFundScheme.option_type == selected.option_type,
     ]
-    if selected.scheme_type:
-        filters.append(MutualFundScheme.scheme_type == selected.scheme_type)
     peers = session.scalars(
         select(MutualFundScheme)
         .where(*filters)
-        .order_by(MutualFundScheme.scheme_name, MutualFundScheme.scheme_code)
+        .order_by(
+            case((MutualFundScheme.scheme_code == scheme_code, 0), else_=1),
+            MutualFundScheme.scheme_name,
+            MutualFundScheme.scheme_code,
+        )
         .limit(max_peers)
     ).all()
     ranked = []
@@ -178,6 +183,12 @@ def compare_disclosed_equity(
                     "scheme_b": right_code,
                     "overlap_pct": overlap,
                     "common_security_count": len(common),
+                    "disclosure_status_a": snapshots[left_code].status,
+                    "disclosure_status_b": snapshots[right_code].status,
+                    "overlap_is_lower_bound": (
+                        snapshots[left_code].status != "complete"
+                        or snapshots[right_code].status != "complete"
+                    ),
                     "common_securities": [
                         {
                             "security_key": key,
@@ -221,12 +232,19 @@ def compare_disclosed_equity(
         ],
         "pairwise_overlap": pairwise,
         "aggregated_equity_exposure": exposure,
+        "has_partial_disclosures": any(
+            snapshot.status != "complete" for snapshot in snapshots.values()
+        ),
+        "aggregate_exposure_is_incomplete": any(
+            snapshot.status != "complete" for snapshot in snapshots.values()
+        ),
         "aggregation_basis": (
             "Equal allocation to each selected fund; not the user's actual portfolio weights."
         ),
         "disclosure_warning": (
             "Holdings are the latest available AMC disclosures, not real-time positions. "
-            "Different funds may have different disclosure dates. Securities without reported "
-            "weights are excluded from weighted overlap and aggregate exposure."
+            "Different funds may have different disclosure dates. Partial disclosures make "
+            "overlap and aggregate exposure incomplete and potentially understated. Securities "
+            "without reported weights are excluded from weighted calculations."
         ),
     }
