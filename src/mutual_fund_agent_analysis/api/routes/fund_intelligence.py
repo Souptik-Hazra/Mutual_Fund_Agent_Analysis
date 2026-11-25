@@ -69,9 +69,16 @@ class MarketObservationRequest(BaseModel):
     @classmethod
     def validate_fundamentals(cls, value: dict[str, Decimal | None]):
         allowed = {
-            "market_cap", "pe_ratio", "pb_ratio", "roe_pct", "debt_to_equity",
-            "revenue_growth_pct", "profit_growth_pct", "promoter_pledge_pct",
-            "dividend_yield_pct", "book_value",
+            "market_cap",
+            "pe_ratio",
+            "pb_ratio",
+            "roe_pct",
+            "debt_to_equity",
+            "revenue_growth_pct",
+            "profit_growth_pct",
+            "promoter_pledge_pct",
+            "dividend_yield_pct",
+            "book_value",
         }
         unknown = set(value) - allowed
         if unknown:
@@ -133,15 +140,19 @@ def _market_payload(row: SecurityMarketObservation | None) -> dict:
             signals.append({"field": key, "message": message})
     pledged = fundamentals.get("promoter_pledge_pct")
     if pledged is not None and Decimal(str(pledged)) > 0:
-        signals.append({
-            "field": "promoter_pledge_pct",
-            "message": "Promoter shares are reported as pledged; review the disclosed percentage.",
-        })
+        signals.append(
+            {
+                "field": "promoter_pledge_pct",
+                "message": "Promoter shares are reported as pledged; review the disclosed percentage.",
+            }
+        )
     if row.market_status == "halted":
-        signals.append({
-            "field": "market_status",
-            "message": "The provider reports the security as halted.",
-        })
+        signals.append(
+            {
+                "field": "market_status",
+                "message": "The provider reports the security as halted.",
+            }
+        )
     return {
         "availability": "available",
         "freshness": freshness,
@@ -237,23 +248,27 @@ def fund_equity_status(
             status_code=404, detail="No portfolio disclosure found for this scheme."
         )
     holdings = session.scalars(
-        select(PortfolioHolding).where(
+        select(PortfolioHolding)
+        .where(
             PortfolioHolding.snapshot_id == snapshot.snapshot_id,
             PortfolioHolding.asset_class == "equity",
-        ).order_by(PortfolioHolding.weight_pct.desc().nullslast())
+        )
+        .order_by(PortfolioHolding.weight_pct.desc().nullslast())
     ).all()
     items = []
     for holding in holdings:
         market = _latest_market_observation(session, holding.security_key, holding.isin)
-        items.append({
-            "security_key": holding.security_key,
+        items.append(
+            {
+                "security_key": holding.security_key,
             "isin": holding.isin,
             "security_name": holding.security_name,
             "sector": holding.sector,
             "disclosed_weight_pct": holding.weight_pct,
             "holding_asset_class": holding.asset_class,
             **_market_payload(market),
-        })
+            }
+        )
     return {
         "scheme_code": scheme_code,
         "snapshot_id": snapshot.snapshot_id,
