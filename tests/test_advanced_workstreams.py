@@ -34,7 +34,9 @@ def test_security_observation_accepts_dated_source_metrics():
 
 def test_security_observation_rejects_unknown_fundamental_fields():
     with pytest.raises(ValidationError, match="Unsupported fundamental metric"):
-        SecurityObservationInput(**valid_security_observation(fundamentals={"forecast_return": "0.3"}))
+        SecurityObservationInput(
+            **valid_security_observation(fundamentals={"forecast_return": "0.3"})
+        )
 
 
 def test_security_observation_requires_timezone_aware_timestamp():
