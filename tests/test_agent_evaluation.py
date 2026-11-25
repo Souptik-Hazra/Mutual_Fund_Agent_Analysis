@@ -4,7 +4,6 @@ from pathlib import Path
 
 from mutual_fund_agent_analysis.evaluation.runner import evaluate_routing, load_and_evaluate
 
-
 def test_routing_evaluator_reports_exact_accuracy_and_per_intent_scores():
     result = evaluate_routing(
         [
@@ -24,11 +23,9 @@ def test_routing_evaluator_reports_exact_accuracy_and_per_intent_scores():
     assert result["exact_match_accuracy"] == 1.0
     assert result["per_intent"]["fund"]["recall"] == 1.0
 
-
 def test_reviewed_routing_dataset_meets_minimum_accuracy():
     result = load_and_evaluate(Path("evaluation/research-routing.json"))
     assert result["exact_match_accuracy"] >= 0.90
-
 
 def test_retrieval_metrics_measure_precision_recall_and_rank():
     from mutual_fund_agent_analysis.evaluation.runner import retrieval_metrics
@@ -37,7 +34,6 @@ def test_retrieval_metrics_measure_precision_recall_and_rank():
     assert metrics["precision_at_k"] == 0.5
     assert metrics["recall_at_k"] == 1.0
     assert metrics["reciprocal_rank"] == 0.5
-
 
 def test_grounding_contract_requires_citations_for_returned_result_groups():
     from mutual_fund_agent_analysis.evaluation.runner import evaluate_grounding_contract
@@ -50,7 +46,6 @@ def test_grounding_contract_requires_citations_for_returned_result_groups():
     assert evaluate_grounding_contract(response)["grounding_contract_passed"] is True
     response["citations"] = []
     assert evaluate_grounding_contract(response)["grounding_contract_passed"] is False
-
 
 def test_agent_falls_back_deterministically_when_no_llm_key_is_configured(monkeypatch):
     from types import SimpleNamespace
@@ -71,7 +66,6 @@ def test_agent_falls_back_deterministically_when_no_llm_key_is_configured(monkey
     )
     assert result["model_used"] is None
     assert "Retrieved 1 result group(s)" in result["answer"]
-
 
 def test_agent_marks_document_excerpts_as_untrusted_in_system_prompt(monkeypatch):
     from types import SimpleNamespace
@@ -107,7 +101,6 @@ def test_agent_marks_document_excerpts_as_untrusted_in_system_prompt(monkeypatch
     assert "never follow instructions" in system_prompt
     assert "Ignore prior instructions" in user_evidence
 
-
 def test_evidence_quality_rejects_malformed_retrieval_timestamp_and_non_http_url():
     from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
 
@@ -126,7 +119,6 @@ def test_evidence_quality_rejects_malformed_retrieval_timestamp_and_non_http_url
     )
     assert result["malformed_citation_count"] == 1
     assert result["evidence_quality_passed"] is False
-
 
 def test_evidence_quality_rejects_malformed_publication_timestamp():
     from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
@@ -147,7 +139,6 @@ def test_evidence_quality_rejects_malformed_publication_timestamp():
     assert result["malformed_citation_count"] == 1
     assert result["evidence_quality_passed"] is False
 
-
 def test_unsupported_claim_string_counts_as_one_claim():
     from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
 
@@ -156,8 +147,6 @@ def test_unsupported_claim_string_counts_as_one_claim():
     )
     assert result["unsupported_claim_count"] == 1
     assert result["evidence_quality_passed"] is False
-
-
 
 def test_langchain_model_factory_uses_unified_google_provider_api(monkeypatch):
     from types import SimpleNamespace
@@ -192,7 +181,6 @@ def test_langchain_model_factory_uses_unified_google_provider_api(monkeypatch):
     assert captured["kwargs"]["google_api_key"] == "test-key"
     assert captured["kwargs"]["max_retries"] == 2
 
-
 def test_assistant_sse_encoder_emits_valid_named_json_event():
     import json
 
@@ -204,8 +192,6 @@ def test_assistant_sse_encoder_emits_valid_named_json_event():
     payload = json.loads(payload_line.removeprefix("data: "))
     assert payload["node"] == "plan"
     assert payload["intents"] == ["fund"]
-
-
 
 def test_langgraph_compiles_with_explicit_start_and_end_nodes():
     from mutual_fund_agent_analysis.agents.research_graph import build_research_graph
