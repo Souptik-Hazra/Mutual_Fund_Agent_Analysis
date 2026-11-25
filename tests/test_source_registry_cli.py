@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mutual_fund_agent_analysis.database.base import Base
 from mutual_fund_agent_analysis.cli.register_source import register_data_source
+from mutual_fund_agent_analysis.database.base import Base
 from mutual_fund_agent_analysis.models import DataSource
 
 
