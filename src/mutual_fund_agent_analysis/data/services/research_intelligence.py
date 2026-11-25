@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models import (
@@ -691,7 +691,7 @@ def social_analytics(
 
 
 def extract_pdf_text(content: bytes) -> tuple[str, int]:
-    """Extract embedded PDF text and reject malformed, encrypted, or scanned documents."""
+    """Extract text per page; optionally OCR scanned pages when explicitly enabled."""
     import fitz
 
     try:
@@ -703,16 +703,45 @@ def extract_pdf_text(content: bytes) -> tuple[str, int]:
             raise ValueError("Password-protected PDFs are not supported.")
         if document.page_count < 1:
             raise ValueError("PDF contains no pages.")
-        pages = [page.get_text("text").strip() for page in document]
+
+        from mutual_fund_agent_analysis.core.config import get_settings
+
+        ocr_enabled = get_settings().document_ocr_enabled
+        pages: list[str] = []
+        ocr_pages = 0
+        for page in document:
+            extracted = page.get_text("text").strip()
+            if len(extracted) < 30 and ocr_enabled:
+                try:
+                    from io import BytesIO
+
+                    import pytesseract
+                    from PIL import Image
+
+                    pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                    image = Image.open(BytesIO(pixmap.tobytes("png")))
+                    extracted = pytesseract.image_to_string(image).strip()
+                    if extracted:
+                        ocr_pages += 1
+                except Exception as exc:
+                    raise ValueError(
+                        "OCR is enabled but pytesseract, Pillow, or the Tesseract binary is unavailable."
+                    ) from exc
+            pages.append(extracted)
+
         text = "\n\n".join(
             f"[Page {index + 1}]\n{value}"
             for index, value in enumerate(pages)
             if value
         )
         if len(text.strip()) < 80:
-            raise ValueError(
-                "PDF has no usable embedded text; OCR is required for scanned documents."
-            )
+            if not ocr_enabled:
+                raise ValueError(
+                    "PDF has no usable embedded text; enable DOCUMENT_OCR_ENABLED and install the OCR extra."
+                )
+            raise ValueError("PDF text extraction and OCR did not produce enough readable content.")
+        if ocr_pages:
+            text = f"[OCR pages: {ocr_pages}]\n\n" + text
         return text, len(document)
     finally:
         document.close()
@@ -788,6 +817,7 @@ def store_document(
         chunk_rows.append({
             "text": chunk, "chunk_index": index, "page_number": page_number,
             "scheme_code": scheme_code, "content_hash": digest, "source_key": source_key,
+            "canonical_url": canonical_url,
         })
         session.add(DocumentChunk(
             document_id=document.document_id, chunk_index=index, page_number=page_number,
@@ -802,38 +832,67 @@ def store_document(
 
 
 def search_documents(session: Session, query: str, scheme_code: int | None, limit: int = 8) -> dict[str, Any]:
-    terms = [term for term in re.findall(r"[a-zA-Z0-9]{3,}", query.lower())[:12]]
+    """Hybrid lexical/semantic retrieval with reciprocal-rank fusion and page citations."""
+    terms = list(dict.fromkeys(re.findall(r"[a-zA-Z0-9]{3,}", query.lower())))[:12]
     if not terms:
         raise ValueError("Query must contain at least one searchable term.")
-    from mutual_fund_agent_analysis.data.services.document_vectors import search_chunks
-    semantic = search_chunks(query, limit, scheme_code)
-    if semantic is not None:
-        return {"query": query, "results": semantic, "retrieval_mode": "qdrant_semantic"}
+    bounded_limit = min(max(limit, 1), 30)
     stmt = select(DocumentChunk, ResearchDocument).join(
         ResearchDocument, ResearchDocument.document_id == DocumentChunk.document_id
     )
     if scheme_code:
         stmt = stmt.where(ResearchDocument.scheme_code == scheme_code)
     conditions = [func.lower(DocumentChunk.chunk_text).contains(term) for term in terms]
-    from sqlalchemy import or_
     stmt = stmt.where(or_(*conditions))
-    rows = session.execute(stmt.limit(min(max(limit * 4, limit), 100))).all()
-    scored = []
+    rows = session.execute(
+        stmt.limit(min(max(bounded_limit * 8, bounded_limit), 200))
+    ).all()
+    lexical = []
     for chunk, doc in rows:
         haystack = chunk.chunk_text.lower()
         score = sum(haystack.count(term) for term in terms)
-        scored.append((score, chunk, doc))
-    scored.sort(key=lambda item: (item[0], item[1].chunk_id), reverse=True)
-    results = [{
-        "score": score, "document_id": doc.document_id, "title": doc.title,
-        "source_key": doc.source_key, "content_hash": doc.content_hash,
-        "effective_date": doc.effective_date, "published_at": doc.published_at,
-        "page_number": chunk.page_number, "chunk_index": chunk.chunk_index,
-        "text": chunk.chunk_text,
-        "citation": {"document_id": doc.document_id, "chunk_id": chunk.chunk_id,
-                     "title": doc.title, "content_hash": doc.content_hash},
-    } for score, chunk, doc in scored[:limit]]
-    return {"query": query, "results": results, "retrieval_mode": "lexical_fallback"}
+        lexical.append({
+            "score": score,
+            "document_id": doc.document_id,
+            "title": doc.title,
+            "source_key": doc.source_key,
+            "content_hash": doc.content_hash,
+            "effective_date": doc.effective_date,
+            "published_at": doc.published_at,
+            "page_number": chunk.page_number,
+            "chunk_index": chunk.chunk_index,
+            "text": chunk.chunk_text,
+            "citation": {
+                "document_id": doc.document_id,
+                "chunk_id": chunk.chunk_id,
+                "chunk_index": chunk.chunk_index,
+                "title": doc.title,
+                "content_hash": doc.content_hash,
+            },
+        })
+    lexical.sort(key=lambda item: (item["score"], item["document_id"], item["chunk_index"]), reverse=True)
+
+    from mutual_fund_agent_analysis.analytics.hybrid_retrieval import reciprocal_rank_fusion
+    from mutual_fund_agent_analysis.data.services.document_vectors import search_chunks
+
+    semantic = search_chunks(query, bounded_limit, scheme_code) or []
+    results = reciprocal_rank_fusion(lexical, semantic, limit=bounded_limit)
+    if semantic and results:
+        mode = "hybrid_rrf"
+    elif semantic:
+        mode = "qdrant_semantic"
+    else:
+        mode = "lexical_fallback"
+    return {
+        "query": query,
+        "results": results,
+        "retrieval_mode": mode,
+        "retrieval_coverage": {
+            "lexical_candidates": len(lexical),
+            "semantic_candidates": len(semantic),
+            "fused_results": len(results),
+        },
+    }
 
 
 def source_social_retention_days(source: DataSource, default_days: int) -> int:
