@@ -134,6 +134,10 @@ async def import_portfolio_file(
     try:
         if filename.endswith(".csv"):
             reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+            if reader.fieldnames and len(reader.fieldnames) > 100:
+                raise HTTPException(
+                    status_code=413, detail="Portfolio files are limited to 100 columns."
+                )
             rows = list(islice(reader, 5001))
         elif filename.endswith(".xlsx"):
             from openpyxl import load_workbook
@@ -153,7 +157,21 @@ async def import_portfolio_file(
             workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
             try:
                 sheet = workbook.active
+                if sheet.max_column is not None and sheet.max_column > 100:
+                    raise HTTPException(
+                        status_code=413, detail="Portfolio files are limited to 100 columns."
+                    )
+                if sheet.max_row is not None and sheet.max_row > 5001:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Portfolio files are limited to 5,000 holding rows plus a header.",
+                    )
                 values = list(islice(sheet.iter_rows(max_col=100, values_only=True), 5002))
+                if len(values) > 5001:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Portfolio files are limited to 5,000 holding rows plus a header.",
+                    )
                 if not values:
                     raise ValueError("Workbook is empty.")
                 headers = [
