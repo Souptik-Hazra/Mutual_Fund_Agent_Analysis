@@ -2,6 +2,8 @@
 
 from datetime import date, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -12,6 +14,7 @@ from mutual_fund_agent_analysis.analytics import (
     calculate_benchmark_metrics,
     calendar_year_returns,
     trailing_return_details,
+    load_fund_prices,
 )
 from mutual_fund_agent_analysis.analytics.risk import calculate_risk_metrics
 
@@ -143,3 +146,36 @@ def test_semiannual_frequency_is_accepted_for_semiannual_returns() -> None:
     ]
     result = calculate_risk_metrics(semiannual, periods_per_year=2)
     assert result.coverage.inferred_frequency == "semiannual"
+
+
+def test_fund_loader_applies_both_date_bounds_before_conflict_checks() -> None:
+    session = Mock()
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(
+            nav_date=date(2024, 1, 15),
+            canonical_nav=Decimal("100"),
+            status="matched",
+        )
+    ]
+    load_fund_prices(
+        session,
+        12345,
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 31),
+    )
+    statement = session.scalars.call_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "nav_date >= '2024-01-01'" in sql
+    assert "nav_date <= '2024-01-31'" in sql
+
+
+def test_fund_loader_rejects_reversed_date_range_before_query() -> None:
+    session = Mock()
+    with pytest.raises(ValueError, match="start_date must be on or before end_date"):
+        load_fund_prices(
+            session,
+            12345,
+            start_date=date(2024, 2, 1),
+            end_date=date(2024, 1, 1),
+        )
+    session.scalars.assert_not_called()
