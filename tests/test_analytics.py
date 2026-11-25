@@ -86,7 +86,7 @@ def test_risk_metrics_use_sample_volatility_and_explicit_frequency() -> None:
     result = calculate_risk_metrics(
         returns(("2024-01-02", "0.01"), ("2024-01-03", "-0.01")),
         annual_risk_free_rate=Decimal("0"),
-        periods_per_year=2,
+        periods_per_year=252,
     )
     assert result.observation_count == 2
     assert result.annualized_volatility is not None
