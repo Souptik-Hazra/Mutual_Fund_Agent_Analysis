@@ -132,8 +132,7 @@ def security_profile(
     quote_age_hours = (
         max(
             0.0,
-            (freshness_reference_time - latest.observed_at.astimezone(UTC)).total_seconds()
-            / 3600,
+            (freshness_reference_time - latest.observed_at.astimezone(UTC)).total_seconds() / 3600,
         )
         if latest
         else None
