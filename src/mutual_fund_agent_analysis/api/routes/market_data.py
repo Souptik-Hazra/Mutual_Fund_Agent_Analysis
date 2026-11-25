@@ -16,6 +16,7 @@ from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClien
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
+from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
@@ -142,3 +143,134 @@ def sync_twelvedata_quote(
             "subscription and approvals.",
         ],
     }
+
+
+from datetime import date
+from decimal import Decimal
+from typing import Any, Literal
+
+from pydantic import AnyHttpUrl, field_validator, model_validator
+from sqlalchemy import select
+
+from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
+from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
+
+
+class SecurityCorporateEvent(BaseModel):
+    title: str = Field(min_length=3, max_length=500)
+    event_type: Literal["results", "board_meeting", "dividend", "record_date", "split", "bonus", "merger", "acquisition", "fundraising", "management", "regulatory", "filing", "other"] = "other"
+    event_date: date | None = None
+    status: Literal["confirmed", "scheduled", "reported", "unverified", "speculative", "disproved", "outdated"] = "reported"
+    source_url: AnyHttpUrl | None = None
+
+
+class SecurityObservationInput(BaseModel):
+    security_key: str = Field(min_length=2, max_length=160)
+    security_name: str = Field(min_length=2, max_length=300)
+    symbol: str | None = Field(default=None, max_length=40)
+    exchange: str | None = Field(default=None, max_length=12)
+    isin: str | None = Field(default=None, max_length=20)
+    source_key: str = Field(min_length=2, max_length=60)
+    source_url: AnyHttpUrl | None = None
+    observed_at: datetime
+    fundamentals_as_of: date | None = None
+    last_price: Decimal = Field(gt=0)
+    change_pct: Decimal | None = Field(default=None, ge=-100)
+    day_high: Decimal | None = Field(default=None, gt=0)
+    day_low: Decimal | None = Field(default=None, gt=0)
+    volume: int | None = Field(default=None, ge=0)
+    market_status: Literal["trading", "halted", "closed", "unknown"] = "unknown"
+    fundamentals: dict[str, Decimal | None] = Field(default_factory=dict)
+    corporate_events: list[SecurityCorporateEvent] = Field(default_factory=list, max_length=100)
+
+    @field_validator("fundamentals")
+    @classmethod
+    def validate_fundamentals(cls, values: dict[str, Decimal | None]) -> dict[str, Decimal | None]:
+        allowed = {
+            "market_cap", "pe_ratio", "pb_ratio", "roe_pct", "debt_to_equity",
+            "dividend_yield_pct", "eps", "book_value", "revenue", "net_profit",
+            "total_debt", "total_equity", "operating_margin_pct", "profit_margin_pct",
+        }
+        unknown = set(values) - allowed
+        if unknown:
+            raise ValueError(f"Unsupported fundamental metric(s): {', '.join(sorted(unknown))}")
+        if any(value is not None and not value.is_finite() for value in values.values()):
+            raise ValueError("Fundamental values must be finite decimals.")
+        return values
+
+    @model_validator(mode="after")
+    def validate_observation(self) -> "SecurityObservationInput":
+        if self.observed_at.tzinfo is None or self.observed_at.utcoffset() is None:
+            raise ValueError("observed_at must include a timezone.")
+        if self.day_high is not None and self.day_low is not None and self.day_high < self.day_low:
+            raise ValueError("day_high cannot be lower than day_low.")
+        if self.fundamentals_as_of and self.fundamentals_as_of > self.observed_at.date():
+            raise ValueError("fundamentals_as_of cannot be after observed_at.")
+        return self
+
+
+@router.post("/security-observations", status_code=201)
+def ingest_security_observation(
+    payload: SecurityObservationInput,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Persist a dated, source-attributed security observation without treating it as verified."""
+    source = session.get(DataSource, payload.source_key)
+    if source is None or not source.enabled:
+        raise HTTPException(status_code=422, detail="source_key must reference an enabled data source.")
+    canonical = payload.model_dump(mode="json")
+    digest = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
+    row = SecurityMarketObservation(
+        security_key=payload.security_key.strip().upper(),
+        isin=payload.isin.strip().upper() if payload.isin else None,
+        security_name=payload.security_name.strip(),
+        symbol=payload.symbol.strip().upper() if payload.symbol else None,
+        exchange=payload.exchange.strip().upper() if payload.exchange else None,
+        source_key=payload.source_key,
+        source_url=str(payload.source_url) if payload.source_url else None,
+        observed_at=payload.observed_at,
+        fundamentals_as_of=payload.fundamentals_as_of,
+        last_price=payload.last_price,
+        change_pct=payload.change_pct,
+        day_high=payload.day_high,
+        day_low=payload.day_low,
+        volume=payload.volume,
+        market_status=payload.market_status,
+        fundamentals_json={key: str(value) if value is not None else None for key, value in payload.fundamentals.items()},
+        corporate_events_json=[
+            {**event.model_dump(mode="json"), "source_key": payload.source_key, "verification_status": "unverified"}
+            for event in payload.corporate_events
+        ],
+        content_hash=digest,
+    )
+    session.add(row)
+    try:
+        session.commit()
+        session.refresh(row)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Duplicate or conflicting security observation.") from exc
+    return {
+        "observation_id": row.observation_id,
+        "security_key": row.security_key,
+        "source_key": row.source_key,
+        "observed_at": row.observed_at,
+        "fundamentals_as_of": row.fundamentals_as_of,
+        "content_hash": row.content_hash,
+        "verification_status": "unverified",
+        "message": "Stored as an immutable source-attributed observation; verify the source before relying on it.",
+    }
+
+
+@router.get("/securities/{security_key}")
+def get_security_intelligence(
+    security_key: str,
+    session: Annotated[Session, Depends(get_db)],
+    as_of: date | None = None,
+    scheme_codes: list[int] | None = None,
+) -> dict:
+    """Return dated stock intelligence and matching positions from the latest AMC disclosures."""
+    try:
+        return security_profile(session, security_key, as_of=as_of, scheme_codes=scheme_codes)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
