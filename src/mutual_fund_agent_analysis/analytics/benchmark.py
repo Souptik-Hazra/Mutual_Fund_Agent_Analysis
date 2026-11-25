@@ -21,7 +21,7 @@ class BenchmarkMetrics:
 def align_returns(
     fund_returns: Iterable[ReturnPoint], benchmark_returns: Iterable[ReturnPoint]
 ) -> tuple[list[ReturnPoint], list[ReturnPoint]]:
-    """Inner-join return observations on exact dates; never forward-fill."""
+    """Inner-join identical return intervals; never forward-fill or mix horizons."""
     fund = {(point.start_date, point.date): point for point in fund_returns}
     benchmark = {(point.start_date, point.date): point for point in benchmark_returns}
     intervals = sorted(fund.keys() & benchmark.keys())
@@ -37,6 +37,8 @@ def calculate_benchmark_metrics(
     """Calculate beta and arithmetic annualized Jensen alpha on aligned returns."""
     if periods_per_year <= 0:
         raise ValueError("periods_per_year must be positive.")
+    if not annual_risk_free_rate.is_finite() or annual_risk_free_rate <= Decimal("-1"):
+        raise ValueError("annual_risk_free_rate must be finite and greater than -1.")
     fund, benchmark = align_returns(fund_returns, benchmark_returns)
     count = len(fund)
     if count < 2:
