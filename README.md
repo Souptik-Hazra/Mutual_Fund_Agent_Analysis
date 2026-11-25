@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** The local-first core (NAV/benchmark ingestion, deterministic analytics, investor ledger, portfolio/evidence foundations, LangGraph and React workspace) is implemented. Financial-reliability extensions for Phases 0–7 are being delivered in a dedicated branch; authoritative IDCW coverage, AMC-specific file adapters and live provider verification remain source-dependent gates. This is a personal local application, not a public deployment. See `docs/roadmap-financial-reliability.md` and `docs/phase-0-7-reliability-implementation.md`.
+> **Project status:** Phases 0–7 financial reliability, event/news intelligence, and social intelligence have been merged into `main`. The React/Vite workspace and LangChain/LangGraph modernization are being extended in the current feature branch. Authoritative IDCW coverage, AMC-specific file adapters, live provider verification, and external API access remain source-dependent gates. This is a personal local application, not a public deployment. See `docs/roadmap-financial-reliability.md`, `docs/phase-0-7-reliability-implementation.md`, and `docs/phase-5-6-event-social-implementation.md`.
 
 ## Table of Contents
 
@@ -243,7 +243,7 @@ Financial calculations, date alignment, holdings aggregation, sentiment aggregat
 
 | Layer | Proposed technology |
 |---|---|
-| Frontend | React + Vite |
+| Frontend | React 19.3 + Vite 8 |
 | Backend API | FastAPI |
 | Agent orchestration | LangGraph |
 | LLM integration | LangChain |
@@ -789,7 +789,7 @@ See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.m
 
 ## Phases 9–11 — Personal research workspace
 
-Phase 9 adds a LangGraph supervisor that routes questions to deterministic fund, portfolio, event, social and document research services, with optional LLM synthesis. Phase 10 adds the React/Vite workspace in `frontend/`. Phase 11 adds an offline routing benchmark and local operating guidance. Start with `docs/phases-9-11-personal.md` for setup and API usage. The optional LangGraph dependency is installed with `pip install -e ".[agents]"`; the Docker development image includes it automatically.
+Phase 9 uses the LangGraph 1.x supervisor and LangChain 1.x model integrations. It routes requests to deterministic fund, portfolio, event, social and document research services, supports optional model synthesis, and streams graph-node progress over Server-Sent Events. Phase 10 provides the React 19 + Vite 8 workspace, including event and social intelligence panels. LangGraph is a core dependency; optional Qdrant and development extras remain separately installable. Start with `docs/phases-9-11-personal.md` for setup and API usage.
 
 
 ## Personal SIP and investor transaction workflows
