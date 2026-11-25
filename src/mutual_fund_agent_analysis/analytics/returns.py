@@ -80,8 +80,7 @@ def trailing_return_details(
     staleness = (target - start.date).days
     if max_staleness_days is not None and staleness > max_staleness_days:
         raise ValueError(
-            f"Trailing-return anchor is stale by {staleness} days "
-            f"(maximum {max_staleness_days})."
+            f"Trailing-return anchor is stale by {staleness} days (maximum {max_staleness_days})."
         )
     return TrailingReturn(
         target_start_date=target,
@@ -162,9 +161,7 @@ def calendar_year_returns(
     for year in sorted(year_ends):
         previous = year_ends.get(year - 1)
         current = year_ends[year]
-        year_is_complete = year < latest_year or (
-            year == latest_year and latest_year_is_complete
-        )
+        year_is_complete = year < latest_year or (year == latest_year and latest_year_is_complete)
         if previous is not None and year_is_complete:
             results[year] = current.value / previous.value - Decimal("1")
     return results
