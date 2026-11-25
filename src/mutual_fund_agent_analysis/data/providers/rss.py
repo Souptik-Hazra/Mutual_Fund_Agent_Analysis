@@ -100,7 +100,7 @@ def fetch_feed(url: str, allowed_host: str) -> list[dict[str, Any]]:
     content = b"".join(chunks)
     # ElementTree does not resolve external entities, but reject declarations explicitly
     # to keep feed parsing deterministic and avoid entity-expansion payloads.
-    if re.search(rb"<!\\s*(DOCTYPE|ENTITY)", content, flags=re.IGNORECASE):
+    if re.search(rb"<!\s*(DOCTYPE|ENTITY)", content, flags=re.IGNORECASE):
         raise ValueError("RSS/Atom feed must not contain document type or entity declarations.")
     try:
         root = ElementTree.fromstring(content)
@@ -126,7 +126,7 @@ def fetch_feed(url: str, allowed_host: str) -> list[dict[str, Any]]:
         guid = value("guid", "{http://www.w3.org/2005/Atom}id") or link or title
         summary = value("description", "{http://www.w3.org/2005/Atom}summary")
         summary = re.sub(r"<[^>]+>", " ", summary)
-        summary = re.sub(r"\\s+", " ", summary).strip()
+        summary = re.sub(r"\s+", " ", summary).strip()
         published = value("pubDate", "{http://www.w3.org/2005/Atom}published") or value(
             "{http://www.w3.org/2005/Atom}updated"
         )
