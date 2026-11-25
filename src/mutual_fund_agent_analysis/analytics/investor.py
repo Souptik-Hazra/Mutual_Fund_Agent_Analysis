@@ -62,19 +62,11 @@ def calculate_investor_returns(
             raise ValueError("Transactions after as_of_date are not allowed.")
         if item.transaction_type not in VALID_TYPES:
             raise ValueError("Unsupported investor transaction type.")
-        if (
-            not isinstance(item.amount, Decimal)
-            or not item.amount.is_finite()
-            or item.amount <= 0
-        ):
+        if not isinstance(item.amount, Decimal) or not item.amount.is_finite() or item.amount <= 0:
             raise ValueError("Transaction amounts must be finite positive Decimal values.")
 
         if item.transaction_type in UNIT_ADDITIONS | UNIT_REDUCTIONS:
-            if (
-                not isinstance(item.units, Decimal)
-                or not item.units.is_finite()
-                or item.units <= 0
-            ):
+            if not isinstance(item.units, Decimal) or not item.units.is_finite() or item.units <= 0:
                 raise ValueError("Unit-changing transactions require finite positive units.")
             if item.transaction_type in UNIT_ADDITIONS:
                 total_units += item.units
@@ -93,9 +85,7 @@ def calculate_investor_returns(
             expenses += item.amount
 
         amount = (
-            -item.amount
-            if item.transaction_type in UNIT_ADDITIONS | EXPENSE_TYPES
-            else item.amount
+            -item.amount if item.transaction_type in UNIT_ADDITIONS | EXPENSE_TYPES else item.amount
         )
         flows.append(CashFlow(item.transaction_date, amount))
 
