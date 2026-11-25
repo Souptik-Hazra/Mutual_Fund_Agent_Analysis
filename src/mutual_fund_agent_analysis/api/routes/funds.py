@@ -59,8 +59,7 @@ def discover_schemes(
         query=normalized,
         count=len(items),
         items=[
-            {"scheme_code": item.scheme_code, "scheme_name": item.scheme_name}
-            for item in items
+            {"scheme_code": item.scheme_code, "scheme_name": item.scheme_name} for item in items
         ],
     )
 

@@ -60,9 +60,7 @@ def test_scheme_discovery_uses_validated_provider_response(monkeypatch) -> None:
     monkeypatch.setattr(funds, "MFAPIClient", StubClient)
     response = TestClient(create_app()).get("/api/v1/schemes/discover?q=HDFC")
     assert response.status_code == 200
-    assert response.json()["items"] == [
-        {"scheme_code": 100, "scheme_name": "HDFC Example Fund"}
-    ]
+    assert response.json()["items"] == [{"scheme_code": 100, "scheme_name": "HDFC Example Fund"}]
 
 
 def test_scheme_detail_includes_latest_reconciliation() -> None:
