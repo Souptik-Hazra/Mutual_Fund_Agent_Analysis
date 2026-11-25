@@ -28,10 +28,12 @@ dependencies = [
 mfa-sync-nav = "mutual_fund_agent_analysis.cli.sync_nav:main"
 mfa-sync-benchmark = "mutual_fund_agent_analysis.cli.sync_benchmark:main"
 mfa-purge-expired-social = "mutual_fund_agent_analysis.cli.purge_social:main"
+mfa-evaluate-agent = "mutual_fund_agent_analysis.cli.evaluate_agent:main"
 
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.3,<2"]
 vectors = ["langchain-qdrant>=0.2,<2", "qdrant-client>=1.13,<2"]
+agents = ["langgraph>=0.2,<2"]
 dev = ["pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.9,<1"]
 
 [tool.hatch.build.targets.wheel]
