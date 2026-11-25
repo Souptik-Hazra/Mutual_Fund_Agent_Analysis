@@ -98,11 +98,19 @@ def security_profile(
         if quote_age_hours is not None and quote_age_hours <= 24
         else "stale"
     )
-    fundamentals_as_of = latest.fundamentals_as_of if latest else None
+    fundamentals_observation = next(
+        (row for row in observations if row.fundamentals_json), None
+    )
+    event_observation = next(
+        (row for row in observations if row.corporate_events_json), None
+    )
+    fundamentals_as_of = (
+        fundamentals_observation.fundamentals_as_of if fundamentals_observation else None
+    )
     fundamentals_age_days = (date.today() - fundamentals_as_of).days if fundamentals_as_of else None
     fundamentals_freshness = (
         "unavailable"
-        if not latest or not latest.fundamentals_json
+        if fundamentals_observation is None
         else "fresh"
         if fundamentals_age_days is not None and 0 <= fundamentals_age_days <= 180
         else "stale"
@@ -134,14 +142,22 @@ def security_profile(
             "age_hours": round(quote_age_hours, 2) if quote_age_hours is not None else None,
         },
         "fundamentals": {
-            "availability": "available" if latest and latest.fundamentals_json else "unavailable",
+            "availability": "available" if fundamentals_observation else "unavailable",
             "as_of": fundamentals_as_of,
             "freshness": fundamentals_freshness,
-            "metrics": latest.fundamentals_json if latest else {},
-            "source_key": latest.source_key if latest else None,
-            "source_url": latest.source_url if latest else None,
+            "metrics": fundamentals_observation.fundamentals_json
+            if fundamentals_observation
+            else {},
+            "source_key": fundamentals_observation.source_key
+            if fundamentals_observation
+            else None,
+            "source_url": fundamentals_observation.source_url
+            if fundamentals_observation
+            else None,
         },
-        "corporate_events": latest.corporate_events_json if latest else [],
+        "corporate_events": event_observation.corporate_events_json
+        if event_observation
+        else [],
         "portfolio_positions": positions,
         "portfolio_coverage": {
             "matched_scheme_count": len({row["scheme_code"] for row in positions}),
