@@ -1,8 +1,8 @@
 """Annualized volatility and risk-adjusted return metrics."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
-from collections.abc import Iterable
 
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint
 
