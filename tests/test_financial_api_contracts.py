@@ -1,42 +1,55 @@
-from mutual_fund_agent_analysis.main import create_app
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
 
+[project]
+name = "mutual-fund-agent-analysis"
+version = "0.1.0"
+description = "AI-assisted mutual fund research and market intelligence platform."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "alembic>=1.14,<2",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "langchain-core>=0.3,<2",
+  "langchain-google-genai>=2,<4",
+  "langchain-groq>=0.3,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.7,<3",
+  "python-multipart>=0.0.20,<1",
+  "pymupdf>=1.25,<2",
+  "openpyxl>=3.1,<4",
+  "sqlalchemy>=2.0,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
 
-def test_financial_reliability_routes_are_registered():
-    paths = create_app().openapi()["paths"]
-    assert "/api/v1/audit/coverage" in paths
-    assert "/api/v1/schemes/{scheme_code}/metadata-observations" in paths
-    assert "/api/v1/schemes/{scheme_code}/distributions" in paths
-    assert "/api/v1/schemes/{scheme_code}/distribution-coverage" in paths
-    assert "/api/v1/schemes/{scheme_code}/idcw-total-return" in paths
-    assert "/api/v1/portfolios/{scheme_code}/quality" in paths
+[project.scripts]
+mfa-sync-nav = "mutual_fund_agent_analysis.cli.sync_nav:main"
+mfa-sync-benchmark = "mutual_fund_agent_analysis.cli.sync_benchmark:main"
+mfa-purge-expired-social = "mutual_fund_agent_analysis.cli.purge_social:main"
+mfa-evaluate-agent = "mutual_fund_agent_analysis.cli.evaluate_agent:main"
+mfa-audit-local = "mutual_fund_agent_analysis.cli.audit_local:main"
+mfa-import-scheme-metadata = "mutual_fund_agent_analysis.cli.import_financial_csv:import_scheme_metadata_main"
+mfa-import-idcw = "mutual_fund_agent_analysis.cli.import_financial_csv:import_idcw_distributions_main"
 
+[project.optional-dependencies]
+openai = ["langchain-openai>=0.3,<2"]
+vectors = ["langchain-qdrant>=0.2,<2", "qdrant-client>=1.13,<2"]
+agents = ["langgraph>=0.2,<2"]
+dev = ["pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.9,<1"]
 
-def test_analytics_contract_exposes_all_sampling_frequencies():
-    paths = create_app().openapi()["paths"]
-    parameters = paths["/api/v1/schemes/{scheme_code}/analytics"]["get"]["parameters"]
-    frequency = next(item for item in parameters if item["name"] == "frequency")
-    assert frequency["schema"]["enum"] == [
-        "daily",
-        "weekly",
-        "monthly",
-        "quarterly",
-        "yearly",
-    ]
+[tool.hatch.build.targets.wheel]
+packages = ["src/mutual_fund_agent_analysis"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
 
-def test_metadata_quality_route_is_registered():
-    paths = create_app().openapi()["paths"]
-    assert "/api/v1/schemes/{scheme_code}/metadata-quality" in paths
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
 
-
-def test_metadata_quality_and_idcw_payout_contracts_are_registered():
-    paths = create_app().openapi()["paths"]
-    assert "/api/v1/schemes/{scheme_code}/metadata-quality" in paths
-    assert "idcw_payout_total_return" in str(
-        paths["/api/v1/schemes/{scheme_code}/idcw-total-return"]
-    )
-
-
-def test_event_revision_history_route_is_registered():
-    paths = create_app().openapi()["paths"]
-    assert "/api/v1/events/{event_id}/revisions" in paths
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

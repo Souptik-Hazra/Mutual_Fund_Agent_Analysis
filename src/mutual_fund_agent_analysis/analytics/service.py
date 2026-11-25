@@ -1,6 +1,6 @@
 """Database-backed orchestration for deterministic single- and multi-fund analytics."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
@@ -59,7 +59,7 @@ class FundAnalyticsReport:
     return_basis: str = "nav_only_excludes_idcw"
     benchmark_return_basis: str | None = None
     base100_series: tuple[tuple[date, Decimal], ...] = ()
-    methodology: dict[str, str] | None = None
+    methodology: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
