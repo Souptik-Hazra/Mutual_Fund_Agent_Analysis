@@ -236,7 +236,7 @@ def collect_official_events(
         return collect_rss_events(session, source_key, feed_url)
     except ValueError as exc:
         raise _domain_error(exc) from exc
-    except Exception:
+    except Exception as exc:
         raise HTTPException(status_code=502, detail="Official event feed could not be retrieved.") from exc
 
 
