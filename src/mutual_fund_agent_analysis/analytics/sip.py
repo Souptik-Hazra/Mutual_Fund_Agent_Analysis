@@ -83,9 +83,7 @@ def simulate_monthly_sip(
     for due in _monthly_dates(start_date, end_date, day_of_month):
         nav = by_date.get(due)
         if nav is None:
-            schedule.append(
-                SipInstallment(due, monthly_amount, None, Decimal("0"), "missed_nav")
-            )
+            schedule.append(SipInstallment(due, monthly_amount, None, Decimal("0"), "missed_nav"))
             continue
         units = monthly_amount / nav
         total_units += units
