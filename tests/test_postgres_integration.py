@@ -94,6 +94,24 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     command.upgrade(config, "0001_initial_market_data")
     original_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(original_key["constrained_columns"]) == {"scheme_code", "nav_date"}
+    with migrated_postgres.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO mutual_fund_schemes "
+                "(scheme_code, scheme_name, fund_house, source) "
+                "VALUES (880001, 'Migration Backfill Equity Fund', "
+                "'Migration AMC', 'amfi')"
+            )
+        )
+    command.upgrade(config, "0005_benchmark_tri")
+    with migrated_postgres.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO benchmark_indices "
+                "(benchmark_code, benchmark_name, provider) "
+                "VALUES ('MIGRATION_TEST', 'Migration Test Index', 'niftyindices')"
+            )
+        )
     command.upgrade(config, "head")
     tables = inspect(migrated_postgres).get_table_names()
     assert "mutual_fund_schemes" in tables
