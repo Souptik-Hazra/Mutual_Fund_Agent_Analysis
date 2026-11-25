@@ -25,7 +25,15 @@ from mutual_fund_agent_analysis.analytics.service import (
 )
 from mutual_fund_agent_analysis.analytics.series import period_returns
 from mutual_fund_agent_analysis.analytics.sip import simulate_monthly_sip
-from mutual_fund_agent_analysis.api.schemas.investor import (\n    ActiveRiskResponse,\n    InvestorReturnsResponse,\n    InvestorTransactionCreate,\n    InvestorTransactionResponse,\n    SipSimulationRequest,\n    SipSimulationResponse,\n)\nfrom mutual_fund_agent_analysis.api.schemas.funds import (
+from mutual_fund_agent_analysis.api.schemas.investor import (
+    ActiveRiskResponse,
+    InvestorReturnsResponse,
+    InvestorTransactionCreate,
+    InvestorTransactionResponse,
+    SipSimulationRequest,
+    SipSimulationResponse,
+)
+from mutual_fund_agent_analysis.api.schemas.funds import (
     FundAnalyticsResponse,
     FundComparisonRequest,
     FundComparisonResponse,
@@ -36,7 +44,11 @@ from mutual_fund_agent_analysis.api.schemas.investor import (\n    ActiveRiskRes
 )
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models import (\n    InvestorTransaction,\n    MutualFundScheme,\n    NavReconciliation,\n)
+from mutual_fund_agent_analysis.models import (
+    InvestorTransaction,
+    MutualFundScheme,
+    NavReconciliation,
+)
 
 router = APIRouter(tags=["funds"])
 
