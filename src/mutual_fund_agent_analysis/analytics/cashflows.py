@@ -103,9 +103,7 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
 
     with localcontext() as context:
         context.prec = 40
-        elapsed = [
-            Decimal((flow.date - origin).days) / DAYS_PER_XIRR_YEAR for flow in normalized
-        ]
+        elapsed = [Decimal((flow.date - origin).days) / DAYS_PER_XIRR_YEAR for flow in normalized]
 
         def value_at(log_gross_rate: Decimal) -> Decimal:
             return sum(
@@ -150,10 +148,7 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
             for _ in range(_MAX_ITERATIONS):
                 middle = (low + high) / Decimal("2")
                 middle_value = value_at(middle)
-                if (
-                    abs(middle_value) <= _ROOT_TOLERANCE
-                    or abs(high - low) <= _ROOT_TOLERANCE
-                ):
+                if abs(middle_value) <= _ROOT_TOLERANCE or abs(high - low) <= _ROOT_TOLERANCE:
                     low = high = middle
                     break
                 if (low_value < 0) != (middle_value < 0):
