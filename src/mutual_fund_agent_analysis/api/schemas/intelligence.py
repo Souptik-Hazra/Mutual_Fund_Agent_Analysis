@@ -174,6 +174,7 @@ class EntityResolveRequest(BaseModel):
     identifier_value: str | None = Field(default=None, max_length=160)
     alias: str | None = Field(default=None, max_length=300)
     as_of: date | None = None
+    source_key: str | None = Field(default=None, max_length=60)
 
     @model_validator(mode="after")
     def require_lookup_key(self):
