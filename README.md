@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Phases 0–7 financial reliability, event/news intelligence, and social intelligence have been merged into `main`. The React/Vite workspace and LangChain/LangGraph modernization are being extended in the current feature branch. Authoritative IDCW coverage, AMC-specific file adapters, live provider verification, and external API access remain source-dependent gates. This is a personal local application, not a public deployment. See `docs/roadmap-financial-reliability.md`, `docs/phase-0-7-reliability-implementation.md`, and `docs/phase-5-6-event-social-implementation.md`.
+> **Project status:** Phases 0–12 are merged into `main`, including the React/Vite workspace and LangChain/LangGraph modernization. Phase 12 adds exact-category peer analysis, multi-fund disclosed-equity overlap, and source-attributed security market observations. Market observations are provider-supplied records; an automatic live Indian equity data-provider integration and category-to-benchmark registry are not yet implemented. Authoritative IDCW coverage, AMC-specific file adapters, live provider verification, and external API access remain source-dependent gates. This is a personal local application, not a public deployment. See `docs/roadmap-financial-reliability.md`, `docs/phase-0-7-reliability-implementation.md`, `docs/phase-5-6-event-social-implementation.md`, and `docs/phase-12-fund-category-equity-intelligence.md`.
 
 ## Table of Contents
 
@@ -11,6 +11,7 @@ An AI-powered mutual fund research and market-intelligence platform focused init
 - [Time-Based Analysis](#time-based-analysis)
 - [Multi-Fund Comparison](#multi-fund-comparison)
 - [Portfolio and Stock Intelligence](#portfolio-and-stock-intelligence)
+- [Fund Category and Underlying Equity Intelligence](#fund-category-and-underlying-equity-intelligence)
 - [Social Media and Sentiment Intelligence](#social-media-and-sentiment-intelligence)
 - [News and Upcoming Events](#news-and-upcoming-events)
 - [AI Agent Architecture](#ai-agent-architecture)
@@ -768,7 +769,7 @@ This phase delivers backend API contracts and services, not a React dashboard. E
 
 ## Phase 4 — Common intelligence foundation
 
-The shared identity and provenance layer is implemented on the development branch. It provides canonical entities, source-aware temporal aliases, namespaced identifiers, a source-authority registry, evidence records, entity-evidence links, and deterministic exact-match resolution. Ambiguous aliases are returned as candidates rather than silently resolved.
+The shared identity and provenance layer is implemented in `main`. It provides canonical entities, source-aware temporal aliases, namespaced identifiers, a source-authority registry, evidence records, entity-evidence links, and deterministic exact-match resolution. Ambiguous aliases are returned as candidates rather than silently resolved.
 
 All endpoints are under `/api/v1/intelligence`:
 
@@ -791,6 +792,20 @@ See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.m
 
 Phase 9 uses the LangGraph 1.x supervisor and LangChain 1.x model integrations. It routes requests to deterministic fund, portfolio, event, social and document research services, supports optional model synthesis, and streams graph-node progress over Server-Sent Events. Phase 10 provides the React 19 + Vite 8 workspace, including event and social intelligence panels. LangGraph is a core dependency; optional Qdrant and development extras remain separately installable. Start with `docs/phases-9-11-personal.md` for setup and API usage.
 
+
+
+## Phase 12 — Fund category and underlying equity intelligence
+
+Phase 12 is merged in PR #15. It adds:
+
+- `GET /api/v1/fund-intelligence/schemes/{scheme_code}/category`: exact category, scheme-type, plan and option peer cohorts; descriptive NAV-based performance/risk rankings; optional user-supplied benchmark TRI comparison.
+- `POST /api/v1/fund-intelligence/compare`: 2–5 funds, pairwise disclosed-equity overlap matched by ISIN/security key, and a clearly labelled hypothetical equal-weighted exposure calculation.
+- `GET /api/v1/fund-intelligence/schemes/{scheme_code}/equity-status`: latest available AMC holdings disclosure joined to the latest stored security observation.
+- `GET /api/v1/fund-intelligence/securities/{security_key}/market-status` and `POST /api/v1/fund-intelligence/market-observations`: source-attributed market observations with separate quote and fundamentals dates.
+
+**Interpretation safeguards:** Holdings are dated AMC disclosures, not live fund positions. Partial holdings disclosures flag overlap as a lower bound and combined exposure as incomplete. Equal-weighted exposure is hypothetical, not the user's actual allocation. NAV-only peer metrics exclude IDCW distributions. Optional benchmark comparison requires the user to supply a benchmark code; automatic category-to-benchmark mapping is not yet available.
+
+**Market-data boundary:** The API persists timestamped provider observations but does not automatically fetch live stock prices, fundamentals or corporate events. Register an enabled provider in the source registry and ingest its observations. Do not interpret the latest stored observation as a live exchange quote. See [Phase 12 implementation notes](docs/phase-12-fund-category-equity-intelligence.md).
 
 ## Personal SIP and investor transaction workflows
 
