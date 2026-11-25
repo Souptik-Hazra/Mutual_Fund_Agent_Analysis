@@ -57,7 +57,7 @@ Run:
 
 ## Deliberate follow-up
 
-- Backfill current mutual-fund scheme and benchmark masters into research_entities and entity_identifiers.
+- Add verified entity-evidence links to NAV and benchmark sync runs after confirming provider record identity and audit semantics.
 - Add evidence links to NAV and benchmark sync runs after validating provider-specific record identity.
 - Add audited entity merge/reconciliation workflow before automatic fuzzy matching.
 - Add source-specific retention enforcement and rights-aware ingestion policies before enabling social connectors.
