@@ -30,6 +30,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [codes, setCodes] = useState("125497");
   const [benchmark, setBenchmark] = useState("NIFTY 50");
+  const [categoryBenchmark, setCategoryBenchmark] = useState("");
   const [analysisFrequency, setAnalysisFrequency] = useState("daily");
   const [question, setQuestion] = useState("Analyse performance, portfolio holdings and recent events");
   const [documentQuery, setDocumentQuery] = useState("expense ratio risk portfolio strategy");
@@ -61,7 +62,7 @@ export default function App() {
   const runCategoryAnalysis = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo });
-    if (benchmark.trim()) params.set("benchmark_code", benchmark.trim());
+    if (categoryBenchmark.trim()) params.set("benchmark_code", categoryBenchmark.trim());
     return run(() => request(`/fund-intelligence/schemes/${schemeCodes[0]}/category?${params.toString()}`));
   };
   const runEquityStatus = () => {
@@ -253,6 +254,7 @@ export default function App() {
               <div className="field"><label>Benchmark TRI (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} /></div>
             </div>
             <div className="field-row">
+              <div className="field"><label>Benchmark TRI code (optional)</label><input value={categoryBenchmark} onChange={(e) => setCategoryBenchmark(e.target.value)} placeholder="Enter the scheme's disclosed TRI benchmark" /></div>
               <div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
               <div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
             </div>
@@ -270,8 +272,8 @@ export default function App() {
               <div className="metric"><small>Sharpe rank</small><strong>{data.selected_fund.sharpe_ratio_rank ?? "—"} / {data.peer_count}</strong></div>
             </div>
             <p className="muted">Cohort: {data.peer_definition?.scheme_type || "—"} · {data.peer_definition?.plan_type || "—"} · {data.peer_definition?.option_type || "—"} · benchmark {data.benchmark_code || "not selected"}</p>
-            <div className="table-wrap"><table><thead><tr><th>Scheme</th><th>CAGR</th><th>Volatility</th><th>Sharpe</th><th>Max drawdown</th><th>Rank</th></tr></thead><tbody>{data.peers?.map((peer) => <tr key={peer.scheme_code}><td>{peer.scheme_name}<small>{peer.scheme_code} · {peer.fund_house || "—"}</small></td><td>{percent(peer.cagr)}</td><td>{percent(peer.annualized_volatility)}</td><td>{money(peer.sharpe_ratio)}</td><td>{percent(peer.maximum_drawdown)}</td><td>{peer.cagr_rank ?? "—"}</td></tr>)}</tbody></table></div>
-            <p className="muted">{data.excluded_peer_count} peer(s) excluded for insufficient NAV history. {data.cohort_truncated ? `Ranking is limited to the first ${data.peer_limit} matching peers and is not a complete category-wide rank. ` : ""}Rankings are descriptive, not recommendations.</p>
+            <div className="table-wrap"><table><thead><tr><th>Scheme</th><th>CAGR</th><th>Volatility</th><th>Sharpe</th><th>Max drawdown</th><th>Benchmark TRI (ann.)</th><th>Alpha (ann.)</th><th>Beta</th><th>TRI coverage</th><th>Rank</th></tr></thead><tbody>{data.peers?.map((peer) => <tr key={peer.scheme_code}><td>{peer.scheme_name}<small>{peer.scheme_code} · {peer.fund_house || "—"}</small></td><td>{percent(peer.cagr)}</td><td>{percent(peer.annualized_volatility)}</td><td>{money(peer.sharpe_ratio)}</td><td>{percent(peer.maximum_drawdown)}</td><td>{percent(peer.benchmark?.annualized_benchmark_return)}</td><td>{percent(peer.benchmark?.annualized_alpha)}</td><td>{money(peer.benchmark?.beta)}</td><td>{percent(peer.benchmark?.coverage_ratio)}</td><td>{peer.cagr_rank ?? "—"}</td></tr>)}</tbody></table></div>
+            <p className="muted">NAV-only returns exclude IDCW distributions and are not total-return comparisons. Benchmark metrics use aligned TRI intervals; unavailable metrics indicate insufficient coverage. {data.excluded_peer_count} peer(s) excluded for insufficient NAV history. {data.cohort_truncated ? `Ranking is limited to the first ${data.peer_limit} matching peers and is not a complete category-wide rank. ` : ""}Rankings are descriptive, not recommendations.</p>
           </Panel>}
           {data?.items && <Panel title={`Underlying equity status · holdings as of ${data.holdings_as_of}`}>
             <p className="muted">Disclosure status: {data.snapshot_status || "unknown"} · This is the latest available AMC disclosure, not a live fund portfolio.</p>
