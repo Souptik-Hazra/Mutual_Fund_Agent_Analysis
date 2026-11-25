@@ -1,6 +1,9 @@
 """Portfolio, event, social, and document intelligence APIs."""
 from datetime import date
+import csv
 import hashlib
+import io
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
