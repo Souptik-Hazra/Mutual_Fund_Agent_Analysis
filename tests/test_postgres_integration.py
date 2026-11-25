@@ -194,7 +194,6 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     check_database_connection()
 
 
-
 def test_postgres_security_market_observation_persists_source_and_json(
     migrated_postgres: Engine,
 ) -> None:
