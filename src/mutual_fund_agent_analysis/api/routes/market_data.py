@@ -12,11 +12,11 @@ from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_valida
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import DataSource
-from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
@@ -191,10 +191,16 @@ class SecurityObservationInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_observation(self) -> "SecurityObservationInput":
+        if not self.security_key.strip() or not self.security_name.strip() or not self.source_key.strip():
+            raise ValueError("security_key, security_name and source_key cannot be blank.")
         if self.observed_at.tzinfo is None or self.observed_at.utcoffset() is None:
             raise ValueError("observed_at must include a timezone.")
         if self.day_high is not None and self.day_low is not None and self.day_high < self.day_low:
             raise ValueError("day_high cannot be lower than day_low.")
+        if self.day_high is not None and self.last_price > self.day_high:
+            raise ValueError("last_price cannot exceed day_high.")
+        if self.day_low is not None and self.last_price < self.day_low:
+            raise ValueError("last_price cannot be below day_low.")
         if self.fundamentals_as_of and self.fundamentals_as_of > self.observed_at.date():
             raise ValueError("fundamentals_as_of cannot be after observed_at.")
         return self
