@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.api.schemas.research import (
-    DocumentMetadata, EventInput, PortfolioCompareRequest, PortfolioImportRequest,
+    DocumentAskRequest, EventInput, PortfolioCompareRequest, PortfolioImportRequest,
     SocialPostInput,
 )
 from mutual_fund_agent_analysis.data.providers.social import SocialProviderError, search_reddit, search_x
