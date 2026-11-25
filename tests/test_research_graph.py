@@ -71,9 +71,7 @@ def test_portfolio_comparison_respects_requested_end_date(monkeypatch):
         end_date=requested_end,
     )
 
-    research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["portfolio"]}
-    )
+    research_graph._run_tools({"request": request, "session": object(), "intents": ["portfolio"]})
 
     assert captured == {"codes": [125497, 120503], "as_of": requested_end}
 
