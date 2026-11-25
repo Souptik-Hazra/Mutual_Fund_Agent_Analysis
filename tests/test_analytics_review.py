@@ -128,3 +128,11 @@ def test_zero_and_negative_benchmark_returns_are_valid_observations() -> None:
     assert result.annualized_alpha == Decimal("0")
     assert result.annualized_fund_return == Decimal("0")
     assert result.annualized_benchmark_return == Decimal("0")
+
+
+def test_calendar_year_does_not_mark_stale_november_data_complete() -> None:
+    navs = _prices(
+        ("2023-12-29", "100"),
+        ("2024-11-15", "110"),
+    )
+    assert 2024 not in calendar_year_returns(navs, date(2025, 1, 2))
