@@ -198,8 +198,7 @@ def _build_report(
         return_basis="nav_only_excludes_idcw",
         benchmark_return_basis="tri" if benchmark_code is not None else None,
         base100_series=tuple(
-            (point.date, Decimal("100") * point.value / prices[0].value)
-            for point in prices
+            (point.date, Decimal("100") * point.value / prices[0].value) for point in prices
         ),
         methodology={
             "nav_return_basis": "NAV-only price return; IDCW distributions are excluded.",
@@ -220,9 +219,7 @@ def _build_report(
                 "Sample covariance of exact interval-aligned fund and TRI returns divided "
                 "by sample benchmark variance."
             ),
-            "alpha": (
-                "Arithmetic annualized Jensen alpha using the periodic risk-free rate."
-            ),
+            "alpha": ("Arithmetic annualized Jensen alpha using the periodic risk-free rate."),
             "benchmark_return": (
                 "Arithmetic mean of exact interval-aligned TRI simple returns multiplied "
                 "by periods_per_year; not CAGR."

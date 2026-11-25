@@ -64,7 +64,6 @@ def reinvested_distribution_index(
     return output
 
 
-
 def payout_distribution_index(
     navs: Sequence[tuple[date, Decimal]],
     distributions: Mapping[date, Decimal],
@@ -99,9 +98,7 @@ def payout_distribution_index(
 
     first_date, first_nav = ordered[0]
     cumulative_distribution = Decimal("0")
-    output = [
-        TotalReturnPoint(first_date, first_nav, Decimal("0"), base_value, base_value)
-    ]
+    output = [TotalReturnPoint(first_date, first_nav, Decimal("0"), base_value, base_value)]
     with localcontext() as context:
         context.prec = 36
         for day, nav in ordered[1:]:
@@ -109,7 +106,5 @@ def payout_distribution_index(
             cumulative_distribution += distribution
             nav_index = base_value * nav / first_nav
             total_index = base_value * (nav + cumulative_distribution) / first_nav
-            output.append(
-                TotalReturnPoint(day, nav, distribution, nav_index, total_index)
-            )
+            output.append(TotalReturnPoint(day, nav, distribution, nav_index, total_index))
     return output

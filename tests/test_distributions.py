@@ -91,9 +91,7 @@ def test_payout_index_accumulates_cash_without_reinvestment():
         (date(2024, 1, 3), Decimal("99")),
     ]
     payouts = payout_distribution_index(navs, {date(2024, 1, 2): Decimal("3")})
-    reinvested = reinvested_distribution_index(
-        navs, {date(2024, 1, 2): Decimal("3")}
-    )
+    reinvested = reinvested_distribution_index(navs, {date(2024, 1, 2): Decimal("3")})
     assert payouts[1].total_return_index == Decimal("101")
     assert payouts[2].total_return_index == Decimal("102")
     assert reinvested[2].total_return_index > payouts[2].total_return_index

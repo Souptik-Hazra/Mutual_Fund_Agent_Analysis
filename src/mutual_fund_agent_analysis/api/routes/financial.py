@@ -303,12 +303,16 @@ def get_scheme_metadata_quality(
             "verification_status": latest.verification_status,
             "valid_from": latest.valid_from,
             "valid_to": latest.valid_to,
-        } if latest else None,
+        }
+        if latest
+        else None,
         "latest_verified_observation": {
             "metadata_id": latest_verified.metadata_id,
             "source_key": latest_verified.source_key,
             "observed_at": latest_verified.observed_at,
-        } if latest_verified else None,
+        }
+        if latest_verified
+        else None,
         "metadata_age_days": age_days,
         "freshness": freshness,
         "freshness_policy_days": {"fresh_max": 90, "ageing_max": 180},
@@ -689,7 +693,8 @@ def get_idcw_total_return(
             }
             for item in points
         ],
-        limitations=limitations + [
+        limitations=limitations
+        + [
             "Coverage is based on the stored source attestation; the application does not independently discover omitted distributions."
         ],
     )
@@ -721,9 +726,7 @@ def get_portfolio_quality(
     missing_weight_count = sum(item.weight_pct is None for item in holdings)
     equity = [item for item in holdings if item.asset_class == "equity"]
     equity_weight = sum((Decimal(item.weight_pct or 0) for item in equity), Decimal("0"))
-    unresolved_equity = [
-        item for item in equity if not item.isin and not item.company_entity_id
-    ]
+    unresolved_equity = [item for item in equity if not item.isin and not item.company_entity_id]
     unresolved_weight = sum(
         (Decimal(item.weight_pct or 0) for item in unresolved_equity), Decimal("0")
     )
