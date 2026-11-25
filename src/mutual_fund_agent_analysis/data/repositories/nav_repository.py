@@ -244,5 +244,17 @@ def upsert_nav_response(
             relation_type="nav_sync",
             resolution_method="identifier",
         )
+        if metadata.fund_house:
+            amc = create_entity(session, "amc", metadata.fund_house)
+            create_entity_relationship(
+                session,
+                entity.entity_id,
+                amc.entity_id,
+                "managed_by",
+                source_key=source_key,
+                evidence_id=evidence.evidence_id,
+                verification_status="unverified",
+                metadata={"provider_scheme_code": metadata.scheme_code},
+            )
     _reconcile_dates(session, metadata.scheme_code, affected_dates)
     return processed
