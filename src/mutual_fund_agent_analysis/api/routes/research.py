@@ -585,6 +585,8 @@ def collect_social_posts(
             "query": q,
             "fetched": len(posts),
             "persisted": saved,
+            "retention_days": retention_days,
+            "terms_reviewed_at": metadata.get("reviewed_at"),
             "sentiment_status": "not_scored",
             "note": "Posts are stored without inferred sentiment; attach an evaluated finance sentiment model before using sentiment analytics.",
         }
