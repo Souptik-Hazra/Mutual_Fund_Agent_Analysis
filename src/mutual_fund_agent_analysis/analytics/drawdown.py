@@ -26,7 +26,7 @@ def calculate_drawdown(points: Iterable[PricePoint]) -> DrawdownMetrics:
     worst = Decimal("0")
     worst_peak = peak
     worst_trough = peak
-    worst_recovery: date | None = peak.date
+    worst_recovery: date | None = None
     underwater_start: date | None = None
     longest_underwater = 0
 
@@ -47,7 +47,8 @@ def calculate_drawdown(points: Iterable[PricePoint]) -> DrawdownMetrics:
                 worst_recovery = None
 
         if (
-            worst_recovery is None
+            worst < 0
+            and worst_recovery is None
             and point.date > worst_trough.date
             and point.value >= worst_peak.value
         ):
