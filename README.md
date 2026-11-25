@@ -591,3 +591,31 @@ AMFI adapter coverage currently targets open-ended scheme history (\`tp=1\`). Cl
 interval schemes, daily NAVAll bulk refresh, and scheme-master lifecycle tracking remain
 separate follow-up work. Raw provider-response audit data has no automated purge job yet;
 define deployment retention and backup policies before large-scale ingestion.
+
+
+## Benchmark TRI ingestion
+
+Benchmark ingestion stores the official Nifty Total Return Index (TRI) and Net Total Return
+(NTR) series separately from mutual-fund NAVs. The Nifty Indices historical-data page publishes
+a dedicated Total Returns Index Values report, with TRI and NTR columns. TRI includes
+constituent dividends reinvested; compare a fund's Growth-option returns with TRI rather than
+a price-only index. See the [Nifty Indices TRI explanation](https://www.niftyindices.com/resources/index-concepts/total-return-index)
+and [historical-data reports](https://www.niftyindices.com/reports/historical-data).
+
+The adapter currently calls the historical-data page's TRI endpoint. That endpoint is
+reverse-engineered and is not a versioned public API, so it is isolated behind
+\`NiftyIndicesClient\`, validates every row, and should be monitored for upstream schema or
+access changes. Use canonical index names exactly as shown by Nifty Indices (for example,
+\`NIFTY 50\`); an invalid/unavailable name returns no rows and is treated as an error.
+
+Example:
+
+\`\`\`bash
+mfa-sync-benchmark "NIFTY 50" --start-date 2020-01-01 --end-date 2026-11-25
+\`\`\`
+
+The \`benchmark_indices\` table stores the benchmark master;
+\`benchmark_observations\` stores daily TRI and optional NTR values keyed by benchmark,
+date, and source; \`benchmark_sync_runs\` stores the original response and ingestion audit
+metadata. Re-running a date range is idempotent. No TRI is synthesized from price-index
+values or fund NAVs, and missing benchmark dates are not forward-filled.
