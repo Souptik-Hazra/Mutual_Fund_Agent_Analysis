@@ -306,4 +306,8 @@ def test_database_service_builds_report_from_reconciled_navs() -> None:
     assert report.absolute_return == Decimal("0.21")
     assert report.nav_conflict_dates == ()
     assert report.benchmark is None
+    assert report.annual_risk_free_rate == Decimal("0")
+    assert report.periods_per_year == 252
+    assert report.benchmark_code is None
+    assert report.benchmark_source is None
     assert report.risk.observation_count == 2
