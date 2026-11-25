@@ -27,9 +27,7 @@ def test_actual_investor_xirr_includes_redemptions_dividends_and_open_units() ->
 
 def test_fully_redeemed_investment_does_not_require_terminal_nav() -> None:
     transactions = [
-        InvestorTransactionInput(
-            date(2024, 1, 1), "purchase", Decimal("1000"), Decimal("100")
-        ),
+        InvestorTransactionInput(date(2024, 1, 1), "purchase", Decimal("1000"), Decimal("100")),
         InvestorTransactionInput(date(2025, 1, 1), "redemption", Decimal("1200"), Decimal("100")),
     ]
     result = calculate_investor_returns(transactions, date(2025, 1, 1))
@@ -41,9 +39,7 @@ def test_fully_redeemed_investment_does_not_require_terminal_nav() -> None:
 
 def test_charges_and_taxes_reduce_investor_gain() -> None:
     transactions = [
-        InvestorTransactionInput(
-            date(2024, 1, 1), "purchase", Decimal("1000"), Decimal("100")
-        ),
+        InvestorTransactionInput(date(2024, 1, 1), "purchase", Decimal("1000"), Decimal("100")),
         InvestorTransactionInput(date(2024, 1, 2), "charges", Decimal("10")),
         InvestorTransactionInput(date(2024, 1, 3), "tax", Decimal("5")),
     ]
