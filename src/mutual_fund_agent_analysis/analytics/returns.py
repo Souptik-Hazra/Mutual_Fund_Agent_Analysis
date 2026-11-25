@@ -13,10 +13,13 @@ DAYS_PER_YEAR = Decimal("365.25")
 
 def _subtract_years(value: date, years: int) -> date:
     """Subtract calendar years, mapping leap day to February 28 when needed."""
+    target_year = value.year - years
+    if target_year < 1:
+        return date.min
     try:
-        return value.replace(year=value.year - years)
+        return value.replace(year=target_year)
     except ValueError:
-        return value.replace(year=value.year - years, month=2, day=28)
+        return value.replace(year=target_year, month=2, day=28)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +33,8 @@ class RollingReturn:
 def absolute_return(points: Iterable[PricePoint]) -> Decimal:
     """Return total point-to-point price appreciation, excluding distributions."""
     prices = normalize_prices(points)
+    if len(prices) < 2:
+        raise ValueError("Absolute return requires at least two distinct observations.")
     return prices[-1].value / prices[0].value - Decimal("1")
 
 
@@ -66,6 +71,8 @@ def rolling_returns(
         for year in windows_years
     ):
         raise ValueError("Rolling windows must be positive integers.")
+    if len(windows_years) != len(set(windows_years)):
+        raise ValueError("Rolling windows must not contain duplicates.")
     dates = [point.date for point in prices]
     results: list[RollingReturn] = []
     for years in windows_years:
@@ -93,9 +100,14 @@ def calendar_year_returns(points: Iterable[PricePoint]) -> dict[int, Decimal]:
     for point in prices:
         year_ends[point.date.year] = point
     results: dict[int, Decimal] = {}
+    latest_year = prices[-1].date.year
+    final_date_is_year_end = prices[-1].date == date(latest_year, 12, 31)
     for year in sorted(year_ends):
         previous = year_ends.get(year - 1)
         current = year_ends[year]
-        if previous is not None:
+        year_is_complete = year < latest_year or (
+            year == latest_year and final_date_is_year_end
+        )
+        if previous is not None and year_is_complete:
             results[year] = current.value / previous.value - Decimal("1")
     return results
