@@ -730,7 +730,7 @@ The shared identity and provenance layer is implemented on the development branc
 All endpoints are under `/api/v1/intelligence`:
 
 - `GET /sources`: list registered sources and authority metadata.
-- `POST /entities`, `GET /entities/{entity_id}`: create or retrieve canonical entities.
+- `POST /entities`, `GET /entities`, `GET /entities/{entity_id}`: create, search, list, and retrieve canonical entities with bounded pagination and type/status filters.
 - `POST /entities/{entity_id}/aliases`, `GET /entities/{entity_id}/aliases`: register and list source-aware aliases and validity intervals.
 - `POST /entities/{entity_id}/identifiers`, `GET /entities/{entity_id}/identifiers`: register and list unique namespaced identifiers.
 - `POST /evidence`: record source references, publication/retrieval/effective dates, content hash, verification status, and confidence.
