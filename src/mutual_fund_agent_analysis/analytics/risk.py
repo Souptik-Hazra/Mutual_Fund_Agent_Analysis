@@ -59,22 +59,15 @@ def calculate_risk_metrics(
     std = _sample_std(values)
     volatility = std * Decimal(periods_per_year).sqrt() if std is not None else None
 
-    downside_squares = [
-        min(value - periodic_rf, Decimal("0")) ** 2 for value in values
-    ]
-    downside = (
-        (sum(downside_squares, Decimal("0")) / Decimal(len(values))).sqrt()
-        * Decimal(periods_per_year).sqrt()
-    )
+    downside_squares = [min(value - periodic_rf, Decimal("0")) ** 2 for value in values]
+    downside = (sum(downside_squares, Decimal("0")) / Decimal(len(values))).sqrt() * Decimal(
+        periods_per_year
+    ).sqrt()
     mean_excess = _mean(excess)
     sharpe = (
         mean_excess * Decimal(periods_per_year) / volatility
         if volatility is not None and volatility != 0
         else None
     )
-    sortino = (
-        mean_excess * Decimal(periods_per_year) / downside
-        if downside != 0
-        else None
-    )
+    sortino = mean_excess * Decimal(periods_per_year) / downside if downside != 0 else None
     return RiskMetrics(len(values), volatility, downside, sharpe, sortino)
