@@ -463,7 +463,6 @@ def test_postgres_investor_ledger_persists_decimal_entries(migrated_postgres: En
         assert saved.currency == "INR"
 
 
-
 def test_postgres_social_purge_deletes_only_expired_records(migrated_postgres: Engine) -> None:
     """Verify retention deletion in PostgreSQL while preserving unexpired records."""
     from mutual_fund_agent_analysis.data.services.research_intelligence import (
