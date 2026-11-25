@@ -81,6 +81,12 @@ def create_entity_endpoint(
         )
         _commit(session)
         return EntityResponse.model_validate(entity)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The requested record conflicts with an existing identity or constraint.",
+        ) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -105,6 +111,12 @@ def add_alias_endpoint(
         )
         _commit(session)
         return AliasResponse.model_validate(record)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The requested record conflicts with an existing identity or constraint.",
+        ) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -124,6 +136,12 @@ def add_identifier_endpoint(
         )
         _commit(session)
         return IdentifierResponse.model_validate(record)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The requested record conflicts with an existing identity or constraint.",
+        ) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -142,6 +160,12 @@ def create_evidence_endpoint(
         )
         _commit(session)
         return EvidenceResponse.model_validate(record)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The requested record conflicts with an existing identity or constraint.",
+        ) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -162,6 +186,12 @@ def link_evidence_endpoint(
         )
         _commit(session)
         return EntityEvidenceLinkResponse.model_validate(record)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The requested record conflicts with an existing identity or constraint.",
+        ) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -225,6 +255,12 @@ def create_relationship_endpoint(
         )
         _commit(session)
         return EntityRelationshipResponse.model_validate(record)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The requested record conflicts with an existing identity or constraint.",
+        ) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
