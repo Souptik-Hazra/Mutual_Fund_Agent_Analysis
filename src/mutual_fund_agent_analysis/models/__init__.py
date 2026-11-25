@@ -10,6 +10,7 @@ from mutual_fund_agent_analysis.models.intelligence import (
     EntityAlias,
     EntityEvidenceLink,
     EntityIdentifier,
+    EntityRelationship,
     EvidenceRecord,
     ResearchEntity,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "EntityAlias",
     "EntityEvidenceLink",
     "EntityIdentifier",
+    "EntityRelationship",
     "EvidenceRecord",
     "MutualFundScheme",
     "NavObservation",
