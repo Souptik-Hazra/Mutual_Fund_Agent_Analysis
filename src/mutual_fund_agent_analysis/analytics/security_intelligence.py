@@ -11,6 +11,23 @@ from sqlalchemy.orm import Session
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
+FUNDAMENTAL_UNITS = {
+    "market_cap": "provider currency; magnitude is not normalized",
+    "pe_ratio": "multiple",
+    "pb_ratio": "multiple",
+    "roe_pct": "percent",
+    "debt_to_equity": "multiple",
+    "dividend_yield_pct": "percent",
+    "eps": "provider currency per share",
+    "book_value": "provider currency per share",
+    "revenue": "provider currency; magnitude is not normalized",
+    "net_profit": "provider currency; magnitude is not normalized",
+    "total_debt": "provider currency; magnitude is not normalized",
+    "total_equity": "provider currency; magnitude is not normalized",
+    "operating_margin_pct": "percent",
+    "profit_margin_pct": "percent",
+}
+
 
 def security_profile(
     session: Session,
@@ -148,6 +165,13 @@ def security_profile(
             "metrics": fundamentals_observation.fundamentals_json
             if fundamentals_observation
             else {},
+            "metric_units": {
+                key: FUNDAMENTAL_UNITS[key]
+                for key in (fundamentals_observation.fundamentals_json or {})
+                if key in FUNDAMENTAL_UNITS
+            }
+            if fundamentals_observation
+            else {},
             "source_key": fundamentals_observation.source_key
             if fundamentals_observation
             else None,
@@ -179,6 +203,11 @@ def security_profile(
             }
             for row in observations
         ],
+        "freshness_policy": {
+            "quote_fresh_hours": 24,
+            "fundamentals_fresh_days": 180,
+            "note": "Application freshness heuristics, not exchange or regulatory standards.",
+        },
         "limitations": [
             (
                 "Market observations and fundamentals are provider-submitted snapshots, "
