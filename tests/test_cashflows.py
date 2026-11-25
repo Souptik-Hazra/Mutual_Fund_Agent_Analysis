@@ -19,7 +19,7 @@ def flows(*items: tuple[str, str]) -> list[CashFlow]:
 
 def test_xirr_matches_simple_annual_cash_flow() -> None:
     result = xirr(flows(("2023-01-01", "-1000"), ("2024-01-01", "1100")))
-    assert result == pytest.approx(Decimal("0.100068"), abs=Decimal("0.00001"))
+    assert result == pytest.approx(Decimal("0.1"), abs=Decimal("0.00001"))
 
 
 def test_xirr_handles_irregular_dates_using_actual_day_count() -> None:
