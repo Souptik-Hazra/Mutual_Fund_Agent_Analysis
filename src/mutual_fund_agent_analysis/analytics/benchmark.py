@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Iterable
+from collections.abc import Iterable
 
 from mutual_fund_agent_analysis.analytics.risk import DEFAULT_PERIODS_PER_YEAR, _mean
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint
@@ -56,7 +56,7 @@ def calculate_benchmark_metrics(
     covariance = sum(
         (
             (f_value - f_mean) * (b_value - b_mean)
-            for f_value, b_value in zip(f_values, b_values)
+            for f_value, b_value in zip(f_values, b_values, strict=True)
         ),
         Decimal("0"),
     )
