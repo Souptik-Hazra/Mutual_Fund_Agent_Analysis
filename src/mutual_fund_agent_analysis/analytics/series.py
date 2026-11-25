@@ -16,7 +16,7 @@ class PricePoint:
 class ReturnPoint:
     date: date
     value: Decimal
-    start_date: date | None = None
+    start_date: date
 
 
 def normalize_prices(points: Iterable[PricePoint]) -> list[PricePoint]:
@@ -43,3 +43,17 @@ def period_returns(points: Iterable[PricePoint]) -> list[ReturnPoint]:
         )
         for previous, current in zip(prices, prices[1:], strict=False)
     ]
+
+
+def normalize_returns(points: Iterable[ReturnPoint]) -> list[ReturnPoint]:
+    """Validate and sort returns with explicit, unique observation intervals."""
+    result = list(points)
+    for point in result:
+        if point.start_date is None or point.start_date >= point.date:
+            raise ValueError("Return observations require start_date earlier than date.")
+        if not point.value.is_finite() or point.value <= Decimal("-1"):
+            raise ValueError("Returns must be finite and greater than -100%.")
+    intervals = [(point.start_date, point.date) for point in result]
+    if len(intervals) != len(set(intervals)):
+        raise ValueError("Duplicate return observation intervals are not allowed.")
+    return sorted(result, key=lambda point: (point.start_date, point.date))
