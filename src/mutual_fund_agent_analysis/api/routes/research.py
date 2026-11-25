@@ -550,6 +550,7 @@ def collect_social_posts(
         not registry.terms_url
         or metadata.get("terms_reviewed") is not True
         or metadata.get("access_confirmed") is not True
+        or not metadata.get("reviewed_at")
     ):
         raise HTTPException(
             status_code=403,
