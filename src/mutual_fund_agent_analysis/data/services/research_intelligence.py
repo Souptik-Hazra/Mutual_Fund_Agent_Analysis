@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -26,8 +26,6 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
     source = session.get(DataSource, payload.source_key)
     if source is None or not source.enabled:
         raise ValueError("Unknown or disabled source_key.")
-    if payload.related_entity_id if hasattr(payload, "related_entity_id") else False:
-        pass
     existing = session.scalar(select(PortfolioSnapshot).where(
         PortfolioSnapshot.scheme_code == payload.scheme_code,
         PortfolioSnapshot.effective_date == payload.effective_date,
@@ -320,14 +318,23 @@ def store_document(
     )
     session.add(document)
     session.flush()
+    chunk_rows = []
     for index, chunk in enumerate(split_document(extracted_text)):
+        page_match = re.search(r"\\[Page (\\d+)\\]", chunk)
+        page_number = int(page_match.group(1)) if page_match else None
+        chunk_rows.append({
+            "text": chunk, "chunk_index": index, "page_number": page_number,
+            "scheme_code": scheme_code, "content_hash": digest, "source_key": source_key,
+        })
         session.add(DocumentChunk(
-            document_id=document.document_id, chunk_index=index, chunk_text=chunk,
-            token_estimate=max(1, len(chunk) // 4),
+            document_id=document.document_id, chunk_index=index, page_number=page_number,
+            chunk_text=chunk, token_estimate=max(1, len(chunk) // 4),
             metadata_json={"source_title": title, "content_hash": digest},
         ))
     session.commit()
     session.refresh(document)
+    from mutual_fund_agent_analysis.data.services.document_vectors import index_chunks
+    index_chunks(document.document_id, title, chunk_rows)
     return document
 
 
@@ -335,6 +342,10 @@ def search_documents(session: Session, query: str, scheme_code: int | None, limi
     terms = [term for term in re.findall(r"[a-zA-Z0-9]{3,}", query.lower())[:12]]
     if not terms:
         raise ValueError("Query must contain at least one searchable term.")
+    from mutual_fund_agent_analysis.data.services.document_vectors import search_chunks
+    semantic = search_chunks(query, limit, scheme_code)
+    if semantic is not None:
+        return {"query": query, "results": semantic, "retrieval_mode": "qdrant_semantic"}
     stmt = select(DocumentChunk, ResearchDocument).join(
         ResearchDocument, ResearchDocument.document_id == DocumentChunk.document_id
     )
