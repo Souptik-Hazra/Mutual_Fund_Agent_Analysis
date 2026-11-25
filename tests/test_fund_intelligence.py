@@ -1,6 +1,6 @@
 """Tests for category, cross-fund and underlying-security intelligence contracts."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -29,6 +29,17 @@ def test_market_observation_requires_timezone_aware_timestamp():
             security_name="Example Limited",
             source_key="market_provider",
             observed_at=datetime(2026, 11, 25, 10, 0),
+            last_price=Decimal("100"),
+        )
+
+
+def test_market_observation_rejects_future_timestamp():
+    with pytest.raises(ValidationError, match="future"):
+        MarketObservationRequest(
+            security_key="INE009A01021",
+            security_name="Example Limited",
+            source_key="market_provider",
+            observed_at=datetime.now(UTC) + timedelta(minutes=1),
             last_price=Decimal("100"),
         )
 
