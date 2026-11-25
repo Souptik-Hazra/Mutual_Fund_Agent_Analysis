@@ -846,8 +846,13 @@ def search_documents(session: Session, query: str, scheme_code: int | None, limi
     stmt = stmt.where(or_(*conditions))
     # Rank candidates in SQL before applying the cap; do not let arbitrary row order
     # discard highly relevant chunks from large document collections.
+    normalized_chunk = func.lower(DocumentChunk.chunk_text)
     candidate_score = sum(
-        case((func.lower(DocumentChunk.chunk_text).contains(term), 1), else_=0)
+        (
+            func.length(normalized_chunk)
+            - func.length(func.replace(normalized_chunk, term, ""))
+        )
+        / len(term)
         for term in terms
     )
     rows = session.execute(
