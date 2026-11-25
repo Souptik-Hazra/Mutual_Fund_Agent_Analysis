@@ -5,14 +5,17 @@ from mutual_fund_agent_analysis.analytics.benchmark import (
     align_returns,
     calculate_benchmark_metrics,
 )
+from mutual_fund_agent_analysis.analytics.coverage import ReturnCoverage, assess_return_coverage
 from mutual_fund_agent_analysis.analytics.drawdown import DrawdownMetrics, calculate_drawdown
 from mutual_fund_agent_analysis.analytics.returns import (
     RollingReturn,
+    TrailingReturn,
     absolute_return,
     cagr,
     calendar_year_returns,
     rolling_returns,
     trailing_return,
+    trailing_return_details,
 )
 from mutual_fund_agent_analysis.analytics.risk import (
     RiskMetrics,
@@ -37,12 +40,15 @@ __all__ = [
     "DrawdownMetrics",
     "FundAnalyticsReport",
     "PricePoint",
+    "ReturnCoverage",
     "ReturnPoint",
     "RiskMetrics",
     "RollingReturn",
+    "TrailingReturn",
     "absolute_return",
     "analyze_fund",
     "align_returns",
+    "assess_return_coverage",
     "calculate_benchmark_metrics",
     "calculate_drawdown",
     "calculate_risk_metrics",
@@ -55,4 +61,5 @@ __all__ = [
     "period_returns",
     "rolling_returns",
     "trailing_return",
+    "trailing_return_details",
 ]
