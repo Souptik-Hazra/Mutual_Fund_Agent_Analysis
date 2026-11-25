@@ -444,7 +444,7 @@ def store_document(
     session.flush()
     chunk_rows = []
     for index, chunk in enumerate(split_document(extracted_text)):
-        page_match = re.search(r"\\[Page (\\d+)\\]", chunk)
+        page_match = re.search(r"\[Page (\d+)\]", chunk)
         page_number = int(page_match.group(1)) if page_match else None
         chunk_rows.append({
             "text": chunk, "chunk_index": index, "page_number": page_number,
