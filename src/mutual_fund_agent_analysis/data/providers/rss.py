@@ -19,6 +19,8 @@ def fetch_feed(url: str, allowed_host: str) -> list[dict[str, Any]]:
     with httpx.Client(timeout=20, follow_redirects=False, headers={"User-Agent": "MutualFundResearch/1.0"}) as client:
         response = client.get(url)
         response.raise_for_status()
+        if len(response.content) > 5 * 1024 * 1024:
+            raise ValueError("RSS/Atom feed exceeds the 5 MB response limit.")
     root = ElementTree.fromstring(response.content)
     items = []
     for node in root.findall(".//item") + root.findall(".//{http://www.w3.org/2005/Atom}entry"):
