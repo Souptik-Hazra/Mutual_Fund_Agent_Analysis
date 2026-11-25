@@ -7,11 +7,25 @@ from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
-from mutual_fund_agent_analysis.analytics.service import analyze_fund, compare_funds
-from mutual_fund_agent_analysis.api.schemas.funds import (
+from mutual_fund_agent_analysis.analytics.active_risk import calculate_active_risk_metrics
+from mutual_fund_agent_analysis.analytics.investor import (
+    InvestorTransactionInput,
+    calculate_investor_returns,
+)
+from mutual_fund_agent_analysis.analytics.service import (
+    analyze_fund,
+    compare_funds,
+    load_benchmark_prices,
+    load_fund_prices,
+)
+from mutual_fund_agent_analysis.analytics.series import period_returns
+from mutual_fund_agent_analysis.analytics.sip import simulate_monthly_sip
+from mutual_fund_agent_analysis.api.schemas.investor import (\n    ActiveRiskResponse,\n    InvestorReturnsResponse,\n    InvestorTransactionCreate,\n    InvestorTransactionResponse,\n    SipSimulationRequest,\n    SipSimulationResponse,\n)\nfrom mutual_fund_agent_analysis.api.schemas.funds import (
     FundAnalyticsResponse,
     FundComparisonRequest,
     FundComparisonResponse,
@@ -22,7 +36,7 @@ from mutual_fund_agent_analysis.api.schemas.funds import (
 )
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models import MutualFundScheme, NavReconciliation
+from mutual_fund_agent_analysis.models import (\n    InvestorTransaction,\n    MutualFundScheme,\n    NavReconciliation,\n)
 
 router = APIRouter(tags=["funds"])
 
@@ -221,3 +235,216 @@ def compare_selected_funds(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     payload = _report_payload(report)
     return FundComparisonResponse.model_validate(payload)
+
+
+
+@router.post(
+    "/schemes/{scheme_code}/sip-simulation",
+    response_model=SipSimulationResponse,
+)
+def run_sip_simulation(
+    scheme_code: int,
+    request: SipSimulationRequest,
+    session: Annotated[Session, Depends(get_db)],
+) -> SipSimulationResponse:
+    """Simulate hypothetical SIP instalments using exact reconciled NAV dates."""
+    _validate_scheme_code(scheme_code)
+    if session.get(MutualFundScheme, scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
+    try:
+        prices, _ = load_fund_prices(
+            session, scheme_code, request.start_date, request.valuation_date
+        )
+        result = simulate_monthly_sip(
+            prices,
+            request.start_date,
+            request.end_date,
+            request.monthly_amount,
+            request.valuation_date,
+            request.day_of_month,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return SipSimulationResponse.model_validate(
+        {"scheme_code": scheme_code, **asdict(result)}
+    )
+
+
+@router.get(
+    "/schemes/{scheme_code}/transactions",
+    response_model=list[InvestorTransactionResponse],
+)
+def list_investor_transactions(
+    scheme_code: int,
+    session: Annotated[Session, Depends(get_db)],
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[InvestorTransactionResponse]:
+    """List the local transaction ledger for a single scheme."""
+    _validate_scheme_code(scheme_code)
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
+    if session.get(MutualFundScheme, scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
+    statement = select(InvestorTransaction).where(
+        InvestorTransaction.scheme_code == scheme_code
+    )
+    if start_date:
+        statement = statement.where(InvestorTransaction.transaction_date >= start_date)
+    if end_date:
+        statement = statement.where(InvestorTransaction.transaction_date <= end_date)
+    rows = session.scalars(
+        statement.order_by(
+            InvestorTransaction.transaction_date,
+            InvestorTransaction.transaction_id,
+        ).limit(limit).offset(offset)
+    ).all()
+    return [InvestorTransactionResponse.model_validate(row) for row in rows]
+
+
+@router.post(
+    "/schemes/{scheme_code}/transactions",
+    response_model=InvestorTransactionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_investor_transaction(
+    scheme_code: int,
+    request: InvestorTransactionCreate,
+    session: Annotated[Session, Depends(get_db)],
+) -> InvestorTransactionResponse:
+    """Append one validated transaction to the personal investor ledger."""
+    _validate_scheme_code(scheme_code)
+    if session.get(MutualFundScheme, scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
+    record = InvestorTransaction(scheme_code=scheme_code, **request.model_dump())
+    session.add(record)
+    try:
+        session.commit()
+        session.refresh(record)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The transaction conflicts with an existing reference or database constraint.",
+        ) from exc
+    return InvestorTransactionResponse.model_validate(record)
+
+
+@router.delete(
+    "/transactions/{transaction_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_investor_transaction(
+    transaction_id: int,
+    session: Annotated[Session, Depends(get_db)],
+) -> Response:
+    """Delete an incorrect manually entered ledger row."""
+    record = session.get(InvestorTransaction, transaction_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Investor transaction not found.")
+    session.delete(record)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/schemes/{scheme_code}/investor-returns",
+    response_model=InvestorReturnsResponse,
+)
+def get_investor_returns(
+    scheme_code: int,
+    session: Annotated[Session, Depends(get_db)],
+    as_of_date: date | None = None,
+) -> InvestorReturnsResponse:
+    """Calculate actual ledger XIRR and open-unit valuation at an exact reconciled NAV date."""
+    _validate_scheme_code(scheme_code)
+    if session.get(MutualFundScheme, scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
+    nav_statement = select(NavReconciliation).where(
+        NavReconciliation.scheme_code == scheme_code
+    )
+    if as_of_date is not None:
+        nav_statement = nav_statement.where(NavReconciliation.nav_date == as_of_date)
+    latest = session.scalars(
+        nav_statement.order_by(NavReconciliation.nav_date.desc()).limit(1)
+    ).first()
+    if latest is None:
+        raise HTTPException(
+            status_code=422,
+            detail="No exact reconciled NAV is available for the requested valuation date.",
+        )
+    if latest.status == "conflict":
+        raise HTTPException(
+            status_code=422,
+            detail="The valuation NAV is conflicted and cannot be used for investor returns.",
+        )
+
+    records = session.scalars(
+        select(InvestorTransaction)
+        .where(
+            InvestorTransaction.scheme_code == scheme_code,
+            InvestorTransaction.transaction_date <= latest.nav_date,
+        )
+        .order_by(InvestorTransaction.transaction_date, InvestorTransaction.transaction_id)
+    ).all()
+    inputs = [
+        InvestorTransactionInput(
+            transaction_date=item.transaction_date,
+            transaction_type=item.transaction_type,
+            amount=Decimal(item.amount),
+            units=Decimal(item.units) if item.units is not None else None,
+        )
+        for item in records
+    ]
+    try:
+        report = calculate_investor_returns(
+            inputs, latest.nav_date, Decimal(latest.canonical_nav)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return InvestorReturnsResponse.model_validate(
+        {"scheme_code": scheme_code, **asdict(report)}
+    )
+
+
+@router.get(
+    "/schemes/{scheme_code}/active-risk",
+    response_model=ActiveRiskResponse,
+)
+def get_active_risk(
+    scheme_code: int,
+    benchmark_code: Annotated[str, Query(min_length=1, max_length=80)],
+    session: Annotated[Session, Depends(get_db)],
+    start_date: date,
+    end_date: date,
+    periods_per_year: Annotated[int, Query(ge=1, le=366)] = 252,
+    benchmark_source: Annotated[str, Query(min_length=1, max_length=40)] = "niftyindices",
+) -> ActiveRiskResponse:
+    """Calculate tracking error and information ratio over exact aligned return intervals."""
+    _validate_scheme_code(scheme_code)
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
+    try:
+        prices, _ = load_fund_prices(session, scheme_code, start_date, end_date)
+        benchmark_prices = load_benchmark_prices(
+            session, benchmark_code, start_date, end_date, benchmark_source
+        )
+        metrics = calculate_active_risk_metrics(
+            period_returns(prices), period_returns(benchmark_prices), periods_per_year
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ActiveRiskResponse(
+        scheme_code=scheme_code,
+        benchmark_code=benchmark_code,
+        start_date=start_date,
+        end_date=end_date,
+        periods_per_year=periods_per_year,
+        aligned_observation_count=metrics.aligned_observation_count,
+        tracking_error=metrics.tracking_error,
+        information_ratio=metrics.information_ratio,
+        mean_active_return=metrics.mean_active_return,
+        coverage_ratio=metrics.coverage_ratio,
+    )
