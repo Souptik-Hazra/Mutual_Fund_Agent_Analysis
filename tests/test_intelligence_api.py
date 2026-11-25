@@ -6,9 +6,11 @@ from mutual_fund_agent_analysis.main import create_app
 
 
 def test_intelligence_routes_are_registered():
-    client = TestClient(create_app())
-    response = client.get("/api/v1/intelligence/sources")
-    assert response.status_code in {200, 503}
+    app = create_app()
+    paths = {route.path for route in app.routes}
+    assert "/api/v1/intelligence/sources" in paths
+    assert "/api/v1/intelligence/entities" in paths
+    assert "/api/v1/intelligence/resolve" in paths
 
 
 def test_entity_create_request_rejects_blank_name():
