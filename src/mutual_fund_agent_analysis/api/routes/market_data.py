@@ -254,6 +254,11 @@ def ingest_security_observation(
         raise HTTPException(
             status_code=422, detail="source_key must reference an enabled data source."
         )
+    if source.source_type not in {"official", "provider", "internal"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Security observations require an official, provider or internal source.",
+        )
     source_url = str(payload.source_url) if payload.source_url else source.base_url
     if not source_url:
         raise HTTPException(
