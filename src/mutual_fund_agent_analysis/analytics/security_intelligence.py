@@ -156,7 +156,10 @@ def security_profile(
             for row in observations
         ],
         "limitations": [
-            "Market observations and fundamentals are provider-submitted snapshots, not guaranteed live exchange data.",
+            (
+                "Market observations and fundamentals are provider-submitted snapshots, "
+                "not guaranteed live exchange data."
+            ),
             "Fundamentals are shown only with their declared as-of date and source attribution.",
             "Portfolio positions come from dated AMC disclosures and may be incomplete or stale.",
             "Missing metrics are unavailable; they are never estimated from price or NAV.",
@@ -216,5 +219,8 @@ def securities_for_funds(
             "unique_equity_securities": len({row.security_key for row in holdings}),
             "returned_securities": len(securities),
         },
-        "warning": "Stock observations are joined by normalized security_key. Unmatched securities remain without market data.",
+        "warning": (
+            "Stock observations are joined by normalized security_key. "
+            "Unmatched securities remain without market data."
+        ),
     }
