@@ -158,8 +158,10 @@ def portfolio_history(session: Session, scheme_code: int) -> list[dict[str, Any]
     return result
 
 
-def compare_portfolios(session: Session, scheme_codes: list[int]) -> dict[str, Any]:
-    snapshots = {code: latest_snapshot(session, code) for code in scheme_codes}
+def compare_portfolios(
+    session: Session, scheme_codes: list[int], as_of: date | None = None
+) -> dict[str, Any]:
+    snapshots = {code: latest_snapshot(session, code, as_of) for code in scheme_codes}
     if any(value is None for value in snapshots.values()):
         missing = [code for code, value in snapshots.items() if value is None]
         raise ValueError(f"No portfolio disclosure available for scheme(s): {missing}")
@@ -186,7 +188,10 @@ def compare_portfolios(session: Session, scheme_codes: list[int]) -> dict[str, A
                      "weight_b": maps[right][key]} for key in sorted(common)
                 ],
             })
-    return {"as_of": {str(code): snapshots[code].effective_date for code in scheme_codes}, "pairwise_overlap": pairwise}
+    return {
+        "as_of": {str(code): snapshots[code].effective_date for code in scheme_codes},
+        "pairwise_overlap": pairwise,
+    }
 
 
 def security_fund_exposure(session: Session, security_key: str) -> dict[str, Any]:
