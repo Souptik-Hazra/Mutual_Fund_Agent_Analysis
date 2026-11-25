@@ -45,7 +45,11 @@ def calculate_risk_metrics(
     """
     observations = normalize_returns(returns)
     values = [point.value for point in observations]
-    if isinstance(periods_per_year, bool) or not isinstance(periods_per_year, int) or periods_per_year <= 0:
+    if (
+        isinstance(periods_per_year, bool)
+        or not isinstance(periods_per_year, int)
+        or periods_per_year <= 0
+    ):
         raise ValueError("periods_per_year must be a positive integer.")
     if not isinstance(annual_risk_free_rate, Decimal):
         raise TypeError("annual_risk_free_rate must be a Decimal.")
