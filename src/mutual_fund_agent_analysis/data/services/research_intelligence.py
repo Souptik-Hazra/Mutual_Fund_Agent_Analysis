@@ -247,6 +247,8 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             evidence.title = item["title"]
             evidence.canonical_url = item["url"]
             evidence.published_at = item["published_at"]
+            if evidence.content_hash != digest:
+                evidence.verification_status = "unverified"
             evidence.content_hash = digest
         event = session.scalar(select(MarketEvent).where(
             MarketEvent.source_key == source_key, MarketEvent.external_id == external_id
