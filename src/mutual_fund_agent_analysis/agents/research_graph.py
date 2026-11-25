@@ -202,6 +202,8 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             ])
             answer = str(response.content)
             model_used = type(model).__name__
+        except ValueError as exc:
+            logger.info("LLM synthesis skipped: %s", exc)
         except Exception:
             logger.exception("Optional LLM synthesis failed; returning deterministic research output.")
     if errors:
