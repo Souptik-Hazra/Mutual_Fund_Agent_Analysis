@@ -68,7 +68,7 @@ class FundComparisonReport:
     end_date: date
     funds: tuple[FundAnalyticsReport, ...]
     benchmark_code: str | None
-    frequency: str
+    frequency: str = "daily"
 
 
 def load_fund_prices(
