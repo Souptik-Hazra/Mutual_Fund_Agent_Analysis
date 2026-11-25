@@ -126,6 +126,24 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
         )
         assert scheme_identifier is not None
         assert benchmark_identifier is not None
+        scheme_entity = session.get(ResearchEntity, scheme_identifier.entity_id)
+        assert scheme_entity is not None
+        amc_entity = session.scalar(
+            select(ResearchEntity).where(
+                ResearchEntity.entity_type == "amc",
+                ResearchEntity.canonical_name == "Migration AMC",
+            )
+        )
+        assert amc_entity is not None
+        relationship = session.scalar(
+            select(EntityRelationship).where(
+                EntityRelationship.from_entity_id == scheme_entity.entity_id,
+                EntityRelationship.to_entity_id == amc_entity.entity_id,
+                EntityRelationship.relation_type == "managed_by",
+            )
+        )
+        assert relationship is not None
+        assert relationship.verification_status == "unverified"
     source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
     check_database_connection()
