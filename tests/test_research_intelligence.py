@@ -16,6 +16,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     split_document,
 )
 from mutual_fund_agent_analysis.models import DataSource
+from mutual_fund_agent_analysis.api.routes import research as research_routes
 
 
 def test_document_split_preserves_page_markers_and_overlap():
@@ -103,6 +104,10 @@ def test_social_retention_uses_source_override_and_global_fallback():
     source.metadata_json = {}
     assert source_social_retention_days(source, 30) == 30
 
+    source.metadata_json = ["invalid"]
+    with pytest.raises(ValueError, match="JSON object"):
+        source_social_retention_days(source, 30)
+
 
 @pytest.mark.parametrize("value", [0, -1, 366, True, 12.5, "12"])
 def test_social_retention_rejects_invalid_source_override(value):
@@ -131,3 +136,55 @@ def test_social_retention_rejects_invalid_global_fallback():
     )
     with pytest.raises(ValueError, match="Default social retention"):
         source_social_retention_days(source, 0)
+
+
+
+def test_social_collection_applies_source_specific_expiry(monkeypatch):
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=True,
+        metadata_json={"retention_days": 12},
+    )
+
+    class StubSession:
+        def get(self, _model, _key):
+            return source
+
+    captured = []
+    monkeypatch.setattr(
+        research_routes,
+        "search_reddit",
+        lambda _query, _limit: [
+            {
+                "external_id": "retention-route-test",
+                "text_excerpt": "A public market discussion",
+                "published_at": datetime.now(UTC),
+                "engagement_count": 1,
+                "metadata": {},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        research_routes,
+        "create_social_post",
+        lambda _session, payload: captured.append(payload),
+    )
+    monkeypatch.setattr(
+        research_routes,
+        "get_settings",
+        lambda: SimpleNamespace(social_retention_days=30),
+    )
+
+    result = research_routes.collect_social_posts(
+        source="reddit", q="mutual funds", session=StubSession(), limit=1
+    )
+    remaining = captured[0].expires_at - datetime.now(UTC)
+    assert result["persisted"] == 1
+    assert timedelta(days=12) - timedelta(seconds=2) < remaining <= timedelta(days=12)
