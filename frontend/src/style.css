@@ -6,3 +6,6 @@
 .upload-block{border:1px dashed #40535d;border-radius:9px;padding:12px 14px;margin-bottom:17px}.upload-block .field{margin:5px 0 10px}.upload-block .field input[type=file]{font-size:10px;color:#9babb2}.upload-block .secondary{margin-top:2px}.json-evidence{max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#0d171e;border:1px solid #293a43;border-radius:8px;padding:13px;color:#b9c8ce;font-size:10px;line-height:1.55}details summary{font-size:11px;color:#c6e991;cursor:pointer}
 .field select{width:100%;background:#0e181f;border:1px solid #344650;color:#e8eff1;border-radius:7px;padding:10px 11px;outline:none;font-size:12px}
 .field select:focus{border-color:#9fc66d}
+
+
+.event-row a{display:inline-block;margin-top:7px;color:#c5f06b;font-size:10px;text-decoration:none}.event-row a:hover{text-decoration:underline}.event-row small+small{margin-top:4px}.loading{display:flex;align-items:center;gap:8px}.loading span{flex:0 0 7px}
