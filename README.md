@@ -534,6 +534,19 @@ mfa-sync-nav 125497 --start-date 2020-01-01
 The command validates the provider response, upserts scheme metadata and source-specific NAV observations, and records the original provider payload in `provider_sync_runs`. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
 
 ### Import source-attributed scheme metadata and IDCW declarations
+Register each source in the local `data_sources` table before importing. The migrations seed `amfi` and the generic `amc_disclosures` placeholder; for each AMC, prefer a distinct source key and its own official base URL:
+
+```bash
+mfa-register-source my_amc \
+  --display-name "AMC legal name" \
+  --source-type official \
+  --authority-tier 1 \
+  --base-url "https://official-amc-domain.example/" \
+  --official --enabled
+```
+
+Replace the example name/domain with the actual source, after checking the AMC's official website and its applicable usage/attribution terms. Use `--disabled` until access and rights have been reviewed. A source's official flag is an operator assertion, not something the CLI independently certifies.
+
 
 Register each source in the local `data_sources` table before importing. Record its true official status, base URL, terms URL and enabled state. The default import status is **unverified**; use `--verification-status verified` only after manually checking every row against the original official AMC/AMFI document. The CLI validates the source registry and URL host, but it cannot independently prove that a disclosure is complete or authentic.
 

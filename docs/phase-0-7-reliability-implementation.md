@@ -94,3 +94,8 @@ The active event record remains the current view. When a manual event update or 
 - `mfa-import-idcw distributions.csv --source-key <registered-source-key>`
 
 Both commands accept a `source_url` column or a shared `--source-url`, default to `unverified`, check the registered source and matching URL host, validate dates/fields, and skip exact duplicate metadata rows or distribution revisions. The optional `--verification-status verified` flag is intended only after manual review against the official original notice; it additionally requires an enabled official source with a registered base URL. IDCW imports never create a coverage attestation. Column headers and use guidance are documented in the README section “Import source-attributed scheme metadata and IDCW declarations”.
+
+
+### Source registry setup
+
+Use `mfa-register-source` to create/update a local source entry with an explicit authority tier, official flag, enabled state, base URL and optional terms URL. Prefer one unique source key per AMC and keep it disabled until the source's authority, access terms and attribution requirements have been reviewed. A verified metadata or distribution import requires an enabled source explicitly registered as official and a matching base URL host.

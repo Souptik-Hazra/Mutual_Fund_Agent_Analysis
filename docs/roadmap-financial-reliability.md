@@ -216,3 +216,8 @@ The implementation branch adds `market_event_revisions` to retain prior event st
 ### CSV source ingestion commands (2026-11-25)
 
 Two local, bounded CSV commands now import effective-dated scheme metadata and versioned IDCW notices. They are idempotent, source-attributed, host-validated and default to unverified. Verified status is allowed only for enabled official registered sources and requires an explicit operator choice. No completeness attestation is inferred from imported rows.
+
+
+### Local source registry CLI
+
+`mfa-register-source` is available for adding/updating source registry rows without manual SQL. Official and enabled states are explicit required flags; each AMC should have a distinct source key/base URL. This improves local source onboarding but does not itself verify that a domain is authoritative or that its terms permit collection.
