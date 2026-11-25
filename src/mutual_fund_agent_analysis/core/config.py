@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
-
     app_name: str = "Mutual Fund Agent Analysis"
     app_env: Literal["development", "test", "production"] = "development"
     log_level: str = "INFO"
@@ -38,10 +37,11 @@ class Settings(BaseSettings):
     reddit_user_agent: str = "MutualFundResearch/1.0"
     x_bearer_token: SecretStr | None = None
     social_retention_days: int = Field(default=30, ge=1, le=365)
+    twelve_data_api_key: SecretStr | None = None
+    twelve_data_exchange_access_confirmed: bool = False
 
     @model_validator(mode="after")
     def validate_production_database_url(self) -> "Settings":
-        """Prevent the development fallback credentials from reaching production."""
         if self.app_env == "production" and "mfa_dev_password" in self.database_url:
             raise ValueError("DATABASE_URL must be explicitly configured for production")
         return self
@@ -49,5 +49,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Return cached settings so all components share one configuration."""
     return Settings()

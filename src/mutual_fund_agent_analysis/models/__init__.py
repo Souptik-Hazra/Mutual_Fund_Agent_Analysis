@@ -5,6 +5,7 @@ from mutual_fund_agent_analysis.models.benchmark import (
     BenchmarkObservation,
     BenchmarkSyncRun,
 )
+from mutual_fund_agent_analysis.models.category_benchmark import CategoryBenchmarkMapping
 from mutual_fund_agent_analysis.models.financial import (
     DistributionCoverageAttestation,
     DistributionObservation,
@@ -39,6 +40,7 @@ __all__ = [
     "BenchmarkIndex",
     "BenchmarkObservation",
     "BenchmarkSyncRun",
+    "CategoryBenchmarkMapping",
     "DataSource",
     "DistributionCoverageAttestation",
     "DistributionObservation",
