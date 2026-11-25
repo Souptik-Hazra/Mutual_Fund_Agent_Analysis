@@ -39,4 +39,4 @@ The default freshness window is 72 hours. This is a coarse data-age signal, not 
 
 ## Migration
 
-Alembic revision: `0011_security_market_observations`, following `0010_market_event_revisions`.
+Alembic revision: `0011_security_market_obs`, following `0010_market_event_revisions`.
