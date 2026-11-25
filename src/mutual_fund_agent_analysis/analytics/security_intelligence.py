@@ -154,6 +154,9 @@ def security_profile(
             "source_url": fundamentals_observation.source_url
             if fundamentals_observation
             else None,
+            "retrieved_at": fundamentals_observation.retrieved_at
+            if fundamentals_observation
+            else None,
         },
         "corporate_events": event_observation.corporate_events_json
         if event_observation
@@ -171,6 +174,7 @@ def security_profile(
                 "change_pct": row.change_pct,
                 "source_key": row.source_key,
                 "source_url": row.source_url,
+                "retrieved_at": row.retrieved_at,
                 "content_hash": row.content_hash,
             }
             for row in observations
