@@ -375,17 +375,16 @@ Implementation should proceed in working milestones rather than creating all age
 
 | Phase | Scope | Deliverable |
 |---|---|---|
-| 1. Foundation | Repository setup, configuration, FastAPI, PostgreSQL, provider abstraction | Working application skeleton |
-| 2. Data ingestion | Scheme master, historical NAV, validation, benchmark data | Reliable financial data layer |
-| 3. Analytics engine | Returns, risk, rolling metrics, SIP calculations | Tested quantitative library |
-| 4. Fund analysis | Explorer, filters, single-fund views, comparison engine | Usable fund analytics |
-| 5. Agent orchestration | LangGraph state, supervisor, financial tools and agents | Working financial agent workflow |
-| 6. Portfolio intelligence | AMC disclosures, holdings, sector exposure, overlap | Stock-level fund exposure |
-| 7. Social intelligence | Reddit and X connectors, entity resolution, sentiment, topics | Stock and fund discussion analysis |
-| 8. News and events | Exchange filings, event calendar, news discovery, watchlists | News and event radar |
-| 9. Document intelligence | PDF parsing, embeddings, Qdrant, retrieval and citations | Financial-document RAG |
-| 10. Frontend integration | Dashboard, comparison studio, charts, AI research interface | Complete user experience |
-| 11. Evaluation and deployment | Financial tests, agent/RAG evaluation, Docker, monitoring | Tested deployable system |
+| 1. Foundation and ingestion | Repository setup, configuration, FastAPI, PostgreSQL, NAV reconciliation, benchmark TRI | Reliable application and financial data foundation |
+| 2. Deterministic analytics | Returns, rolling metrics, risk, benchmark attribution, drawdown | Tested quantitative calculation library |
+| 3. Fund analysis | Explorer, filters, single-fund views, comparison engine | Usable fund analytics |
+| 4. Agent orchestration | LangGraph state, supervisor, financial tools and agents | Working financial agent workflow |
+| 5. Portfolio intelligence | AMC disclosures, holdings, sector exposure, overlap | Stock-level fund exposure |
+| 6. Social intelligence | Reddit and X connectors, entity resolution, sentiment, topics | Stock and fund discussion analysis |
+| 7. News and events | Exchange filings, event calendar, news discovery, watchlists | News and event radar |
+| 8. Document intelligence | PDF parsing, embeddings, Qdrant, retrieval and citations | Financial-document RAG |
+| 9. Frontend integration | Dashboard, comparison studio, charts, AI research interface | Complete user experience |
+| 10. Evaluation and deployment | Financial tests, agent/RAG evaluation, Docker, monitoring | Tested deployable system |
 
 ## Evaluation and Reliability
 
