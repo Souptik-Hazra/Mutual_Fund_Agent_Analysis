@@ -23,10 +23,8 @@ from mutual_fund_agent_analysis.analytics import (
     trailing_return,
 )
 
-
 def prices(*items: tuple[str, str]) -> list[PricePoint]:
     return [PricePoint(date.fromisoformat(day), Decimal(value)) for day, value in items]
-
 
 def returns(*items: tuple[str, str]) -> list[ReturnPoint]:
     return [
@@ -38,19 +36,16 @@ def returns(*items: tuple[str, str]) -> list[ReturnPoint]:
         for day, value in items
     ]
 
-
 def test_absolute_return_and_cagr() -> None:
     observations = prices(("2020-01-01", "100"), ("2021-01-01", "110"))
     assert absolute_return(observations) == Decimal("0.1")
     assert cagr(observations) == pytest.approx(Decimal("0.0997"), abs=Decimal("0.001"))
-
 
 def test_period_returns_sort_observations_and_preserve_actual_dates() -> None:
     result = period_returns(prices(("2024-01-03", "121"), ("2024-01-01", "100")))
     assert [(point.date.isoformat(), point.value, point.start_date) for point in result] == [
         ("2024-01-03", Decimal("0.21"), date(2024, 1, 1))
     ]
-
 
 def test_rolling_returns_and_calendar_year_returns() -> None:
     observations = prices(
@@ -66,20 +61,17 @@ def test_rolling_returns_and_calendar_year_returns() -> None:
     assert calendar[2023] == Decimal("0.1")
     assert calendar[2024] == Decimal("0.1")
 
-
 def test_trailing_return_requires_sufficient_history() -> None:
     observations = prices(("2023-01-01", "100"), ("2024-01-02", "120"))
     assert trailing_return(observations, 1) == Decimal("0.2")
     with pytest.raises(ValueError, match="Insufficient history"):
         trailing_return(observations, 3)
 
-
 def test_duplicate_and_non_positive_prices_are_rejected() -> None:
     with pytest.raises(ValueError, match="Duplicate"):
         absolute_return(prices(("2024-01-01", "10"), ("2024-01-01", "11")))
     with pytest.raises(ValueError, match="greater than zero"):
         absolute_return(prices(("2024-01-01", "0")))
-
 
 def test_risk_metrics_use_sample_volatility_and_explicit_frequency() -> None:
     result = calculate_risk_metrics(
@@ -92,12 +84,10 @@ def test_risk_metrics_use_sample_volatility_and_explicit_frequency() -> None:
     assert result.sharpe_ratio == pytest.approx(Decimal("0"))
     assert result.sortino_ratio is not None
 
-
 def test_zero_volatility_has_undefined_sharpe() -> None:
     result = calculate_risk_metrics(returns(("2024-01-02", "0.01"), ("2024-01-03", "0.01")))
     assert result.annualized_volatility == 0
     assert result.sharpe_ratio is None
-
 
 def test_benchmark_metrics_align_exact_dates_and_calculate_beta_alpha() -> None:
     fund = returns(
@@ -120,7 +110,6 @@ def test_benchmark_metrics_align_exact_dates_and_calculate_beta_alpha() -> None:
     assert metrics.beta == Decimal("2")
     assert metrics.annualized_alpha == Decimal("0")
 
-
 def test_insufficient_benchmark_history_returns_undefined_metrics() -> None:
     metrics = calculate_benchmark_metrics(
         returns(("2024-01-02", "0.02")),
@@ -128,7 +117,6 @@ def test_insufficient_benchmark_history_returns_undefined_metrics() -> None:
     )
     assert metrics.beta is None
     assert metrics.annualized_alpha is None
-
 
 def test_drawdown_reports_peak_trough_and_recovery() -> None:
     result = calculate_drawdown(
@@ -146,7 +134,6 @@ def test_drawdown_reports_peak_trough_and_recovery() -> None:
     assert result.drawdown_duration_days == 10
     assert result.recovery_duration_days == 12
 
-
 def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
     fund = [
         ReturnPoint(date(2024, 1, 3), Decimal("0.02"), date(2024, 1, 1)),
@@ -157,7 +144,6 @@ def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
     aligned_fund, aligned_benchmark = align_returns(fund, benchmark)
     assert aligned_fund == []
     assert aligned_benchmark == []
-
 
 def test_database_loader_rejects_nav_reconciliation_conflicts_by_default() -> None:
     session = Mock()
@@ -175,7 +161,6 @@ def test_database_loader_rejects_nav_reconciliation_conflicts_by_default() -> No
     ]
     with pytest.raises(ValueError, match="reconciliation conflict"):
         load_fund_prices(session, 12345)
-
 
 def test_database_loader_can_explicitly_include_and_report_nav_conflicts() -> None:
     session = Mock()
@@ -196,8 +181,6 @@ def test_database_loader_can_explicitly_include_and_report_nav_conflicts() -> No
     assert [point.value for point in prices] == [Decimal("100"), Decimal("101")]
     assert conflicts == (conflict_date,)
 
-
-
 def test_one_year_rolling_window_uses_calendar_anniversary() -> None:
     observations = prices(
         ("2023-02-28", "100"),
@@ -209,19 +192,15 @@ def test_one_year_rolling_window_uses_calendar_anniversary() -> None:
     assert latest.start_date == date(2023, 2, 28)
     assert latest.value == Decimal("0.1")
 
-
-
 def test_return_alignment_rejects_missing_or_invalid_intervals() -> None:
     invalid = ReturnPoint(date(2024, 1, 2), Decimal("0.01"), date(2024, 1, 2))
     with pytest.raises(ValueError, match="start_date earlier than date"):
         align_returns([invalid], [])
 
-
 def test_return_alignment_rejects_duplicate_intervals() -> None:
     duplicate = ReturnPoint(date(2024, 1, 2), Decimal("0.01"), date(2024, 1, 1))
     with pytest.raises(ValueError, match="Duplicate return observation intervals"):
         align_returns([duplicate, duplicate], [duplicate])
-
 
 def test_drawdown_recovery_duration_is_measured_from_trough() -> None:
     result = calculate_drawdown(
@@ -234,12 +213,9 @@ def test_drawdown_recovery_duration_is_measured_from_trough() -> None:
     )
     assert result.recovery_duration_days == 12
 
-
-
 def test_price_inputs_require_decimal_values() -> None:
     with pytest.raises(TypeError, match="Decimal"):
         absolute_return([PricePoint(date(2024, 1, 1), 100)])  # type: ignore[arg-type]
-
 
 def test_risk_frequency_must_be_a_positive_integer() -> None:
     with pytest.raises(ValueError, match="positive integer"):
@@ -247,8 +223,6 @@ def test_risk_frequency_must_be_a_positive_integer() -> None:
             returns(("2024-01-02", "0.01"), ("2024-01-03", "0.02")),
             periods_per_year=12.5,  # type: ignore[arg-type]
         )
-
-
 
 def test_risk_metrics_require_two_observations_for_ratios() -> None:
     result = calculate_risk_metrics(returns(("2024-01-02", "0.01")))
@@ -258,8 +232,6 @@ def test_risk_metrics_require_two_observations_for_ratios() -> None:
     assert result.sharpe_ratio is None
     assert result.sortino_ratio is None
 
-
-
 def test_drawdown_recovery_is_none_when_series_never_declines() -> None:
     result = calculate_drawdown(
         prices(("2024-01-01", "100"), ("2024-01-02", "110"), ("2024-01-03", "120"))
@@ -268,12 +240,9 @@ def test_drawdown_recovery_is_none_when_series_never_declines() -> None:
     assert result.recovery_date is None
     assert result.recovery_duration_days is None
 
-
-
 def test_absolute_return_requires_two_observations() -> None:
     with pytest.raises(ValueError, match="at least two"):
         absolute_return(prices(("2024-01-01", "100")))
-
 
 def test_calendar_year_returns_exclude_incomplete_latest_year() -> None:
     result = calendar_year_returns(
@@ -285,7 +254,6 @@ def test_calendar_year_returns_exclude_incomplete_latest_year() -> None:
         )
     )
     assert result == {2024: Decimal("0.1")}
-
 
 def test_rolling_windows_reject_duplicates() -> None:
     with pytest.raises(ValueError, match="must not contain duplicates"):
