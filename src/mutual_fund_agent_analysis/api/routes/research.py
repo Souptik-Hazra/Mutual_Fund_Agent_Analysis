@@ -41,6 +41,82 @@ def ingest_portfolio(
         raise _domain_error(exc) from exc
 
 
+@router.post("/portfolios/import-file", status_code=status.HTTP_201_CREATED)
+async def import_portfolio_file(
+    session: Annotated[Session, Depends(get_db)],
+    file: UploadFile = File(...),
+    scheme_code: int = Form(...),
+    effective_date: date = Form(...),
+    published_at: str | None = Form(default=None),
+) -> dict:
+    """Import a normalized AMC CSV/XLSX disclosure with an immutable content hash."""
+    content = await file.read(20 * 1024 * 1024 + 1)
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Portfolio file exceeds 20 MB.")
+    filename = (file.filename or "").lower()
+    try:
+        if filename.endswith(".csv"):
+            rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+        elif filename.endswith(".xlsx"):
+            from openpyxl import load_workbook
+            workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            sheet = workbook.active
+            values = list(sheet.iter_rows(values_only=True))
+            if not values:
+                raise ValueError("Workbook is empty.")
+            headers = [str(value or "").strip().lower().replace(" ", "_") for value in values[0]]
+            rows = [dict(zip(headers, row, strict=False)) for row in values[1:] if any(v is not None for v in row)]
+        else:
+            raise HTTPException(status_code=415, detail="Only .csv and .xlsx portfolio files are supported.")
+        if not rows:
+            raise ValueError("No holding rows were found.")
+        holdings = []
+        for index, row in enumerate(rows, start=2):
+            normalized = {str(k).strip().lower().replace(" ", "_"): v for k, v in row.items() if k is not None}
+            isin = normalized.get("isin") or normalized.get("isin_code")
+            security_key = normalized.get("security_key") or isin
+            name = normalized.get("security_name") or normalized.get("name") or normalized.get("instrument")
+            asset_class = str(normalized.get("asset_class") or "").strip().lower()
+            if not security_key or not name:
+                raise ValueError(f"Row {index}: security_key/ISIN and security_name are required.")
+            if asset_class not in {"equity", "debt", "cash", "derivative", "reit_invit", "gold", "other"}:
+                raise ValueError(f"Row {index}: provide a valid asset_class; asset classes are never inferred.")
+            def number(field):
+                value = normalized.get(field)
+                if value in (None, ""):
+                    return None
+                return Decimal(str(value).replace(",", "").replace("%", "").strip())
+            holdings.append({
+                "security_key": str(security_key).strip().upper(),
+                "isin": str(isin).strip().upper() if isin else None,
+                "security_name": str(name).strip(),
+                "sector": str(normalized.get("sector")).strip() if normalized.get("sector") else None,
+                "asset_class": asset_class,
+                "quantity": number("quantity"),
+                "market_value": number("market_value"),
+                "weight_pct": number("weight_pct"),
+                "currency": str(normalized.get("currency") or "INR").upper(),
+            })
+        published = None
+        if published_at:
+            from datetime import datetime
+            published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        payload = PortfolioImportRequest(
+            scheme_code=scheme_code, source_key="amc_disclosures",
+            effective_date=effective_date, published_at=published,
+            content_hash=hashlib.sha256(content).hexdigest(), holdings=holdings,
+            metadata={"original_filename": file.filename, "ingestion_format": filename.rsplit(".", 1)[-1]},
+        )
+        snapshot = import_portfolio_snapshot(session, payload)
+        return portfolio_payload(session, snapshot)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise _domain_error(exc) from exc
+        raise HTTPException(status_code=422, detail="Unable to parse the uploaded portfolio file.") from exc
+
+
 @router.get("/portfolios/{scheme_code}")
 def get_portfolio(
     scheme_code: int,
