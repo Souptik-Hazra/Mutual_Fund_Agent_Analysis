@@ -44,7 +44,7 @@ Outputs include top holdings, sector/asset allocation, weight coverage, HHI when
 - `POST /api/v1/social/posts` accepts a normalized post and optional externally evaluated sentiment label/score/model.
 - `GET /api/v1/social/analytics` aggregates discussion volume and supplied sentiment scores.
 - `GET /api/v1/social/funds/{scheme_code}/sentiment?start_date=...&end_date=...` time-weights scored company sentiment by the fund holdings effective when each post was published and returns coverage.
-- Collection currently stores identifiers, URLs, hashes, timestamps and engagement metadata, not post text. A configurable expiry (`SOCIAL_RETENTION_DAYS`, default 30 days) is applied to collected posts. Set it to a period permitted by each provider's current terms.
+- Collection currently stores identifiers, URLs, hashes, timestamps and engagement metadata, not post text. A configurable expiry (`SOCIAL_RETENTION_DAYS`, default 30 days) is applied to collected posts. Set it to a period permitted by each provider's current terms. Schedule `mfa-purge-expired-social` daily to remove expired records.
 - The collector does not fabricate sentiment. Collected posts are marked `not_scored`; connect and evaluate a finance sentiment classifier before using sentiment analytics. Do not interpret discussion volume or engagement as credibility or a NAV predictor.
 
 ## Phase 8 — Document intelligence
