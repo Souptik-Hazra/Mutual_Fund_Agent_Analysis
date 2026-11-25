@@ -33,9 +33,8 @@ def assistant_capabilities() -> dict[str, Any]:
         "llm_synthesis": "optional; configured provider required",
         "financial_calculations": "deterministic analytics services",
         "supported_providers": ["gemini", "groq", "openai"],
+        "streaming_endpoint": "/api/v1/assistant/research/stream",
     }
-
-
 
 
 def _sse(event: str, payload: dict[str, Any]) -> str:
