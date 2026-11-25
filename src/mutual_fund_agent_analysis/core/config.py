@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     qdrant_api_key: SecretStr | None = None
     qdrant_collection: str = "mutual_fund_research"
     document_embedding_model: str = "gemini-embedding-001"
+    document_ocr_enabled: bool = False
     reddit_client_id: SecretStr | None = None
     reddit_client_secret: SecretStr | None = None
     reddit_user_agent: str = "MutualFundResearch/1.0"
