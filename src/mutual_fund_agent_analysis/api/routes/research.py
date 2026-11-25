@@ -1,8 +1,9 @@
 """Portfolio, event, social, and document intelligence APIs."""
+# ruff: noqa: E501, B008
 import csv
 import hashlib
 import io
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated
 
@@ -15,7 +16,7 @@ from mutual_fund_agent_analysis.api.schemas.research import (
     SocialPostInput,
 )
 from mutual_fund_agent_analysis.core.config import get_settings
-from mutual_fund_agent_analysis.data.providers.social import SocialProviderError, search_reddit, search_x
+from mutual_fund_agent_analysis.data.providers.social import (\n    SocialProviderError,\n    search_reddit,\n    search_x,\n)
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     collect_rss_events, compare_portfolios, create_market_event, create_social_post,
     events_for_fund_exposure, extract_pdf_text, fund_social_sentiment,
@@ -86,8 +87,8 @@ async def import_portfolio_file(
                 raise ValueError(f"Row {index}: security_key/ISIN and security_name are required.")
             if asset_class not in {"equity", "debt", "cash", "derivative", "reit_invit", "gold", "other"}:
                 raise ValueError(f"Row {index}: provide a valid asset_class; asset classes are never inferred.")
-            def number(field):
-                value = normalized.get(field)
+            def parse_number(values: dict, field: str) -> Decimal | None:
+                value = values.get(field)
                 if value in (None, ""):
                     return None
                 return Decimal(str(value).replace(",", "").replace("%", "").strip())
@@ -97,9 +98,9 @@ async def import_portfolio_file(
                 "security_name": str(name).strip(),
                 "sector": str(normalized.get("sector")).strip() if normalized.get("sector") else None,
                 "asset_class": asset_class,
-                "quantity": number("quantity"),
-                "market_value": number("market_value"),
-                "weight_pct": number("weight_pct"),
+                "quantity": parse_number(normalized, "quantity"),
+                "market_value": parse_number(normalized, "market_value"),
+                "weight_pct": parse_number(normalized, "weight_pct"),
                 "currency": str(normalized.get("currency") or "INR").upper(),
             })
         published = None
@@ -319,7 +320,7 @@ def collect_social_posts(
                 content_hash=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
                 published_at=item.get("published_at"),
                 engagement_count=item.get("engagement_count", 0),
-                expires_at=datetime.now(timezone.utc) + timedelta(days=get_settings().social_retention_days),
+                expires_at=datetime.now(UTC)\n                + timedelta(days=get_settings().social_retention_days),
                 metadata=item.get("metadata", {}),
             )
             create_social_post(session, payload)
