@@ -156,3 +156,60 @@ def test_unsupported_claim_string_counts_as_one_claim():
     )
     assert result["unsupported_claim_count"] == 1
     assert result["evidence_quality_passed"] is False
+
+
+def test_langchain_model_factory_uses_unified_google_provider_api(monkeypatch):
+    from types import SimpleNamespace
+
+    from pydantic import SecretStr
+
+    from mutual_fund_agent_analysis.llm import providers
+
+    settings = SimpleNamespace(
+        llm_provider="gemini",
+        gemini_api_key=SecretStr("test-key"),
+        gemini_model="gemini-test",
+        groq_api_key=None,
+        groq_model=None,
+        openai_api_key=None,
+        openai_model=None,
+    )
+    captured = {}
+    monkeypatch.setattr(providers, "get_settings", lambda: settings)
+
+    def fake_init_chat_model(model, **kwargs):
+        captured["model"] = model
+        captured["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(providers, "init_chat_model", fake_init_chat_model)
+    result = providers.create_chat_model(temperature=0)
+
+    assert result is not None
+    assert captured["model"] == "gemini-test"
+    assert captured["kwargs"]["model_provider"] == "google_genai"
+    assert captured["kwargs"]["google_api_key"] == "test-key"
+    assert captured["kwargs"]["max_retries"] == 2
+
+
+def test_assistant_sse_encoder_emits_valid_named_json_event():
+    import json
+
+    from mutual_fund_agent_analysis.api.routes.assistant import _sse
+
+    frame = _sse("progress", {"node": "plan", "intents": ["fund"]})
+    assert frame.startswith("event: progress\n")
+    payload_line = next(line for line in frame.splitlines() if line.startswith("data: "))
+    payload = json.loads(payload_line.removeprefix("data: "))
+    assert payload["node"] == "plan"
+    assert payload["intents"] == ["fund"]
+
+
+def test_langgraph_compiles_with_explicit_start_and_end_nodes():
+    from mutual_fund_agent_analysis.agents.research_graph import build_research_graph
+
+    graph = build_research_graph()
+    nodes = graph.get_graph().nodes
+    assert "__start__" in nodes
+    assert "__end__" in nodes
+    assert {"plan", "specialist_agents", "synthesize"}.issubset(nodes)

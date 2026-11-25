@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { request } from "./api";
+import { request, streamRequest } from "./api";
 import { buildDocumentSearchPath, eventRows } from "./research";
 
-const tabs = ["Overview", "Funds", "Compare", "Portfolio", "Investments", "Events", "Documents", "Assistant"];
+const tabs = ["Overview", "Funds", "Compare", "Portfolio", "Investments", "Events", "Social", "Documents", "Assistant"];
 const money = (value) => value == null ? "—" : Number(value).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const percent = (value) => value == null ? "—" : `${(Number(value) * 100).toFixed(2)}%`;
 const base100Points = (series = []) => {
@@ -38,6 +38,10 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [documentTitle, setDocumentTitle] = useState("");
+  const [eventStatus, setEventStatus] = useState("");
+  const [eventSource, setEventSource] = useState("");
+  const [socialSource, setSocialSource] = useState("");
+  const [streamProgress, setStreamProgress] = useState([]);
   const [sipAmount, setSipAmount] = useState("5000");
   const [sipDay, setSipDay] = useState("1");
   const [transactionDate, setTransactionDate] = useState(dateTo);
@@ -59,9 +63,57 @@ export default function App() {
     const quality = await request(`/portfolios/${schemeCodes[0]}/quality`);
     return { ...snapshot, quality };
   });
-  const runEvents = () => run(() => request(`/events/fund-exposure/${schemeCodes[0]}?start_date=${dateFrom}&end_date=${dateTo}`));
+  const runEvents = () => {
+    if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
+    const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo, limit: "100" });
+    if (eventStatus) params.set("status", eventStatus);
+    if (eventSource.trim()) params.set("source_key", eventSource.trim());
+    return run(async () => {
+      const [listing, exposure] = await Promise.all([
+        request(`/events?${params.toString()}`),
+        request(`/events/fund-exposure/${schemeCodes[0]}?start_date=${dateFrom}&end_date=${dateTo}`),
+      ]);
+      const exposureById = new Map((exposure.events || []).map((item) => [item.event_id, item]));
+      return {
+        ...listing,
+        events: (listing.items || []).map((item) => ({ ...item, ...(exposureById.get(item.event_id) || {}) })),
+        exposure_summary: exposure,
+      };
+    });
+  };
+  const runSocial = () => run(async () => {
+    const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo });
+    if (socialSource) params.set("source_key", socialSource);
+    const analytics = await request(`/social/analytics?${params.toString()}`);
+    let fund = null;
+    if (schemeCodes[0]) {
+      try {
+        fund = await request(`/social/funds/${schemeCodes[0]}/sentiment?start_date=${dateFrom}&end_date=${dateTo}`);
+      } catch (error) {
+        fund = { unavailable_reason: error.message };
+      }
+    }
+    return { analytics, fund };
+  });
   const runDocuments = () => run(() => request(buildDocumentSearchPath(documentQuery, schemeCodes[0])));
-  const runAssistant = () => run(() => request("/assistant/research", json("POST", { question, scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo })));
+  async function runAssistant() {
+    setBusy(true);
+    setError("");
+    setData(null);
+    setStreamProgress([]);
+    try {
+      const result = await streamRequest(
+        "/assistant/research/stream",
+        { question, scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo },
+        (progress) => setStreamProgress((current) => [...current, progress]),
+      );
+      setData(result);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const runSipSimulation = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     return run(() => request(`/schemes/${schemeCodes[0]}/sip-simulation`, json("POST", {
@@ -179,9 +231,10 @@ export default function App() {
             {data?.transaction_id && <p className="muted">Transaction #{data.transaction_id} saved. Refresh the ledger to view all entries.</p>}
           </Panel>
         </>}
-        {tab === "Events" && <Panel title="Events mapped to fund exposure"><div className="field-row"><div className="field"><label>Scheme code</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div><div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div><div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div></div><button className="primary" disabled={busy} onClick={runEvents}>Load events</button>{eventRows(data).length ? <div className="event-list">{eventRows(data).map((event) => <article className="event-row" key={event.event_id}><div><strong>{event.title}</strong><small>{event.event_date || "Date unavailable"} · {event.status} · {event.source_key || "source unknown"}</small></div><b>{event.exposure_found ? `${money(event.aggregate_exposure_pct)}% exposure` : "No mapped exposure"}</b></article>)}</div> : <Empty>{data ? "No linked events found for this period." : "Load event-to-holdings mapping."}</Empty>}</Panel>}
+        {tab === "Events" && <Panel title="Event and news intelligence"><div className="field-row"><div className="field"><label>Scheme code</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div><div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div><div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div></div><div className="field-row"><div className="field"><label>Status</label><select value={eventStatus} onChange={(e) => setEventStatus(e.target.value)}><option value="">All statuses</option>{["confirmed","scheduled","reported","unverified","speculative","disproved","outdated"].map((value) => <option key={value}>{value}</option>)}</select></div><div className="field"><label>Source key (optional)</label><input value={eventSource} onChange={(e) => setEventSource(e.target.value)} placeholder="e.g. nse_announcements" /></div></div><button className="primary" disabled={busy} onClick={runEvents}>Load events and fund exposure</button>{eventRows(data).length ? <div className="event-list">{eventRows(data).map((event) => <article className="event-row" key={event.event_id}><div><strong>{event.title}</strong><small>{event.event_date || "Effective date unavailable"} · published {event.published_at || "unknown"} · {event.status} · {event.source_key || "source unknown"}</small><small>Evidence: {event.evidence?.verification_status || "not linked"} · authority tier {event.source?.authority_tier ?? "—"}</small>{event.canonical_url && <a href={event.canonical_url} target="_blank" rel="noreferrer">Open source</a>}</div><b>{event.exposure_found ? `${money(event.aggregate_exposure_pct)}% exposure` : "Exposure unavailable"}</b></article>)}</div> : <Empty>{data ? "No events matched these filters." : "Filter reported and verified events, then inspect historical fund exposure."}</Empty>}</Panel>}
         {tab === "Documents" && <Panel title="Document research"><div className="upload-block"><div className="field"><label>Upload a text-based PDF factsheet, SID or disclosure</label><input type="file" accept="application/pdf,.pdf" onChange={(e) => setSelectedDocument(e.target.files?.[0] || null)} /></div><div className="field"><label>Document title</label><input value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} placeholder="Optional title (defaults to filename)" /></div><button className="secondary" disabled={busy} onClick={importDocument}>Upload and index PDF</button></div><div className="toolbar"><input value={documentQuery} onChange={(e) => setDocumentQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runDocuments()} /><button className="primary" disabled={busy} onClick={runDocuments}>Search documents</button></div>{data?.document_id ? <div className="upload-success"><strong>PDF uploaded successfully</strong><p>{data.title} · Document #{data.document_id} · {data.page_count} page(s)</p><small>Document stored. Search the indexed documents above to retrieve relevant excerpts.</small></div> : data?.results?.length ? data.results.map((item, i) => <article className="document-result" key={i}><div><strong>{item.title}</strong><small>Page {item.page_number || "—"} · {item.retrieval_mode || data.retrieval_mode}</small></div><p>{item.text}</p><small>Document #{item.document_id} · chunk #{item.citation?.chunk_id || item.chunk_index}</small></article>) : <Empty>{data ? "No matching document chunks." : "Search indexed PDFs and factsheets."}</Empty>}</Panel>}
-        {tab === "Assistant" && <><Panel title="Research assistant"><p className="muted">Ask a question. LangGraph routes it to the relevant research specialists; deterministic services calculate financial metrics.</p><div className="field"><label>Question</label><textarea rows="4" value={question} onChange={(e) => setQuestion(e.target.value)} /></div><div className="field"><label>Scheme codes (optional, comma-separated)</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div><div className="field-row"><div className="field"><label>Benchmark TRI (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} /></div><div className="field"><label>Start date</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div><div className="field"><label>End date</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div></div><button className="primary" disabled={busy} onClick={runAssistant}>{busy ? "Researching…" : "Run research"}</button></Panel>{data && <><Panel title="Research synthesis"><p className="answer">{data.answer}</p><div className="chip-row">{data.intents?.map((intent) => <span className="chip" key={intent}>{intent}</span>)}</div>{data.model_used && <small className="muted">Synthesized with {data.model_used}</small>}</Panel><Panel title="Evidence and citations">{data.citations?.length ? data.citations.map((c, i) => <div className="citation" key={i}><strong>{c.type}</strong><small>{JSON.stringify(c)}</small></div>) : <Empty>No source references were returned.</Empty>}</Panel><Panel title="Structured evidence"><details><summary>Show retrieved tool outputs</summary><pre className="json-evidence">{JSON.stringify(data.results, null, 2)}</pre></details></Panel>{data.errors?.length > 0 && <Panel title="Data limitations"><ul>{data.errors.map((e) => <li key={e}>{e}</li>)}</ul></Panel>}</>}</>}
+        {tab === "Social" && <><Panel title="Social intelligence"><p className="muted">Provider discussion volume and independently evaluated sentiment only. Social signals are not verified facts or return predictors.</p><div className="field-row"><div className="field"><label>Scheme code</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div><div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div><div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div><div className="field"><label>Provider</label><select value={socialSource} onChange={(e) => setSocialSource(e.target.value)}><option value="">All providers</option><option value="reddit">Reddit</option><option value="x">X</option></select></div></div><button className="primary" disabled={busy} onClick={runSocial}>Load social analytics</button></Panel>{data?.analytics && <><Panel title="Discussion coverage"><div className="analysis-grid"><div className="metric"><small>Total posts</small><strong>{money(data.analytics.post_count ?? data.analytics.total_posts ?? 0)}</strong></div><div className="metric"><small>Scored posts</small><strong>{money(data.analytics.scored_post_count ?? 0)}</strong></div><div className="metric"><small>Unscored posts</small><strong>{money(data.analytics.unscored_post_count ?? 0)}</strong></div><div className="metric"><small>Average sentiment</small><strong>{data.analytics.average_sentiment == null ? "—" : money(data.analytics.average_sentiment)}</strong></div></div><p className="muted">Source counts: {JSON.stringify(data.analytics.source_counts || {})} · Social discussion is experimental and should not be interpreted as fund performance.</p></Panel>{data.fund && <Panel title="Holdings-weighted fund discussion signal"><div className="analysis-grid"><div className="metric"><small>Weighted sentiment</small><strong>{data.fund.weighted_sentiment == null ? "—" : money(data.fund.weighted_sentiment)}</strong></div><div className="metric"><small>Holdings coverage</small><strong>{data.fund.coverage_pct == null ? "—" : `${money(data.fund.coverage_pct)}%`}</strong></div><div className="metric"><small>Disclosure intervals</small><strong>{money((data.fund.intervals || []).length)}</strong></div><div className="metric"><small>Post count</small><strong>{money((data.fund.intervals || []).reduce((total, item) => total + (item.post_count || 0), 0))}</strong></div></div><p className="muted">{data.fund.unavailable_reason || data.fund.warning || "Uses historical equity holdings where available; missing coverage is not inferred."}</p></Panel>}</>}</>}
+        {tab === "Assistant" && <><Panel title="Research assistant"><p className="muted">Ask a question. LangGraph routes it to the relevant research specialists; deterministic services calculate financial metrics.</p><div className="field"><label>Question</label><textarea rows="4" value={question} onChange={(e) => setQuestion(e.target.value)} /></div><div className="field"><label>Scheme codes (optional, comma-separated)</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div><div className="field-row"><div className="field"><label>Benchmark TRI (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} /></div><div className="field"><label>Start date</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div><div className="field"><label>End date</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div></div><button className="primary" disabled={busy} onClick={runAssistant}>{busy ? "Researching…" : "Run research"}</button></Panel>{streamProgress.length > 0 && <Panel title="LangGraph execution"><div className="event-list">{streamProgress.map((step, index) => <article className="event-row" key={`${step.node}-${index}`}><div><strong>{step.node}</strong><small>{step.message}</small></div><b>{step.intents?.join(", ") || "running"}</b></article>)}</div></Panel>}{data && <><Panel title="Research synthesis"><p className="answer">{data.answer}</p><div className="chip-row">{data.intents?.map((intent) => <span className="chip" key={intent}>{intent}</span>)}</div>{data.model_used && <small className="muted">Synthesized with {data.model_used}</small>}</Panel><Panel title="Evidence and citations">{data.citations?.length ? data.citations.map((c, i) => <div className="citation" key={i}><strong>{c.type}</strong><small>{JSON.stringify(c)}</small></div>) : <Empty>No source references were returned.</Empty>}</Panel><Panel title="Structured evidence"><details><summary>Show retrieved tool outputs</summary><pre className="json-evidence">{JSON.stringify(data.results, null, 2)}</pre></details></Panel>{data.errors?.length > 0 && <Panel title="Data limitations"><ul>{data.errors.map((e) => <li key={e}>{e}</li>)}</ul></Panel>}</>}</>}
         {busy && <div className="loading"><span></span> Working…</div>}{error && <div className="error">{error}</div>}
       </div><footer>Personal workspace · Metrics are deterministic · AI summaries are evidence-bounded</footer></main>
   </div>;

@@ -498,7 +498,9 @@ def list_events(
     rows = session.scalars(
         stmt.order_by(
             MarketEvent.event_date.desc().nullslast(), MarketEvent.published_at.desc().nullslast()
-        ).offset(offset).limit(limit)
+        )
+        .offset(offset)
+        .limit(limit)
     ).all()
     items = []
     for row in rows:
@@ -506,33 +508,40 @@ def list_events(
         evidence_record = (
             session.get(EvidenceRecord, row.evidence_id) if row.evidence_id is not None else None
         )
-        items.append({
-            "event_id": row.event_id,
-            "title": row.title,
-            "summary": row.summary,
-            "event_type": row.event_type,
-            "status": row.status,
-            "event_date": row.event_date,
-            "published_at": row.published_at,
-            "source_key": row.source_key,
-            "source": {
-                "source_type": source_record.source_type,
-                "authority_tier": source_record.authority_tier,
-                "is_official": source_record.is_official,
-                "attribution_required": source_record.attribution_required,
-            } if source_record else None,
-            "related_entity_id": row.related_entity_id,
-            "evidence_id": row.evidence_id,
-            "evidence": {
-                "verification_status": evidence_record.verification_status,
-                "published_at": evidence_record.published_at,
-                "retrieved_at": evidence_record.retrieved_at,
-                "content_hash": evidence_record.content_hash,
-            } if evidence_record else None,
-            "canonical_url": row.canonical_url,
-            "confidence": row.confidence,
-        })
+        items.append(
+            {
+                "event_id": row.event_id,
+                "title": row.title,
+                "summary": row.summary,
+                "event_type": row.event_type,
+                "status": row.status,
+                "event_date": row.event_date,
+                "published_at": row.published_at,
+                "source_key": row.source_key,
+                "source": {
+                    "source_type": source_record.source_type,
+                    "authority_tier": source_record.authority_tier,
+                    "is_official": source_record.is_official,
+                    "attribution_required": source_record.attribution_required,
+                }
+                if source_record
+                else None,
+                "related_entity_id": row.related_entity_id,
+                "evidence_id": row.evidence_id,
+                "evidence": {
+                    "verification_status": evidence_record.verification_status,
+                    "published_at": evidence_record.published_at,
+                    "retrieved_at": evidence_record.retrieved_at,
+                    "content_hash": evidence_record.content_hash,
+                }
+                if evidence_record
+                else None,
+                "canonical_url": row.canonical_url,
+                "confidence": row.confidence,
+            }
+        )
     return {"count": len(items), "offset": offset, "limit": limit, "items": items}
+
 
 @router.post("/social/posts", status_code=status.HTTP_201_CREATED)
 def ingest_social_post(
@@ -618,10 +627,18 @@ def collect_social_posts(
     except httpx.HTTPStatusError as exc:
         upstream_status = exc.response.status_code
         if upstream_status in {401, 403}:
-            raise HTTPException(status_code=403, detail="Social provider denied access; verify API credentials and plan permissions.") from exc
+            raise HTTPException(
+                status_code=403,
+                detail="Social provider denied access; verify API credentials and plan permissions.",
+            ) from exc
         if upstream_status == 429:
-            raise HTTPException(status_code=429, detail="Social provider rate limit reached; retry after the provider reset window.") from exc
-        raise HTTPException(status_code=502, detail="Social provider returned an unsuccessful response.") from exc
+            raise HTTPException(
+                status_code=429,
+                detail="Social provider rate limit reached; retry after the provider reset window.",
+            ) from exc
+        raise HTTPException(
+            status_code=502, detail="Social provider returned an unsuccessful response."
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Social provider request failed.") from exc
 
