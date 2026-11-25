@@ -33,9 +33,7 @@ def calculate_drawdown(points: Iterable[PricePoint]) -> DrawdownMetrics:
     for point in prices:
         if point.value >= peak.value:
             if underwater_start is not None:
-                longest_underwater = max(
-                    longest_underwater, (point.date - underwater_start).days
-                )
+                longest_underwater = max(longest_underwater, (point.date - underwater_start).days)
                 underwater_start = None
             peak = point
         else:
