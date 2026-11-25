@@ -3,7 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,8 @@ from mutual_fund_agent_analysis.api.schemas.intelligence import (
     EntityEvidenceLinkResponse,
     EntityResolveRequest,
     EntityResolveResponse,
+    EntityRelationshipCreateRequest,
+    EntityRelationshipResponse,
     EntityResponse,
     EvidenceCreateRequest,
     EvidenceResponse,
@@ -26,6 +28,7 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_alias,
     add_entity_identifier,
     create_entity,
+    create_entity_relationship,
     link_entity_evidence,
     record_evidence,
     resolve_entity,
@@ -34,6 +37,7 @@ from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import (
     DataSource,
     EntityEvidenceLink,
+    EntityRelationship,
     EvidenceRecord,
     ResearchEntity,
 )
@@ -192,3 +196,56 @@ def resolve_entity_endpoint(
         entity=EntityResponse.model_validate(result.entity) if result.entity else None,
         candidates=[EntityResponse.model_validate(item) for item in result.candidates],
     )
+
+
+
+@router.post(
+    "/entities/{entity_id}/relationships",
+    response_model=EntityRelationshipResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_relationship_endpoint(
+    entity_id: int,
+    request: EntityRelationshipCreateRequest,
+    session: Annotated[Session, Depends(get_db)],
+):
+    try:
+        record = create_entity_relationship(
+            session,
+            entity_id,
+            request.to_entity_id,
+            request.relation_type,
+            request.source_key,
+            request.evidence_id,
+            request.valid_from,
+            request.valid_to,
+            request.confidence,
+            request.verification_status,
+            request.metadata,
+        )
+        _commit(session)
+        return EntityRelationshipResponse.model_validate(record)
+    except ValueError as exc:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/entities/{entity_id}/relationships",
+    response_model=list[EntityRelationshipResponse],
+)
+def list_entity_relationships(
+    entity_id: int, session: Annotated[Session, Depends(get_db)]
+):
+    _entity_or_404(session, entity_id)
+    rows = session.scalars(
+        select(EntityRelationship)
+        .where(
+            or_(
+                EntityRelationship.from_entity_id == entity_id,
+                EntityRelationship.to_entity_id == entity_id,
+            )
+        )
+        .order_by(EntityRelationship.relationship_id)
+    ).all()
+    return [EntityRelationshipResponse.model_validate(row) for row in rows]
