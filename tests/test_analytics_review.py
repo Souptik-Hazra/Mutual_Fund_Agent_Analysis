@@ -110,3 +110,21 @@ def test_benchmark_metrics_report_partial_alignment_coverage() -> None:
     assert result.fund_observation_count == 3
     assert result.benchmark_observation_count == 2
     assert result.coverage_ratio == Decimal("0.6666666666666666666666666667")
+
+
+def test_zero_and_negative_benchmark_returns_are_valid_observations() -> None:
+    fund = [
+        ReturnPoint(date(2024, 1, 2), Decimal("-0.1"), date(2024, 1, 1)),
+        ReturnPoint(date(2024, 1, 3), Decimal("0"), date(2024, 1, 2)),
+        ReturnPoint(date(2024, 1, 4), Decimal("0.1"), date(2024, 1, 3)),
+    ]
+    benchmark = [
+        ReturnPoint(date(2024, 1, 2), Decimal("-0.05"), date(2024, 1, 1)),
+        ReturnPoint(date(2024, 1, 3), Decimal("0"), date(2024, 1, 2)),
+        ReturnPoint(date(2024, 1, 4), Decimal("0.05"), date(2024, 1, 3)),
+    ]
+    result = calculate_benchmark_metrics(fund, benchmark)
+    assert result.beta == Decimal("2")
+    assert result.annualized_alpha == Decimal("0")
+    assert result.annualized_fund_return == Decimal("0")
+    assert result.annualized_benchmark_return == Decimal("0")
