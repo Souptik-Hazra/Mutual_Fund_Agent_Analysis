@@ -413,11 +413,27 @@ def store_document(
     ))
     if existing:
         return existing
+    evidence_external_id = "document:" + digest
+    evidence = session.scalar(select(EvidenceRecord).where(
+        EvidenceRecord.source_key == source_key,
+        EvidenceRecord.external_id == evidence_external_id,
+    ))
+    if evidence is None:
+        evidence = EvidenceRecord(
+            source_key=source_key, external_id=evidence_external_id,
+            canonical_url=canonical_url, title=title, published_at=published_at,
+            effective_from=effective_date, content_hash=digest,
+            verification_status="unverified",
+            metadata_json={"media_type": media_type, "original_filename": original_filename},
+        )
+        session.add(evidence)
+        session.flush()
     document = ResearchDocument(
         source_key=source_key, scheme_code=scheme_code, related_entity_id=related_entity_id,
-        title=title, original_filename=original_filename, media_type=media_type,
-        canonical_url=canonical_url, content_hash=digest, published_at=published_at,
-        effective_date=effective_date, extracted_text=extracted_text, page_count=page_count,
+        evidence_id=evidence.evidence_id, title=title, original_filename=original_filename,
+        media_type=media_type, canonical_url=canonical_url, content_hash=digest,
+        published_at=published_at, effective_date=effective_date,
+        extracted_text=extracted_text, page_count=page_count,
     )
     session.add(document)
     session.flush()
