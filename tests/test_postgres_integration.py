@@ -422,7 +422,6 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         )
 
 
-
 def test_postgres_investor_ledger_persists_decimal_entries(migrated_postgres: Engine) -> None:
     """The personal ledger persists transaction magnitudes and optional NAV exactly."""
     with Session(migrated_postgres) as session, session.begin():
