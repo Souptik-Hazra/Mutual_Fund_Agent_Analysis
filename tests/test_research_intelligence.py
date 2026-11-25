@@ -13,6 +13,7 @@ from mutual_fund_agent_analysis.api.schemas.research import (
 )
 from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
+    portfolio_payload,
     source_social_retention_days,
     split_document,
 )
@@ -281,3 +282,60 @@ def test_event_revision_archiver_preserves_prior_source_state():
     assert revision.snapshot["status"] == "reported"
     assert revision.snapshot["event_date"] == "2026-10-01"
     assert session.added == [revision]
+
+
+
+def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
+    from types import SimpleNamespace
+
+    snapshot = SimpleNamespace(
+        snapshot_id=3,
+        scheme_code=100,
+        source_key="amc_disclosures",
+        effective_date=date(2026, 10, 31),
+        published_at=datetime(2026, 11, 5, tzinfo=UTC),
+        status="complete",
+        content_hash="a" * 64,
+        total_market_value=Decimal("1000000"),
+        document_url="https://amc.example/portfolio.csv",
+    )
+    rows = [
+        SimpleNamespace(
+            weight_pct=Decimal("60"),
+            asset_class="equity",
+            sector="Banks",
+            security_key="INE1",
+            security_name="Bank One",
+            isin="INE000000001",
+            quantity=Decimal("10"),
+            market_value=Decimal("600000"),
+            currency="INR",
+        ),
+        SimpleNamespace(
+            weight_pct=Decimal("40"),
+            asset_class="equity",
+            sector="Technology",
+            security_key="INE2",
+            security_name="Tech Two",
+            isin="INE000000002",
+            quantity=Decimal("20"),
+            market_value=Decimal("400000"),
+            currency="INR",
+        ),
+    ]
+
+    class StubSession:
+        def scalars(self, _statement):
+            return SimpleNamespace(all=lambda: rows)
+
+    result = portfolio_payload(StubSession(), snapshot)
+    assert result["weight_coverage_pct"] == Decimal("100")
+    assert result["hhi_0_to_1"] == Decimal("0.52")
+    assert result["hhi_coverage_sufficient"] is True
+    assert result["sector_allocation"][0]["sector"] == "Banks"
+
+    rows[1].weight_pct = None
+    incomplete = portfolio_payload(StubSession(), snapshot)
+    assert incomplete["weight_coverage_pct"] == Decimal("60")
+    assert incomplete["hhi_0_to_1"] is None
+    assert incomplete["hhi_coverage_sufficient"] is False
