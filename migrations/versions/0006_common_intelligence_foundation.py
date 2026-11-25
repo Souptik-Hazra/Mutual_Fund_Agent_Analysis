@@ -61,9 +61,11 @@ def upgrade() -> None:
         Column("normalized_name", String(300), nullable=False),
         Column("description", Text()),
         Column("status", String(20), nullable=False, server_default="active"),
-        Column("merged_into_entity_id", BigInteger(), ForeignKey(
-            "research_entities.entity_id", ondelete="RESTRICT"
-        )),
+        Column(
+            "merged_into_entity_id",
+            BigInteger(),
+            ForeignKey("research_entities.entity_id", ondelete="RESTRICT"),
+        ),
         Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
         Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
         CheckConstraint(
@@ -82,14 +84,18 @@ def upgrade() -> None:
     op.create_table(
         "entity_aliases",
         Column("alias_id", BigInteger(), Identity(), primary_key=True),
-        Column("entity_id", BigInteger(), ForeignKey(
-            "research_entities.entity_id", ondelete="CASCADE"
-        ), nullable=False),
+        Column(
+            "entity_id",
+            BigInteger(),
+            ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         Column("alias", String(300), nullable=False),
         Column("normalized_alias", String(300), nullable=False),
         Column("alias_type", String(30), nullable=False, server_default="common"),
         Column(
-            "source_key", String(60),
+            "source_key",
+            String(60),
             ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
         ),
         Column("valid_from", Date()),
@@ -132,9 +138,12 @@ def upgrade() -> None:
     op.create_table(
         "evidence_records",
         Column("evidence_id", BigInteger(), Identity(), primary_key=True),
-        Column("source_key", String(60), ForeignKey(
-            "data_sources.source_key", ondelete="RESTRICT"
-        ), nullable=False),
+        Column(
+            "source_key",
+            String(60),
+            ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         Column("external_id", String(200)),
         Column("canonical_url", String(1000)),
         Column("title", String(500)),
@@ -168,12 +177,18 @@ def upgrade() -> None:
     op.create_index("ix_evidence_content_hash", "evidence_records", ["content_hash"])
     op.create_table(
         "entity_evidence_links",
-        Column("entity_id", BigInteger(), ForeignKey(
-            "research_entities.entity_id", ondelete="CASCADE"
-        ), primary_key=True),
-        Column("evidence_id", BigInteger(), ForeignKey(
-            "evidence_records.evidence_id", ondelete="CASCADE"
-        ), primary_key=True),
+        Column(
+            "entity_id",
+            BigInteger(),
+            ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+        Column(
+            "evidence_id",
+            BigInteger(),
+            ForeignKey("evidence_records.evidence_id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
         Column("relation_type", String(40), nullable=False, server_default="mentions"),
         Column("confidence", Numeric(4, 3)),
         Column("resolution_method", String(20), nullable=False, server_default="manual"),
@@ -193,12 +208,14 @@ def upgrade() -> None:
         "entity_relationships",
         Column("relationship_id", BigInteger(), Identity(), primary_key=True),
         Column(
-            "from_entity_id", BigInteger(),
+            "from_entity_id",
+            BigInteger(),
             ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
             nullable=False,
         ),
         Column(
-            "to_entity_id", BigInteger(),
+            "to_entity_id",
+            BigInteger(),
             ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -208,7 +225,8 @@ def upgrade() -> None:
             ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
         ),
         Column(
-            "evidence_id", BigInteger(),
+            "evidence_id",
+            BigInteger(),
             ForeignKey("evidence_records.evidence_id", ondelete="RESTRICT"),
         ),
         Column("valid_from", Date()),
@@ -218,9 +236,7 @@ def upgrade() -> None:
         Column("metadata", JSONB(), nullable=False, server_default="{}"),
         Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
         Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-        CheckConstraint(
-            "from_entity_id <> to_entity_id", name="ck_entity_relationships_not_self"
-        ),
+        CheckConstraint("from_entity_id <> to_entity_id", name="ck_entity_relationships_not_self"),
         CheckConstraint(
             "valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from",
             name="ck_entity_relationships_valid_range",
@@ -235,25 +251,35 @@ def upgrade() -> None:
             name="ck_entity_relationships_confidence",
         ),
         UniqueConstraint(
-            "from_entity_id", "to_entity_id", "relation_type", "valid_from",
+            "from_entity_id",
+            "to_entity_id",
+            "relation_type",
+            "valid_from",
             name="uq_entity_relationship_identity",
         ),
     )
     op.create_index(
-        "ix_entity_relationships_from", "entity_relationships",
+        "ix_entity_relationships_from",
+        "entity_relationships",
         ["from_entity_id", "relation_type"],
     )
     op.create_index(
-        "ix_entity_relationships_to", "entity_relationships",
+        "ix_entity_relationships_to",
+        "entity_relationships",
         ["to_entity_id", "relation_type"],
     )
 
     source_table = Table(
-        "data_sources", MetaData(),
-        Column("source_key", String(60)), Column("display_name", String(160)),
-        Column("source_type", String(20)), Column("authority_tier", Integer()),
-        Column("is_official", Boolean()), Column("base_url", String(500)),
-        Column("attribution_required", Boolean()), Column("enabled", Boolean()),
+        "data_sources",
+        MetaData(),
+        Column("source_key", String(60)),
+        Column("display_name", String(160)),
+        Column("source_type", String(20)),
+        Column("authority_tier", Integer()),
+        Column("is_official", Boolean()),
+        Column("base_url", String(500)),
+        Column("attribution_required", Boolean()),
+        Column("enabled", Boolean()),
         Column("metadata", JSONB()),
     )
     op.bulk_insert(source_table, [
