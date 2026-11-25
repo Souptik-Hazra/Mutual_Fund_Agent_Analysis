@@ -401,7 +401,7 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         benchmark_identifier = session.scalar(
             select(EntityIdentifier).where(
                 EntityIdentifier.namespace == "BENCHMARK_CODE",
-                EntityIdentifier.normalized_value == "NIFTY 50",
+                EntityIdentifier.normalized_value == "NIFTY50",
             )
         )
         assert benchmark_identifier is not None
