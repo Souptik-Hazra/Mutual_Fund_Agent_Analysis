@@ -12,6 +12,7 @@ from mutual_fund_agent_analysis.analytics import (
     ReturnPoint,
     absolute_return,
     align_returns,
+    analyze_fund,
     cagr,
     calculate_benchmark_metrics,
     calculate_drawdown,
@@ -280,3 +281,35 @@ def test_constant_benchmark_keeps_return_metrics_but_not_beta_or_alpha() -> None
     assert result.annualized_fund_return == Decimal("0.36")
     assert result.annualized_benchmark_return == Decimal("0.12")
     assert result.mean_period_excess_return == Decimal("0.02")
+
+
+
+def test_database_service_builds_report_from_reconciled_navs() -> None:
+    session = Mock()
+    nav_rows = [
+        SimpleNamespace(
+            nav_date=date(2024, 1, 1),
+            canonical_nav=Decimal("100"),
+            status="matched",
+        ),
+        SimpleNamespace(
+            nav_date=date(2024, 1, 2),
+            canonical_nav=Decimal("110"),
+            status="matched",
+        ),
+        SimpleNamespace(
+            nav_date=date(2024, 1, 3),
+            canonical_nav=Decimal("121"),
+            status="matched",
+        ),
+    ]
+    session.scalars.return_value.all.return_value = nav_rows
+
+    report = analyze_fund(session, 12345)
+
+    assert report.scheme_code == 12345
+    assert report.observation_count == 3
+    assert report.absolute_return == Decimal("0.21")
+    assert report.nav_conflict_dates == ()
+    assert report.benchmark is None
+    assert report.risk.observation_count == 2
