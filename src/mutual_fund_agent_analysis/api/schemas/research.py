@@ -69,7 +69,7 @@ class SocialPostInput(BaseModel):
     sentiment_score: Decimal | None = Field(default=None, ge=-1, le=1)
     sentiment_model: str | None = Field(default=None, max_length=100)
     is_spam: bool = False
-    expires_at: datetime | None = None
+    expires_at: datetime
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
