@@ -153,8 +153,11 @@ def calendar_year_returns(
     results: dict[int, Decimal] = {}
     latest_year = prices[-1].date.year
     final_date_is_year_end = prices[-1].date == date(latest_year, 12, 31)
+    latest_observation_is_near_year_end = prices[-1].date >= date(latest_year, 12, 24)
     latest_year_is_complete = final_date_is_year_end or (
-        as_of_date is not None and as_of_date > date(latest_year, 12, 31)
+        latest_observation_is_near_year_end
+        and as_of_date is not None
+        and as_of_date > date(latest_year, 12, 31)
     )
     for year in sorted(year_ends):
         previous = year_ends.get(year - 1)
