@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from mutual_fund_agent_analysis.analytics.risk import DEFAULT_PERIODS_PER_YEAR, _mean
-from mutual_fund_agent_analysis.analytics.series import ReturnPoint
+from mutual_fund_agent_analysis.analytics.series import ReturnPoint, normalize_returns
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,8 +22,10 @@ def align_returns(
     fund_returns: Iterable[ReturnPoint], benchmark_returns: Iterable[ReturnPoint]
 ) -> tuple[list[ReturnPoint], list[ReturnPoint]]:
     """Inner-join identical return intervals; never forward-fill or mix horizons."""
-    fund = {(point.start_date, point.date): point for point in fund_returns}
-    benchmark = {(point.start_date, point.date): point for point in benchmark_returns}
+    fund_points = normalize_returns(fund_returns)
+    benchmark_points = normalize_returns(benchmark_returns)
+    fund = {(point.start_date, point.date): point for point in fund_points}
+    benchmark = {(point.start_date, point.date): point for point in benchmark_points}
     intervals = sorted(fund.keys() & benchmark.keys())
     return [fund[key] for key in intervals], [benchmark[key] for key in intervals]
 
