@@ -77,15 +77,21 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
     results = response.get("results") or {}
     citations = response.get("citations") or []
     expected_types = {
-        "fund": "financial_data",
-        "portfolio": "portfolio_disclosure",
-        "security": "security_market_observation",
-        "events": "market_event",
-        "social": "social_aggregation",
-        "documents": "document_chunk",
+        "fund": {"financial_data"},
+        "portfolio": {"portfolio_disclosure"},
+        "security": {
+            "security_market_observation",
+            "security_corporate_event",
+            "portfolio_disclosure",
+        },
+        "events": {"market_event"},
+        "social": {"social_aggregation"},
+        "documents": {"document_chunk"},
     }
     citation_types = {citation.get("type") for citation in citations if isinstance(citation, dict)}
-    missing_groups = [group for group in results if expected_types.get(group) not in citation_types]
+    missing_groups = [
+        group for group in results if not (expected_types.get(group, {None}) & citation_types)
+    ]
     answer_nonempty = bool(str(response.get("answer", "")).strip())
     evidence_present = not results or not missing_groups
     return {
