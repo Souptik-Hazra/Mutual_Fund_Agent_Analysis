@@ -1,6 +1,6 @@
 """Database-backed orchestration for deterministic single- and multi-fund analytics."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
@@ -24,9 +24,15 @@ from mutual_fund_agent_analysis.analytics.risk import (
     RiskMetrics,
     calculate_risk_metrics,
 )
-from mutual_fund_agent_analysis.analytics.series import PricePoint, period_returns
+from mutual_fund_agent_analysis.analytics.series import (
+    FREQUENCY_PERIODS_PER_YEAR,
+    PricePoint,
+    period_returns,
+    resample_prices,
+)
 from mutual_fund_agent_analysis.models.benchmark import BenchmarkObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
+from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +56,11 @@ class FundAnalyticsReport:
     benchmark_source: str | None
     nav_conflict_dates: tuple[date, ...]
     calendar_year_as_of_date: date | None
+    frequency: str = "daily"
+    return_basis: str = "nav_only_excludes_idcw"
+    benchmark_return_basis: str | None = None
+    base100_series: tuple[tuple[date, Decimal], ...] = ()
+    methodology: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +73,8 @@ class FundComparisonReport:
     end_date: date
     funds: tuple[FundAnalyticsReport, ...]
     benchmark_code: str | None
+    frequency: str = "daily"
+    comparability_warnings: tuple[str, ...] = ()
 
 
 def load_fund_prices(
@@ -127,7 +140,16 @@ def _build_report(
     annual_risk_free_rate: Decimal,
     periods_per_year: int,
     calendar_year_as_of_date: date | None,
+    frequency: str,
 ) -> FundAnalyticsReport:
+    if frequency not in FREQUENCY_PERIODS_PER_YEAR:
+        raise ValueError("Unsupported analysis frequency.")
+    if frequency != "daily":
+        periods_per_year = FREQUENCY_PERIODS_PER_YEAR[frequency]
+    prices = resample_prices(prices, frequency)
+    benchmark_prices = (
+        resample_prices(benchmark_prices, frequency) if benchmark_prices is not None else None
+    )
     if len(prices) < 2:
         raise ValueError("At least two NAV observations are required for fund analytics.")
     if calendar_year_as_of_date is not None and (
@@ -174,6 +196,37 @@ def _build_report(
         benchmark_source=benchmark_source if benchmark_code is not None else None,
         nav_conflict_dates=conflicts,
         calendar_year_as_of_date=calendar_year_as_of_date,
+        frequency=frequency,
+        return_basis="nav_only_excludes_idcw",
+        benchmark_return_basis="tri" if benchmark_code is not None else None,
+        base100_series=tuple(
+            (point.date, Decimal("100") * point.value / prices[0].value) for point in prices
+        ),
+        methodology={
+            "nav_return_basis": "NAV-only price return; IDCW distributions are excluded.",
+            "absolute_return": "(ending NAV / starting NAV) - 1.",
+            "cagr": "Geometric annualization using 365.25 calendar days.",
+            "annualized_volatility": (
+                "Sample standard deviation of periodic simple NAV returns multiplied by "
+                "sqrt(periods_per_year)."
+            ),
+            "annualized_downside_deviation": (
+                "Root mean square periodic shortfall below the periodic risk-free rate, "
+                "multiplied by sqrt(periods_per_year)."
+            ),
+            "sharpe_sortino": (
+                "Periodic excess returns use annual_risk_free_rate / periods_per_year."
+            ),
+            "beta": (
+                "Sample covariance of exact interval-aligned fund and TRI returns divided "
+                "by sample benchmark variance."
+            ),
+            "alpha": ("Arithmetic annualized Jensen alpha using the periodic risk-free rate."),
+            "benchmark_return": (
+                "Arithmetic mean of exact interval-aligned TRI simple returns multiplied "
+                "by periods_per_year; not CAGR."
+            ),
+        },
     )
 
 
@@ -188,6 +241,7 @@ def analyze_fund(
     benchmark_source: str = "niftyindices",
     allow_nav_conflicts: bool = False,
     calendar_year_as_of_date: date | None = None,
+    frequency: str = "daily",
 ) -> FundAnalyticsReport:
     """Run deterministic analytics and retain explicit calendar-year completion context."""
     prices, conflicts = load_fund_prices(
@@ -210,6 +264,7 @@ def analyze_fund(
         annual_risk_free_rate,
         periods_per_year,
         calendar_year_as_of_date,
+        frequency,
     )
 
 
@@ -224,6 +279,7 @@ def compare_funds(
     benchmark_source: str = "niftyindices",
     allow_nav_conflicts: bool = False,
     calendar_year_as_of_date: date | None = None,
+    frequency: str = "daily",
 ) -> FundComparisonReport:
     """Compare 2–5 schemes using the exact intersection of their available NAV dates.
 
@@ -237,6 +293,37 @@ def compare_funds(
         raise ValueError("Comparison scheme codes must be unique.")
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be on or before end_date.")
+
+    scheme_rows = session.scalars(
+        select(MutualFundScheme).where(MutualFundScheme.scheme_code.in_(codes))
+    ).all()
+    option_by_code = {row.scheme_code: row.option_type for row in scheme_rows}
+    unclassified_codes = [code for code in codes if option_by_code.get(code) in {None, "unknown"}]
+    known_options = {
+        option_by_code[code] for code in codes if option_by_code.get(code) not in {None, "unknown"}
+    }
+    if len(known_options) > 1:
+        raise ValueError(
+            "Fund comparison requires like-for-like scheme options. "
+            "Growth and IDCW options cannot be compared using NAV-only returns."
+        )
+    if known_options and unclassified_codes:
+        raise ValueError(
+            "Cannot confirm comparable scheme options because one or more selected schemes "
+            "have unclassified plan/option metadata."
+        )
+    comparability_warnings = []
+    if not known_options:
+        comparability_warnings.append(
+            "Scheme options are unclassified. Results are NAV-only and IDCW distributions "
+            "are excluded; this is not a verified total-return comparison."
+        )
+    elif next(iter(known_options)) != "growth":
+        comparability_warnings.append(
+            "Selected schemes share an IDCW option classification, but these comparison "
+            "metrics are still NAV-only and exclude IDCW distributions. Use verified "
+            "IDCW total-return series for distribution-aware comparison."
+        )
 
     loaded: dict[int, tuple[list[PricePoint], tuple[date, ...]]] = {
         code: load_fund_prices(session, code, start_date, end_date, allow_nav_conflicts)
@@ -282,14 +369,17 @@ def compare_funds(
                 annual_risk_free_rate,
                 periods_per_year,
                 calendar_year_as_of_date,
+                frequency,
             )
         )
 
     return FundComparisonReport(
         scheme_codes=codes,
-        observation_count=len(ordered_dates),
-        start_date=ordered_dates[0],
-        end_date=ordered_dates[-1],
+        observation_count=reports[0].observation_count,
+        start_date=reports[0].start_date,
+        end_date=reports[0].end_date,
         funds=tuple(reports),
         benchmark_code=benchmark_code,
+        frequency=frequency,
+        comparability_warnings=tuple(comparability_warnings),
     )

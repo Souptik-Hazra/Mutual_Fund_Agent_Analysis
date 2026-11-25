@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Phases 1–8 are implemented on the preceding feature branch; Phases 9–11 add LangGraph research orchestration, a local React workspace, and offline evaluation. This is designed as a personal local application, not a public deployment. See `docs/phases-5-8-implementation.md` and `docs/phases-9-11-personal.md`.
+> **Project status:** The local-first core (NAV/benchmark ingestion, deterministic analytics, investor ledger, portfolio/evidence foundations, LangGraph and React workspace) is implemented. Financial-reliability extensions for Phases 0–7 are being delivered in a dedicated branch; authoritative IDCW coverage, AMC-specific file adapters and live provider verification remain source-dependent gates. This is a personal local application, not a public deployment. See `docs/roadmap-financial-reliability.md` and `docs/phase-0-7-reliability-implementation.md`.
 
 ## Table of Contents
 
@@ -533,6 +533,46 @@ mfa-sync-nav 125497 --start-date 2020-01-01
 
 The command validates the provider response, upserts scheme metadata and source-specific NAV observations, and records the original provider payload in `provider_sync_runs`. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
 
+### Import source-attributed scheme metadata and IDCW declarations
+Register each source in the local `data_sources` table before importing. The migrations seed `amfi` and the generic `amc_disclosures` placeholder; for each AMC, prefer a distinct source key and its own official base URL:
+
+```bash
+mfa-register-source my_amc \
+  --display-name "AMC legal name" \
+  --source-type official \
+  --authority-tier 1 \
+  --base-url "https://official-amc-domain.example/" \
+  --official --enabled
+```
+
+Replace the example name/domain with the actual source, after checking the AMC's official website and its applicable usage/attribution terms. Use `--disabled` until access and rights have been reviewed. A source's official flag is an operator assertion, not something the CLI independently certifies.
+
+
+Register each source in the local `data_sources` table before importing. Record its true official status, base URL, terms URL and enabled state. The default import status is **unverified**; use `--verification-status verified` only after manually checking every row against the original official AMC/AMFI document. The CLI validates the source registry and URL host, but it cannot independently prove that a disclosure is complete or authentic.
+
+Metadata CSV header:
+
+```csv
+scheme_code,source_url,valid_from,valid_to,plan_type,option_type,lifecycle_type,expense_ratio,expense_ratio_effective_date,benchmark_code,launch_date,closure_date,verification_note,metadata_json
+```
+
+IDCW CSV header:
+
+```csv
+scheme_code,source_url,external_id,revision,supersedes_distribution_id,ex_date,record_date,payment_date,amount_per_unit,option_type,status,published_at,metadata_json
+```
+
+Run the importers:
+
+```bash
+mfa-import-scheme-metadata data/scheme-metadata.csv --source-key amc-official
+mfa-import-idcw data/idcw-distributions.csv --source-key amc-official
+```
+
+Use `--verification-status verified` only after manual source validation and only when the registered source is enabled, official, and has a matching `base_url`. For a correction, create a new distribution revision and set `supersedes_distribution_id` to the active prior record. Imports are idempotent; conflicting reuse of an existing revision is rejected.
+
+**CSV import does not assert complete date coverage.** The IDCW total-return API remains blocked until a separate verified coverage attestation is created for the exact scheme, source and requested date interval. Review the imported rows and original notice before creating that attestation.
+
 ### Quality checks
 
 ```bash
@@ -788,3 +828,21 @@ checksums, retention, Qdrant version compatibility, and the destructive restore 
 
 The restore command requires an explicit interactive confirmation. Backups are not encrypted
 by these scripts; protect or encrypt the resulting archives before moving them off the machine.
+
+
+## Financial reliability audit
+
+After applying database migrations, generate a local coverage report:
+
+```bash
+mfa-audit-local --output artifacts/local-coverage-audit.json
+```
+
+For a bounded read-only MFAPI, AMFI and Nifty TRI provider check (maximum 31 calendar days), pass the exact scheme and benchmark identifiers:
+
+```bash
+mfa-audit-local --live --scheme-code YOUR_SCHEME_CODE --benchmark-code "NIFTY 50" \
+  --start-date 2026-11-01 --end-date 2026-11-25
+```
+
+The added API contracts include `GET /api/v1/audit/coverage`, source-attributed scheme metadata observations, versioned IDCW records and coverage attestations, a guarded reinvested-IDCW index, and portfolio holding-quality diagnostics. Daily, weekly, monthly, quarterly and yearly analytics use actual observed period-end NAVs; missing values are never filled. Read the phase implementation notes before registering an official distribution source.

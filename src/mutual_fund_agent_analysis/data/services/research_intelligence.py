@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models import (
-    DataSource, DocumentChunk, EvidenceRecord, MarketEvent, MutualFundScheme,
+    DataSource, DocumentChunk, EvidenceRecord, MarketEvent, MarketEventRevision, MutualFundScheme,
     PortfolioHolding, PortfolioSnapshot, ResearchDocument, ResearchEntity, SocialPost,
 )
 
@@ -221,6 +221,72 @@ def security_fund_exposure(session: Session, security_key: str) -> dict[str, Any
     return {"security_key": key, "funds": funds, "total_fund_count": len(funds)}
 
 
+
+def archive_market_event_revision(
+    session: Session,
+    event: MarketEvent,
+    *,
+    reason: str = "source_correction",
+    evidence_snapshot: dict[str, Any] | None = None,
+) -> MarketEventRevision:
+    """Append a JSON-safe snapshot before replacing the active event record."""
+    latest_number = session.scalar(
+        select(func.max(MarketEventRevision.revision_number)).where(
+            MarketEventRevision.event_id == event.event_id
+        )
+    ) or 0
+    if evidence_snapshot is None:
+        evidence = (
+            session.get(EvidenceRecord, event.evidence_id)
+            if event.evidence_id is not None
+            else None
+        )
+        evidence_snapshot = (
+            {
+                "evidence_id": evidence.evidence_id,
+                "source_key": evidence.source_key,
+                "external_id": evidence.external_id,
+                "canonical_url": evidence.canonical_url,
+                "title": evidence.title,
+                "published_at": evidence.published_at.isoformat()
+                if evidence.published_at
+                else None,
+                "retrieved_at": evidence.retrieved_at.isoformat()
+                if evidence.retrieved_at
+                else None,
+                "content_hash": evidence.content_hash,
+                "verification_status": evidence.verification_status,
+            }
+            if evidence is not None
+            else None
+        )
+    snapshot = {
+        "source_key": event.source_key,
+        "external_id": event.external_id,
+        "evidence_id": event.evidence_id,
+        "related_entity_id": event.related_entity_id,
+        "title": event.title,
+        "summary": event.summary,
+        "event_type": event.event_type,
+        "status": event.status,
+        "event_date": event.event_date.isoformat() if event.event_date else None,
+        "published_at": event.published_at.isoformat() if event.published_at else None,
+        "canonical_url": event.canonical_url,
+        "confidence": str(event.confidence) if event.confidence is not None else None,
+        "metadata": event.metadata_json or {},
+        "evidence": evidence_snapshot,
+    }
+    revision = MarketEventRevision(
+        event_id=event.event_id,
+        revision_number=int(latest_number) + 1,
+        revision_reason=reason,
+        snapshot=snapshot,
+    )
+    session.add(revision)
+    session.flush()
+    return revision
+
+
 def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict[str, Any]:
     """Ingest RSS/Atom items as reported (never confirmed) events with evidence records."""
     from urllib.parse import urlparse
@@ -236,6 +302,31 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
     created = updated = 0
     for item in items:
         external_id = "rss:" + item["external_id"]
+        event = session.scalar(
+            select(MarketEvent).where(
+                MarketEvent.source_key == source_key,
+                MarketEvent.external_id == external_id,
+            )
+        )
+        previous_evidence_snapshot = None
+        if event is not None and event.evidence_id is not None:
+            previous_evidence = session.get(EvidenceRecord, event.evidence_id)
+            if previous_evidence is not None:
+                previous_evidence_snapshot = {
+                    "evidence_id": previous_evidence.evidence_id,
+                    "source_key": previous_evidence.source_key,
+                    "external_id": previous_evidence.external_id,
+                    "canonical_url": previous_evidence.canonical_url,
+                    "title": previous_evidence.title,
+                    "published_at": previous_evidence.published_at.isoformat()
+                    if previous_evidence.published_at
+                    else None,
+                    "retrieved_at": previous_evidence.retrieved_at.isoformat()
+                    if previous_evidence.retrieved_at
+                    else None,
+                    "content_hash": previous_evidence.content_hash,
+                    "verification_status": previous_evidence.verification_status,
+                }
         evidence = session.scalar(select(EvidenceRecord).where(
             EvidenceRecord.source_key == source_key, EvidenceRecord.external_id == external_id
         ))
@@ -256,9 +347,6 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             if evidence.content_hash != digest:
                 evidence.verification_status = "unverified"
             evidence.content_hash = digest
-        event = session.scalar(select(MarketEvent).where(
-            MarketEvent.source_key == source_key, MarketEvent.external_id == external_id
-        ))
         event_type = "other"
         title_lower = item["title"].lower()
         for term, category in (
@@ -283,8 +371,16 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             session.add(MarketEvent(source_key=source_key, external_id=external_id, **values))
             created += 1
         else:
-            for key, value in values.items():
-                setattr(event, key, value)
+            changed = any(getattr(event, key) != value for key, value in values.items())
+            if changed:
+                archive_market_event_revision(
+                    session,
+                    event,
+                    reason="rss_source_update",
+                    evidence_snapshot=previous_evidence_snapshot,
+                )
+                for key, value in values.items():
+                    setattr(event, key, value)
             updated += 1
     session.commit()
     return {"source_key": source_key, "feed_url": feed_url, "fetched": len(items),
@@ -323,7 +419,26 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
             MarketEvent.external_id == payload.external_id,
         ))
         if existing:
-            for field in ("title", "summary", "event_type", "status", "event_date", "published_at", "canonical_url", "confidence", "metadata_json"):
+            tracked_fields = (
+                "evidence_id",
+                "related_entity_id",
+                "title",
+                "summary",
+                "event_type",
+                "status",
+                "event_date",
+                "published_at",
+                "canonical_url",
+                "confidence",
+                "metadata_json",
+            )
+            changed = any(
+                getattr(existing, field) != getattr(event, field)
+                for field in tracked_fields
+            )
+            if changed:
+                archive_market_event_revision(session, existing, reason="manual_event_update")
+            for field in tracked_fields:
                 setattr(existing, field, getattr(event, field))
             session.commit()
             session.refresh(existing)
@@ -398,14 +513,31 @@ def social_analytics(session: Session, entity_id: int | None, start: date | None
 
 
 def extract_pdf_text(content: bytes) -> tuple[str, int]:
-    """Extract text and page count from a PDF; scanned PDFs require OCR and are rejected."""
+    """Extract embedded PDF text and reject malformed, encrypted, or scanned documents."""
     import fitz
-    document = fitz.open(stream=content, filetype="pdf")
-    pages = [page.get_text("text").strip() for page in document]
-    text = "\n\n".join(f"[Page {index + 1}]\n{value}" for index, value in enumerate(pages) if value)
-    if len(text.strip()) < 80:
-        raise ValueError("PDF has no usable embedded text; OCR is required for scanned documents.")
-    return text, len(document)
+
+    try:
+        document = fitz.open(stream=content, filetype="pdf")
+    except Exception as exc:
+        raise ValueError("PDF is malformed or cannot be opened.") from exc
+    try:
+        if document.is_encrypted or document.needs_pass:
+            raise ValueError("Password-protected PDFs are not supported.")
+        if document.page_count < 1:
+            raise ValueError("PDF contains no pages.")
+        pages = [page.get_text("text").strip() for page in document]
+        text = "\n\n".join(
+            f"[Page {index + 1}]\n{value}"
+            for index, value in enumerate(pages)
+            if value
+        )
+        if len(text.strip()) < 80:
+            raise ValueError(
+                "PDF has no usable embedded text; OCR is required for scanned documents."
+            )
+        return text, len(document)
+    finally:
+        document.close()
 
 
 def split_document(text: str, chunk_size: int = 1200, overlap: int = 180) -> list[str]:

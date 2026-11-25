@@ -13,6 +13,7 @@ from mutual_fund_agent_analysis.api.schemas.research import (
 )
 from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
+    portfolio_payload,
     source_social_retention_days,
     split_document,
 )
@@ -186,3 +187,154 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
     remaining = captured[0].expires_at - datetime.now(UTC)
     assert result["persisted"] == 1
     assert timedelta(days=12) - timedelta(seconds=2) < remaining <= timedelta(days=12)
+
+
+def test_standard_portfolio_disclosure_headers_are_normalized_without_guessing_asset_class():
+    from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
+
+    row = _normalize_portfolio_row(
+        {
+            "ISIN": "INE123A01016",
+            "Name of Instrument": "Example Ltd",
+            "Industry": "Banks",
+            "% to NAV": "2.50",
+            "Mkt Value (Rs in Lakhs)": "12.75",
+        }
+    )
+    assert row["isin"] == "INE123A01016"
+    assert row["security_name"] == "Example Ltd"
+    assert row["sector"] == "Banks"
+    assert row["%_to_nav"] == "2.50"
+    assert row["market_value_source_unit"] == "INR lakhs"
+    assert row["market_value"] == Decimal("1275000.00")
+    assert "asset_class" not in row
+
+
+def test_portfolio_kind_column_is_used_only_as_an_explicit_asset_class():
+    from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
+
+    assert _normalize_portfolio_row({"Kind": "debt"})["asset_class"] == "debt"
+
+
+def test_pdf_extraction_rejects_malformed_and_encrypted_documents():
+    import fitz
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import extract_pdf_text
+
+    with pytest.raises(ValueError, match="malformed"):
+        extract_pdf_text(b"not a PDF document")
+
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "A protected financial document.")
+    encrypted = document.tobytes(
+        encryption=fitz.PDF_ENCRYPT_AES_256,
+        owner_pw="owner",
+        user_pw="secret",
+    )
+    document.close()
+    with pytest.raises(ValueError, match="Password-protected"):
+        extract_pdf_text(encrypted)
+
+
+def test_event_revision_archiver_preserves_prior_source_state():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import (
+        archive_market_event_revision,
+    )
+
+    event = SimpleNamespace(
+        event_id=7,
+        source_key="exchange",
+        external_id="notice-42",
+        evidence_id=None,
+        related_entity_id=9,
+        title="Original disclosure",
+        summary="Initial summary",
+        event_type="results",
+        status="reported",
+        event_date=date(2026, 10, 1),
+        published_at=datetime(2026, 10, 1, tzinfo=UTC),
+        canonical_url="https://exchange.example/notice-42",
+        confidence=Decimal("0.5"),
+        metadata_json={"revision": "original"},
+    )
+
+    class StubSession:
+        def __init__(self):
+            self.added = []
+
+        def scalar(self, _statement):
+            return 1
+
+        def add(self, value):
+            self.added.append(value)
+
+        def flush(self):
+            return None
+
+    session = StubSession()
+    revision = archive_market_event_revision(session, event, reason="source_correction")
+    assert revision.revision_number == 2
+    assert revision.revision_reason == "source_correction"
+    assert revision.snapshot["title"] == "Original disclosure"
+    assert revision.snapshot["status"] == "reported"
+    assert revision.snapshot["event_date"] == "2026-10-01"
+    assert session.added == [revision]
+
+
+def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
+    from types import SimpleNamespace
+
+    snapshot = SimpleNamespace(
+        snapshot_id=3,
+        scheme_code=100,
+        source_key="amc_disclosures",
+        effective_date=date(2026, 10, 31),
+        published_at=datetime(2026, 11, 5, tzinfo=UTC),
+        status="complete",
+        content_hash="a" * 64,
+        total_market_value=Decimal("1000000"),
+        document_url="https://amc.example/portfolio.csv",
+    )
+    rows = [
+        SimpleNamespace(
+            weight_pct=Decimal("60"),
+            asset_class="equity",
+            sector="Banks",
+            security_key="INE1",
+            security_name="Bank One",
+            isin="INE000000001",
+            quantity=Decimal("10"),
+            market_value=Decimal("600000"),
+            currency="INR",
+        ),
+        SimpleNamespace(
+            weight_pct=Decimal("40"),
+            asset_class="equity",
+            sector="Technology",
+            security_key="INE2",
+            security_name="Tech Two",
+            isin="INE000000002",
+            quantity=Decimal("20"),
+            market_value=Decimal("400000"),
+            currency="INR",
+        ),
+    ]
+
+    class StubSession:
+        def scalars(self, _statement):
+            return SimpleNamespace(all=lambda: rows)
+
+    result = portfolio_payload(StubSession(), snapshot)
+    assert result["weight_coverage_pct"] == Decimal("100")
+    assert result["hhi_0_to_1"] == Decimal("0.52")
+    assert result["hhi_coverage_sufficient"] is True
+    assert result["sector_allocation"][0]["sector"] == "Banks"
+
+    rows[1].weight_pct = None
+    incomplete = portfolio_payload(StubSession(), snapshot)
+    assert incomplete["weight_coverage_pct"] == Decimal("60")
+    assert incomplete["hhi_0_to_1"] is None
+    assert incomplete["hhi_coverage_sufficient"] is False

@@ -6,7 +6,7 @@ import hashlib
 import io
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
@@ -44,7 +44,12 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models import DataSource, MarketEvent, PortfolioSnapshot
+from mutual_fund_agent_analysis.models import (
+    DataSource,
+    MarketEvent,
+    MarketEventRevision,
+    PortfolioSnapshot,
+)
 from mutual_fund_agent_analysis.models.research import ResearchDocument
 
 router = APIRouter(tags=["research-intelligence"])
@@ -65,6 +70,47 @@ def ingest_portfolio(
         return portfolio_payload(session, snapshot)
     except ValueError as exc:
         raise _domain_error(exc) from exc
+
+
+def _normalize_portfolio_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize common AMC/SEBI column labels without inferring asset classes."""
+    normalized = {
+        str(key).strip().lower().replace(" ", "_"): value
+        for key, value in row.items()
+        if key is not None
+    }
+    aliases = {
+        "name_of_instrument": "security_name",
+        "instrument_name": "security_name",
+        "name_of_security": "security_name",
+        "isin_code": "isin",
+        "isin_no": "isin",
+        "security_isin": "isin",
+        "industry": "sector",
+        "percentage_to_nav": "weight_pct",
+        "percent_to_nav": "weight_pct",
+        "%_to_nav": "weight_pct",
+        "%_of_nav": "weight_pct",
+        "kind": "asset_class",
+    }
+    for alias, canonical in aliases.items():
+        if canonical not in normalized and alias in normalized:
+            normalized[canonical] = normalized[alias]
+    if "market_value" not in normalized:
+        for key in (
+            "market_value_rs_in_lakhs",
+            "market_value_in_lakhs",
+            "market_value_lakhs",
+            "mkt_value_(rs_in_lakhs)",
+            "mkt_value_rs_in_lakhs",
+        ):
+            value = normalized.get(key)
+            if value not in (None, ""):
+                parsed = Decimal(str(value).replace(",", "").strip())
+                normalized["market_value"] = parsed * Decimal("100000")
+                normalized["market_value_source_unit"] = "INR lakhs"
+                break
+    return normalized
 
 
 @router.post("/portfolios/import-file", status_code=status.HTTP_201_CREATED)
@@ -105,9 +151,7 @@ async def import_portfolio_file(
             raise ValueError("No holding rows were found.")
         holdings = []
         for index, row in enumerate(rows, start=2):
-            normalized = {
-                str(k).strip().lower().replace(" ", "_"): v for k, v in row.items() if k is not None
-            }
+            normalized = _normalize_portfolio_row(row)
             isin = normalized.get("isin") or normalized.get("isin_code")
             security_key = normalized.get("security_key") or isin
             name = (
@@ -336,6 +380,47 @@ def compare_selected_portfolios(
 @router.get("/securities/{security_key}/fund-exposure")
 def get_security_exposure(security_key: str, session: Annotated[Session, Depends(get_db)]) -> dict:
     return security_fund_exposure(session, security_key)
+
+
+@router.get("/events/{event_id}/revisions")
+def get_market_event_revisions(
+    event_id: int,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Return immutable prior source/event versions for one active event."""
+    event = session.get(MarketEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Market event not found.")
+    revisions = session.scalars(
+        select(MarketEventRevision)
+        .where(MarketEventRevision.event_id == event_id)
+        .order_by(MarketEventRevision.revision_number)
+    ).all()
+    return {
+        "event_id": event_id,
+        "current": {
+            "title": event.title,
+            "summary": event.summary,
+            "event_type": event.event_type,
+            "status": event.status,
+            "event_date": event.event_date,
+            "published_at": event.published_at,
+            "canonical_url": event.canonical_url,
+            "evidence_id": event.evidence_id,
+            "metadata": event.metadata_json,
+        },
+        "revision_count": len(revisions),
+        "revisions": [
+            {
+                "revision_id": item.revision_id,
+                "revision_number": item.revision_number,
+                "revision_reason": item.revision_reason,
+                "recorded_at": item.recorded_at,
+                "snapshot": item.snapshot,
+            }
+            for item in revisions
+        ],
+    }
 
 
 @router.post("/events", status_code=status.HTTP_201_CREATED)

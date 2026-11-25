@@ -101,3 +101,11 @@ def test_xirr_handles_leap_year_day_count() -> None:
     cash_flows = flows(("2024-01-01", "-1000"), ("2025-01-01", "1100"))
     result = xirr(cash_flows)
     assert xnpv(result, cash_flows).copy_abs() < Decimal("1e-18")
+
+
+def test_xirr_reports_non_convergence_instead_of_returning_last_midpoint(monkeypatch):
+    from mutual_fund_agent_analysis.analytics import cashflows
+
+    monkeypatch.setattr(cashflows, "_MAX_ITERATIONS", 0)
+    with pytest.raises(ValueError, match="did not converge"):
+        xirr(flows(("2023-01-01", "-1000"), ("2024-01-01", "1100")))

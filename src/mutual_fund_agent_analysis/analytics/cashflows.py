@@ -135,17 +135,21 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
             root = low
         else:
             low_value = value_at(low)
+            converged = False
             for _ in range(_MAX_ITERATIONS):
                 middle = (low + high) / Decimal("2")
                 middle_value = value_at(middle)
                 if abs(middle_value) <= _ROOT_TOLERANCE or abs(high - low) <= _ROOT_TOLERANCE:
                     low = high = middle
+                    converged = True
                     break
                 if (low_value < 0) != (middle_value < 0):
                     high = middle
                 else:
                     low = middle
                     low_value = middle_value
+            if not converged:
+                raise ValueError("XIRR solver did not converge in the supported rate domain.")
             root = (low + high) / Decimal("2")
 
         return root.exp() - Decimal("1")

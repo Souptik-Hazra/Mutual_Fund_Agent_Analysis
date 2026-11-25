@@ -1,8 +1,10 @@
 """Offline routing and response-grounding evaluation; no LLM or network calls."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from mutual_fund_agent_analysis.agents.research_graph import classify_intents
 
@@ -96,3 +98,124 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
         and isinstance(results, dict)
         and evidence_present,
     }
+
+
+def evaluate_evidence_quality(
+    response: dict[str, Any],
+    *,
+    require_citations: bool | None = None,
+) -> dict[str, Any]:
+    """Measure citation provenance, verification and temporal anomalies."""
+    citations = response.get("citations") or []
+    if not isinstance(citations, list):
+        citations = []
+    results = response.get("results") or {}
+    required = bool(results) if require_citations is None else require_citations
+    complete = 0
+    verified = 0
+    stale = 0
+    future_publications = 0
+    malformed = 0
+
+    def parse_timestamp(value: Any) -> datetime:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+
+    for citation in citations:
+        if not isinstance(citation, dict):
+            malformed += 1
+            continue
+        source_url = citation.get("canonical_url")
+        retrieved = citation.get("retrieved_at")
+        published = citation.get("published_at")
+        has_provenance = all((citation.get("source_key"), source_url, retrieved))
+        complete += int(has_provenance)
+        verified += int(citation.get("verification_status") == "verified")
+        citation_is_malformed = False
+        if source_url:
+            parsed_url = urlparse(str(source_url))
+            if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+                citation_is_malformed = True
+        retrieved_at = None
+        if retrieved:
+            try:
+                retrieved_at = parse_timestamp(retrieved)
+            except (TypeError, ValueError, OverflowError):
+                citation_is_malformed = True
+        published_at = None
+        if published:
+            try:
+                published_at = parse_timestamp(published)
+            except (TypeError, ValueError, OverflowError):
+                citation_is_malformed = True
+        if published_at is not None and retrieved_at is not None:
+            if published_at > retrieved_at:
+                future_publications += 1
+            elif (retrieved_at - published_at).days > 365:
+                stale += 1
+        malformed += int(citation_is_malformed)
+    citation_count = len(citations)
+    provenance_completeness = complete / citation_count if citation_count else 0.0
+    verified_ratio = verified / citation_count if citation_count else 0.0
+    unsupported_claims = response.get("unsupported_claims") or []
+    unsupported_claim_count = (
+        len(unsupported_claims)
+        if isinstance(unsupported_claims, (list, tuple, set))
+        else int(bool(unsupported_claims))
+    )
+    passed = (
+        (not required or citation_count > 0)
+        and (not required or complete == citation_count)
+        and malformed == 0
+        and future_publications == 0
+        and stale == 0
+        and unsupported_claim_count == 0
+    )
+    return {
+        "citation_count": citation_count,
+        "provenance_completeness": provenance_completeness,
+        "verified_citation_ratio": verified_ratio,
+        "stale_citation_count": stale,
+        "future_publication_count": future_publications,
+        "malformed_citation_count": malformed,
+        "unsupported_claim_count": unsupported_claim_count,
+        "evidence_quality_passed": passed,
+    }
+
+
+def evaluate_evidence_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Run a reviewed set of evidence-contract cases and compare expected outcomes."""
+    if not cases:
+        raise ValueError("Evidence evaluation dataset is empty.")
+    rows = []
+    passed = 0
+    for case in cases:
+        metrics = evaluate_evidence_quality(
+            case["response"],
+            require_citations=case.get("require_citations"),
+        )
+        expected = bool(case["expected_pass"])
+        actual = bool(metrics["evidence_quality_passed"])
+        correct = actual == expected
+        passed += int(correct)
+        rows.append(
+            {
+                "name": case["name"],
+                "expected_pass": expected,
+                "actual_pass": actual,
+                "case_passed": correct,
+                "metrics": metrics,
+            }
+        )
+    return {
+        "case_count": len(cases),
+        "correct_outcomes": passed,
+        "accuracy": passed / len(cases),
+        "cases": rows,
+    }
+
+
+def load_and_evaluate_evidence(path: str | Path) -> dict[str, Any]:
+    """Load reviewed evidence-contract cases from JSON."""
+    cases = json.loads(Path(path).read_text(encoding="utf-8"))
+    return evaluate_evidence_cases(cases)
