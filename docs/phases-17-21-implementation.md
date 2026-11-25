@@ -22,6 +22,7 @@ and React/Vite workspace rather than introducing duplicate persistence models or
 
 - Replaced the single-channel retrieval branch with lexical + optional Qdrant semantic retrieval.
 - Uses reciprocal-rank fusion on stable document/chunk identity; raw lexical and vector scores are never compared directly.
+- Persists source key and canonical URL in newly indexed vector metadata; existing Qdrant collections should be reindexed to backfill this metadata.
 - Preserves page/chunk/document provenance and reports candidate counts and retrieval mode.
 - Added opt-in OCR for scanned pages. Enable `DOCUMENT_OCR_ENABLED=true`, install `pip install -e '.[ocr]'`, and install the Tesseract OCR executable on the host. OCR is disabled by default.
 - PDF ingestion remains page-labelled; unsupported or unreadable documents fail with an explicit error rather than silently creating empty chunks.
