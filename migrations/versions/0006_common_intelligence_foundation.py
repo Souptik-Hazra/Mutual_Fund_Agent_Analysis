@@ -240,7 +240,8 @@ def upgrade() -> None:
         ),
         Column("relation_type", String(50), nullable=False),
         Column(
-            "source_key", String(60),
+            "source_key",
+            String(60),
             ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
         ),
         Column(
