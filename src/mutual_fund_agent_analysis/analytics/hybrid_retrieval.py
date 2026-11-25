@@ -47,8 +47,6 @@ def reciprocal_rank_fusion(
         row = merged[key]
         row["retrieval_score"] = scores[key]
         row["retrieval_modes"] = sorted(modes[key])
-        row["retrieval_mode"] = (
-            "hybrid_rrf" if len(modes[key]) == 2 else next(iter(modes[key]))
-        )
+        row["retrieval_mode"] = "hybrid_rrf" if len(modes[key]) == 2 else next(iter(modes[key]))
         results.append(row)
     return results
