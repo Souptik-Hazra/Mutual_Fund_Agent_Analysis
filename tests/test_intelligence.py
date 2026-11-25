@@ -257,6 +257,18 @@ def test_entity_relationship_rejects_self_links_and_invalid_dates(session):
         )
 
 
+def test_evidence_timestamps_must_be_timezone_aware(session):
+    with pytest.raises(ValueError, match="timezone offset"):
+        record_evidence(
+            session,
+            "amfi",
+            external_id="naive-timestamp",
+            published_at=datetime(2026, 11, 25),
+        )
+    with pytest.raises(ValueError, match="cannot be blank"):
+        record_evidence(session, "amfi", external_id="   ")
+
+
 def test_invalid_evidence_url_and_confidence_rejected(session):
     with pytest.raises(ValueError, match="HTTP"):
         record_evidence(session, "amfi", canonical_url="javascript:alert(1)")
