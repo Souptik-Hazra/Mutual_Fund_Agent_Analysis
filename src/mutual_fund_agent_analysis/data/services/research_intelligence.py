@@ -100,7 +100,12 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
     ).order_by(PortfolioHolding.weight_pct.desc().nullslast(), PortfolioHolding.security_name)).all()
     known = [r for r in rows if r.weight_pct is not None]
     weights = [r.weight_pct / D("100") for r in known]
-    weight_coverage = sum((r.weight_pct for r in known), D("0"))\n    hhi = (sum((w * w for w in weights), D("0"))\n           if weights and D("99") <= weight_coverage <= D("101") else None)
+    weight_coverage = sum((r.weight_pct for r in known), D("0"))
+    hhi = (
+        sum((w * w for w in weights), D("0"))
+        if weights and D("99") <= weight_coverage <= D("101")
+        else None
+    ))
     sectors: dict[str, Decimal] = defaultdict(lambda: D("0"))
     assets: dict[str, Decimal] = defaultdict(lambda: D("0"))
     for row in rows:
