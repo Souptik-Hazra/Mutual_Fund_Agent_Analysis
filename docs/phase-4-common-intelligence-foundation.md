@@ -14,7 +14,9 @@ Create one canonical identity and provenance layer shared by fund, portfolio, ma
 - Entity-evidence links with relation type, confidence, resolution method, and verification timestamp.
 - Typed entity-to-entity relationships with validity dates, source/evidence references, confidence, verification state, and metadata; for example, a scheme can be related to its AMC with a managed_by edge.
 - Deterministic resolver: exact identifier first, then exact alias; temporal validity and optional source scope are honored; ambiguous aliases return candidates and are never auto-selected.
-- NAV and benchmark ingestion now creates or updates matching canonical entities, provider aliases, and AMFI scheme-code / benchmark-code identifiers; migration backfills identities for already-ingested scheme and benchmark masters.
+- NAV and benchmark ingestion creates or updates canonical entities and stable identifiers; NAV ingestion also registers AMC entities and an explicitly unverified managed_by relationship from provider fund-house metadata.
+- Each new NAV and benchmark sync run is hashed, recorded as evidence metadata, and linked to its canonical scheme or benchmark entity. The original raw provider response remains in the existing append-only sync audit table; evidence records do not duplicate full provider payloads.
+- Migration backfills identities for already-ingested scheme and benchmark masters.
 - REST API for source listing, entity creation/read, alias and identifier registration, evidence creation, entity-evidence linking, evidence listing, and identity resolution.
 
 ## API
@@ -46,7 +48,7 @@ All endpoints are under /api/v1/intelligence.
 7. Social sources are disabled by default; registration does not imply permission to collect or retain content.
 8. Evidence stores source references and metadata, not unrestricted copies of copyrighted articles or platform content.
 9. Services do not commit transactions; API boundaries own commits and rollbacks.
-10. Existing NAV and benchmark schemas remain unchanged; provider sync audit remains their raw-response lineage while new ingestion writes also maintain canonical entity identity. Evidence links to individual sync runs remain a follow-up.
+10. Existing NAV and benchmark schemas remain unchanged; provider sync audit remains the raw-response lineage while evidence records link sync-run IDs and content hashes to canonical entities.
 
 ## Validation
 
@@ -61,7 +63,6 @@ Run:
 
 ## Deliberate follow-up
 
-- Add verified entity-evidence links to NAV and benchmark sync runs after confirming provider record identity and audit semantics.
 - Add reviewed historical validity intervals and conflict-resolution workflow for provider-reported AMC changes.
 - Add evidence links to NAV and benchmark sync runs after validating provider-specific record identity.
 - Add audited entity merge/reconciliation workflow before automatic fuzzy matching.
