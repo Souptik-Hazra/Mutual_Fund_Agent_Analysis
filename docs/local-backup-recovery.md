@@ -35,7 +35,8 @@ The default output is `backups/mfa-backup-<UTC timestamp>.tar.gz`, plus an adjac
 - A Qdrant collection snapshot if the configured collection exists.
 - A JSON manifest with backup time, database/collection names, Qdrant version, and source
   Git commit.
-- A `SHA256SUMS` file covering every payload in the archive.
+- A `SHA256SUMS` file covering every payload in the archive; Qdrant's upload endpoint also
+  receives the snapshot SHA-256 when restoring.
 
 The script downloads and then removes its temporary Qdrant-side snapshot. The default
 retention is the newest seven archives. Set `BACKUP_KEEP=0` to disable automatic pruning,
@@ -102,4 +103,4 @@ deliberately rather than bypassing the database-name check.
 Official references:
 - [Qdrant snapshots](https://qdrant.tech/documentation/snapshots/) — collection snapshot,
   download, uploaded restore, and supported version window.
-- [Qdrant snapshot upload API](https://api.qdrant.tech/v-1-14-x/api-reference/snapshots/recover-from-uploaded-snapshot).
+- [Qdrant snapshot upload API](https://api.qdrant.tech/v-1-13-x/api-reference/snapshots/recover-from-uploaded-snapshot).
