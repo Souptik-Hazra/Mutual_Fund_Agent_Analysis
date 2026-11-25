@@ -41,16 +41,28 @@ def session():
         ],
     )
     with Session(engine) as db:
-        db.add_all([
-            DataSource(
-                source_key="amfi", display_name="AMFI", source_type="official",
-                authority_tier=1, is_official=True, enabled=True, metadata_json={},
-            ),
-            DataSource(
-                source_key="mfapi", display_name="MFAPI", source_type="provider",
-                authority_tier=2, is_official=False, enabled=True, metadata_json={},
-            ),
-        ])
+        db.add_all(
+            [
+                DataSource(
+                    source_key="amfi",
+                    display_name="AMFI",
+                    source_type="official",
+                    authority_tier=1,
+                    is_official=True,
+                    enabled=True,
+                    metadata_json={},
+                ),
+                DataSource(
+                    source_key="mfapi",
+                    display_name="MFAPI",
+                    source_type="provider",
+                    authority_tier=2,
+                    is_official=False,
+                    enabled=True,
+                    metadata_json={},
+                ),
+            ]
+        )
         db.commit()
         yield db
     engine.dispose()
@@ -91,8 +103,11 @@ def test_ambiguous_alias_is_not_auto_resolved(session):
 def test_alias_validity_is_temporal(session):
     entity = create_entity(session, "company", "Old Name Limited")
     add_entity_alias(
-        session, entity.entity_id, "Old Name",
-        valid_from=date(2010, 1, 1), valid_to=date(2020, 1, 1),
+        session,
+        entity.entity_id,
+        "Old Name",
+        valid_from=date(2010, 1, 1),
+        valid_to=date(2020, 1, 1),
     )
     current = resolve_entity(session, alias="Old Name", as_of=date(2025, 1, 1))
     historical = resolve_entity(session, alias="Old Name", as_of=date(2015, 1, 1))
@@ -155,19 +170,30 @@ def test_identifier_cannot_be_reassigned(session):
 def test_evidence_is_idempotent_and_linked(session):
     entity = create_entity(session, "scheme", "HDFC Flexi Cap Fund")
     evidence = record_evidence(
-        session, "amfi", external_id="nav-report-2026-11-25",
-        canonical_url="https://www.amfiindia.com/", title="AMFI NAV report",
+        session,
+        "amfi",
+        external_id="nav-report-2026-11-25",
+        canonical_url="https://www.amfiindia.com/",
+        title="AMFI NAV report",
         published_at=datetime(2026, 11, 25, tzinfo=UTC),
-        confidence=Decimal("0.990"), verification_status="verified",
+        confidence=Decimal("0.990"),
+        verification_status="verified",
     )
     same = record_evidence(
-        session, "amfi", external_id="nav-report-2026-11-25",
-        title="Updated AMFI NAV report", verification_status="verified",
+        session,
+        "amfi",
+        external_id="nav-report-2026-11-25",
+        title="Updated AMFI NAV report",
+        verification_status="verified",
     )
     assert evidence.evidence_id == same.evidence_id
     link = link_entity_evidence(
-        session, entity.entity_id, evidence.evidence_id,
-        "published_by", Decimal("0.99"), "manual",
+        session,
+        entity.entity_id,
+        evidence.evidence_id,
+        "published_by",
+        Decimal("0.99"),
+        "manual",
     )
     assert link.entity_id == entity.entity_id
     assert link.evidence_id == evidence.evidence_id
@@ -177,8 +203,11 @@ def test_entity_relationship_is_validated_and_idempotent(session):
     scheme = create_entity(session, "scheme", "Example Equity Fund")
     amc = create_entity(session, "amc", "Example Asset Management")
     evidence = record_evidence(
-        session, "amfi", external_id="amc-relationship-source",
-        title="Scheme information", verification_status="verified",
+        session,
+        "amfi",
+        external_id="amc-relationship-source",
+        title="Scheme information",
+        verification_status="verified",
     )
     relationship = create_entity_relationship(
         session,
@@ -238,10 +267,17 @@ def test_invalid_evidence_url_and_confidence_rejected(session):
 def test_unknown_and_disabled_sources_are_rejected(session):
     with pytest.raises(ValueError, match="Unknown source"):
         record_evidence(session, "unknown")
-    session.add(DataSource(
-        source_key="disabled", display_name="Disabled", source_type="social",
-        authority_tier=4, is_official=False, enabled=False, metadata_json={},
-    ))
+    session.add(
+        DataSource(
+            source_key="disabled",
+            display_name="Disabled",
+            source_type="social",
+            authority_tier=4,
+            is_official=False,
+            enabled=False,
+            metadata_json={},
+        )
+    )
     session.flush()
     with pytest.raises(ValueError, match="disabled"):
         record_evidence(session, "disabled")
