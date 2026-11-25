@@ -773,3 +773,18 @@ the cash-flow sign. SIP simulation is never mixed into actual investor returns u
 also enters those transactions into the ledger. IDCW payouts entered manually are included as
 cash inflows, but historical IDCW total-return series are not yet available until official
 distribution disclosures, corrections, option mapping, and effective dates are ingested.
+
+## Local backup and recovery
+
+The local application data can be backed up and restored with the scripts in
+`scripts/`. They protect the PostgreSQL database and configured Qdrant collection;
+see [Local backup and recovery](docs/local-backup-recovery.md) for prerequisites,
+checksums, retention, Qdrant version compatibility, and the destructive restore procedure.
+
+```bash
+./scripts/backup-local.sh
+./scripts/restore-local.sh backups/mfa-backup-YYYYMMDDTHHMMSSZ.tar.gz
+```
+
+The restore command requires an explicit interactive confirmation. Backups are not encrypted
+by these scripts; protect or encrypt the resulting archives before moving them off the machine.
