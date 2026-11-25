@@ -548,11 +548,10 @@ def fund_social_sentiment(
         holdings = session.scalars(select(PortfolioHolding).where(
             PortfolioHolding.snapshot_id == snapshot.snapshot_id
         )).all()
-        weight_by_entity = {
-            row.company_entity_id: row.weight_pct
-            for row in holdings
-            if row.company_entity_id is not None and row.weight_pct is not None
-        }
+        weight_by_entity: dict[int, Decimal] = defaultdict(lambda: D("0"))
+        for row in holdings:
+            if row.company_entity_id is not None and row.weight_pct is not None:
+                weight_by_entity[row.company_entity_id] += row.weight_pct
         total_weight = sum((row.weight_pct or D("0") for row in holdings), D("0"))
         total_weight_days += total_weight * days
         relevant = [
@@ -597,8 +596,6 @@ def events_for_fund_exposure(
     session: Session, scheme_code: int, start: date | None, end: date | None, limit: int = 100
 ) -> dict[str, Any]:
     """Map company/sector events to the fund holdings snapshot effective on the event date."""
-    from mutual_fund_agent_analysis.models import EntityRelationship
-
     entity_filter = select(MarketEvent).where(MarketEvent.related_entity_id.is_not(None))
     if start:
         entity_filter = entity_filter.where(MarketEvent.event_date >= start)
