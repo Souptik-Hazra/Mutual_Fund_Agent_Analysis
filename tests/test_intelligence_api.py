@@ -12,6 +12,8 @@ def test_intelligence_routes_are_registered():
     assert "/api/v1/intelligence/entities" in paths
     assert "/api/v1/intelligence/resolve" in paths
     assert "/api/v1/intelligence/entities/{entity_id}/relationships" in paths
+    assert "/api/v1/intelligence/entities/{entity_id}/aliases" in paths
+    assert "/api/v1/intelligence/entities/{entity_id}/identifiers" in paths
 
 
 def test_entity_create_request_rejects_blank_name():
@@ -34,5 +36,14 @@ def test_evidence_request_rejects_invalid_confidence():
     response = client.post(
         "/api/v1/intelligence/evidence",
         json={"source_key": "amfi", "confidence": "1.2"},
+    )
+    assert response.status_code == 422
+
+
+def test_evidence_pagination_is_bounded():
+    client = TestClient(create_app())
+    response = client.get(
+        "/api/v1/intelligence/entities/1/evidence",
+        params={"limit": 101},
     )
     assert response.status_code == 422
