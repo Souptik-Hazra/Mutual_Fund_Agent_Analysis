@@ -97,7 +97,8 @@ def test_social_retention_uses_source_override_and_global_fallback():
         authority_tier=5,
         is_official=False,
         enabled=False,
-        metadata_json={"retention_days": 12},
+        terms_url="https://terms.example/reddit",
+        metadata_json={"retention_days": 12, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25"},
     )
     assert source_social_retention_days(source, 30) == 12
 
@@ -149,7 +150,8 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
         authority_tier=5,
         is_official=False,
         enabled=True,
-        metadata_json={"retention_days": 12},
+        terms_url="https://terms.example/reddit",
+        metadata_json={"retention_days": 12, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25"},
     )
 
     class StubSession:
@@ -338,3 +340,201 @@ def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
     assert incomplete["weight_coverage_pct"] == Decimal("60")
     assert incomplete["hhi_0_to_1"] is None
     assert incomplete["hhi_coverage_sufficient"] is False
+
+
+
+def test_rss_adapter_rejects_entity_declarations_and_non_https_links(monkeypatch):
+    import httpx
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-length": "100"}
+
+        def raise_for_status(self):
+            return None
+
+        def iter_bytes(self):
+            yield b'<!DOCTYPE feed [<!ENTITY x "expanded">]><rss><channel/></rss>'
+
+    class FakeStream:
+        def __enter__(self):
+            return FakeResponse()
+
+        def __exit__(self, *_args):
+            return None
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def stream(self, *_args, **_kwargs):
+            return FakeStream()
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+    with pytest.raises(ValueError, match="entity declarations"):
+        fetch_feed("https://www.nseindia.com/feed.xml", "www.nseindia.com")
+
+
+def test_social_source_requires_source_specific_evaluated_sentiment_model():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import create_social_post
+
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=True,
+        terms_url="https://www.redditinc.com/policies",
+        metadata_json={"retention_days": 30, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25", "evaluated_sentiment_models": []},
+    )
+
+    class StubSession:
+        def __init__(self):
+            self.added = []
+
+        def get(self, model, _key):
+            return source if model is DataSource else None
+
+        def scalar(self, _statement):
+            return None
+
+        def add(self, row):
+            self.added.append(row)
+
+    payload = SocialPostInput(
+        source_key="reddit",
+        external_id="post-1",
+        content_hash="a" * 64,
+        published_at=datetime.now(UTC),
+        sentiment_label="positive",
+        sentiment_score=Decimal("0.7"),
+        sentiment_model="unreviewed-model",
+        expires_at=datetime.now(UTC) + __import__("datetime").timedelta(days=1),
+    )
+    with pytest.raises(ValueError, match="not registered as evaluated"):
+        create_social_post(StubSession(), payload)
+
+
+def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(monkeypatch):
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import create_social_post
+
+    source = DataSource(
+        source_key="reddit",
+        display_name="Reddit",
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=True,
+        terms_url="https://terms.example/reddit",
+        metadata_json={"retention_days": 30, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25"},
+    )
+    monkeypatch.setattr(
+        "mutual_fund_agent_analysis.core.config.get_settings",
+        lambda: SimpleNamespace(social_retention_days=30),
+    )
+
+    class StubSession:
+        def __init__(self):
+            self.added = []
+
+        def get(self, model, _key):
+            return source if model is DataSource else None
+
+        def scalar(self, _statement):
+            return None
+
+        def add(self, row):
+            self.added.append(row)
+
+        def commit(self):
+            return None
+
+        def refresh(self, _row):
+            return None
+
+    session = StubSession()
+    payload = SocialPostInput(
+        source_key="reddit",
+        external_id="post-2",
+        content_hash="b" * 64,
+        text_excerpt="Do not persist this post text",
+        expires_at=datetime.now(UTC) + __import__("datetime").timedelta(days=2),
+        metadata={"subreddit": "investing", "text": "raw text", "content": "raw body", "nested": {"body": "raw nested body"}},
+    )
+    row = create_social_post(session, payload)
+    assert row.text_excerpt is None
+    assert row.metadata_json == {"subreddit": "investing"}
+
+
+
+def test_rss_entity_resolution_requires_one_unique_exact_company_alias():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import (
+        _resolve_rss_entity_exact,
+    )
+
+    entity = SimpleNamespace(entity_id=42)
+    alias = SimpleNamespace(normalized_alias="example industries")
+
+    class StubResult:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
+
+    class StubSession:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def execute(self, _statement):
+            return StubResult(self.rows)
+
+    assert _resolve_rss_entity_exact(
+        StubSession([(alias, entity)]),
+        "nse",
+        "Example Industries announces quarterly results",
+        date(2026, 11, 1),
+    ) == 42
+    assert _resolve_rss_entity_exact(
+        StubSession([(alias, entity)]),
+        "nse",
+        "Example Industries Ltd competitor results",
+        None,
+    ) is None
+
+    other = SimpleNamespace(entity_id=43)
+    assert _resolve_rss_entity_exact(
+        StubSession([(alias, entity), (alias, other)]),
+        "nse",
+        "Example Industries announces quarterly results",
+        date(2026, 11, 1),
+    ) is None
+
+
+
+def test_rss_event_date_is_not_inferred_from_publication_date():
+    from xml.etree import ElementTree
+
+    from mutual_fund_agent_analysis.data.providers.rss import _parse_event_date
+
+    no_effective_date = ElementTree.fromstring(
+        "<item><pubDate>Tue, 25 Nov 2026 10:00:00 GMT</pubDate></item>"
+    )
+    explicit_event_date = ElementTree.fromstring(
+        "<item><eventDate>2026-11-20</eventDate><pubDate>Tue, 25 Nov 2026 10:00:00 GMT</pubDate></item>"
+    )
+    assert _parse_event_date(no_effective_date) is None
+    assert _parse_event_date(explicit_event_date) == date(2026, 11, 20)

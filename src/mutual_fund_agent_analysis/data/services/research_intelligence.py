@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models import (
-    DataSource, DocumentChunk, EvidenceRecord, MarketEvent, MarketEventRevision, MutualFundScheme,
+    DataSource, DocumentChunk, EntityAlias, EntityEvidenceLink, EvidenceRecord, MarketEvent, MarketEventRevision, MutualFundScheme,
     PortfolioHolding, PortfolioSnapshot, ResearchDocument, ResearchEntity, SocialPost,
 )
 
@@ -287,14 +287,55 @@ def archive_market_event_revision(
     return revision
 
 
+def _resolve_rss_entity_exact(
+    session: Session, source_key: str, title: str, as_of: date | None
+) -> int | None:
+    """Link a headline only when exactly one active company alias matches."""
+    if as_of is None:
+        return None
+    aliases = session.execute(
+        select(EntityAlias, ResearchEntity)
+        .join(ResearchEntity, ResearchEntity.entity_id == EntityAlias.entity_id)
+        .where(ResearchEntity.entity_type == "company")
+        .where(ResearchEntity.status == "active")
+        .where((EntityAlias.source_key == source_key) | EntityAlias.source_key.is_(None))
+        .where((EntityAlias.valid_from.is_(None)) | (EntityAlias.valid_from <= as_of))
+        .where((EntityAlias.valid_to.is_(None)) | (EntityAlias.valid_to >= as_of))
+    ).all()
+    normalized_title = " ".join(title.casefold().split())
+    matches: dict[int, int] = {}
+    for alias, entity in aliases:
+        normalized_alias = " ".join(alias.normalized_alias.casefold().split())
+        if normalized_alias and re.search(
+            rf"(?<![\w]){re.escape(normalized_alias)}(?![\w])",
+            normalized_title,
+        ):
+            matches[entity.entity_id] = max(matches.get(entity.entity_id, 0), len(normalized_alias))
+    if len(matches) != 1:
+        return None
+    return next(iter(matches))
+
+
 def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict[str, Any]:
     """Ingest RSS/Atom items as reported (never confirmed) events with evidence records."""
     from urllib.parse import urlparse
     from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
 
     source = session.get(DataSource, source_key)
-    if source is None or not source.enabled or not source.base_url:
-        raise ValueError("Source must be registered, enabled, and have an official base_url.")
+    if (
+        source is None
+        or not source.enabled
+        or not source.is_official
+        or source.source_type != "official"
+        or not source.base_url
+        or not source.terms_url
+        or urlparse(source.base_url).scheme != "https"
+        or not isinstance(source.metadata_json, dict)
+        or source.metadata_json.get("terms_reviewed") is not True
+        or source.metadata_json.get("access_confirmed") is not True
+        or not source.metadata_json.get("reviewed_at")
+    ):
+        raise ValueError("Event feed source must be enabled, official, and registered with an HTTPS base_url.")
     allowed_host = urlparse(source.base_url).hostname
     if not allowed_host:
         raise ValueError("Registered source base_url is invalid.")
@@ -340,13 +381,31 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             )
             session.add(evidence)
             session.flush()
+        evidence_changed = False
+        if evidence is None:
+            evidence = EvidenceRecord(
+                source_key=source_key, external_id=external_id, canonical_url=item["url"],
+                title=item["title"], published_at=item["published_at"],
+                content_hash=digest, verification_status="unverified",
+                metadata_json={"ingestion": "rss_atom", "feed_url": feed_url},
+            )
+            session.add(evidence)
+            session.flush()
+            evidence_changed = True
         else:
+            evidence_changed = any((
+                evidence.content_hash != digest,
+                evidence.title != item["title"],
+                evidence.canonical_url != item["url"],
+                evidence.published_at != item["published_at"],
+            ))
+            if evidence_changed:
+                evidence.verification_status = "unverified"
             evidence.title = item["title"]
             evidence.canonical_url = item["url"]
             evidence.published_at = item["published_at"]
-            if evidence.content_hash != digest:
-                evidence.verification_status = "unverified"
             evidence.content_hash = digest
+            evidence.retrieved_at = datetime.now(timezone.utc)
         event_type = "other"
         title_lower = item["title"].lower()
         for term, category in (
@@ -360,10 +419,25 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             if term in title_lower:
                 event_type = category
                 break
+        resolved_entity_id = _resolve_rss_entity_exact(
+            session, source_key, item["title"], item.get("event_date") or (item["published_at"].date() if item["published_at"] else None)
+        )
+        if event is not None and event.related_entity_id is not None:
+            # Preserve an existing manually reviewed or previously resolved entity link.
+            resolved_entity_id = event.related_entity_id
+        if resolved_entity_id is not None:
+            existing_link = session.get(EntityEvidenceLink, (resolved_entity_id, evidence.evidence_id))
+            if existing_link is None:
+                session.add(EntityEvidenceLink(
+                    entity_id=resolved_entity_id,
+                    evidence_id=evidence.evidence_id,
+                    relation_type="mentions",
+                    resolution_method="exact_alias",
+                ))
         values = {
-            "evidence_id": evidence.evidence_id, "title": item["title"],
+            "evidence_id": evidence.evidence_id, "related_entity_id": resolved_entity_id, "title": item["title"],
             "summary": item["summary"], "event_type": event_type, "status": "reported",
-            "event_date": item["published_at"].date() if item["published_at"] else None,
+            "event_date": item.get("event_date"),
             "published_at": item["published_at"], "canonical_url": item["url"],
             "metadata_json": {"ingestion": "rss_atom", "feed_url": feed_url},
         }
@@ -371,7 +445,13 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             session.add(MarketEvent(source_key=source_key, external_id=external_id, **values))
             created += 1
         else:
-            changed = any(getattr(event, key) != value for key, value in values.items())
+            source_fields = (
+                "title", "summary", "event_type", "event_date",
+                "published_at", "canonical_url", "related_entity_id",
+            )
+            changed = evidence_changed or any(
+                getattr(event, key) != values[key] for key in source_fields
+            )
             if changed:
                 archive_market_event_revision(
                     session,
@@ -381,11 +461,20 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
                 )
                 for key, value in values.items():
                     setattr(event, key, value)
+            # Unchanged RSS refreshes never downgrade a manually verified event status.
             updated += 1
     session.commit()
-    return {"source_key": source_key, "feed_url": feed_url, "fetched": len(items),
-            "created": created, "updated": updated,
-            "status_policy": "RSS items are stored as reported, never automatically confirmed."}
+    return {
+        "source_key": source_key,
+        "feed_url": feed_url,
+        "fetched": len(items),
+        "created": created,
+        "updated": updated,
+        "terms_reviewed_at": source.metadata_json.get("reviewed_at"),
+        "status_policy": "RSS items are stored as reported; unchanged refreshes preserve manual verification.",
+        "event_date_policy": "Only explicit feed event/effective date fields are used; publication time is not substituted.",
+        "entity_link_policy": "Source-aware exact aliases; ambiguous or unmatched headlines remain unlinked.",
+    }
 
 
 def create_market_event(session: Session, payload: Any) -> MarketEvent:
@@ -397,8 +486,16 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
     evidence = session.get(EvidenceRecord, payload.evidence_id) if payload.evidence_id else None
     if payload.evidence_id and evidence is None:
         raise ValueError("Unknown evidence_id.")
+    if evidence is not None and evidence.source_key != payload.source_key:
+        raise ValueError("Event source_key must match the linked evidence source.")
+    if payload.published_at is not None and (
+        payload.published_at.tzinfo is None or payload.published_at.utcoffset() is None
+    ):
+        raise ValueError("published_at must include a timezone offset.")
     if payload.status in {"confirmed", "scheduled", "disproved"} and evidence is None:
         raise ValueError("Confirmed, scheduled, and disproved events require a linked evidence record.")
+    if payload.status in {"reported", "unverified", "speculative"} and evidence is None and not payload.canonical_url:
+        raise ValueError("Reported or speculative events require a source URL or linked evidence record.")
     if payload.status in {"confirmed", "scheduled"} and (
         evidence is None or evidence.verification_status not in {"verified", "corroborated"}
     ):
@@ -450,24 +547,95 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
 
 
 def create_social_post(session: Session, payload: Any) -> SocialPost:
+    """Persist only minimal social metadata under an enforced source retention policy."""
+    from datetime import timedelta
+    from mutual_fund_agent_analysis.core.config import get_settings
+
     source = session.get(DataSource, payload.source_key)
-    if source is None or not source.enabled:
-        raise ValueError("Social source is not registered and enabled. Enable it only after API/terms review.")
+    if source is None or not source.enabled or source.source_type != "social":
+        raise ValueError("Social source is not registered, enabled, and classified as social.")
+    source_metadata = source.metadata_json if isinstance(source.metadata_json, dict) else {}
+    if (
+        not source.terms_url
+        or source_metadata.get("terms_reviewed") is not True
+        or source_metadata.get("access_confirmed") is not True
+        or not source_metadata.get("reviewed_at")
+    ):
+        raise ValueError("Social source requires a recorded terms review, confirmed API access, and terms URL.")
     if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
         raise ValueError("Unknown related_entity_id.")
-    if payload.expires_at <= datetime.now(timezone.utc):
+
+    now = datetime.now(timezone.utc)
+    expires_at = payload.expires_at
+    if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+        raise ValueError("Social post expiry must include a timezone.")
+    if payload.published_at is not None and (
+        payload.published_at.tzinfo is None or payload.published_at.utcoffset() is None
+    ):
+        raise ValueError("Social post published_at must include a timezone offset.")
+    expires_at = expires_at.astimezone(timezone.utc)
+    if expires_at <= now:
         raise ValueError("Social post expiry must be in the future.")
+    retention_days = source_social_retention_days(source, get_settings().social_retention_days)
+    if expires_at > now + timedelta(days=retention_days, minutes=2):
+        raise ValueError("Social post expiry exceeds the source-specific retention policy.")
+
+    digest = str(payload.content_hash).lower()
+    if not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Social content_hash must be a SHA-256 hexadecimal digest.")
+    if payload.canonical_url:
+        from urllib.parse import urlparse
+        parsed_url = urlparse(str(payload.canonical_url))
+        allowed_hosts = {"reddit.com", "www.reddit.com"} if payload.source_key == "reddit" else {"x.com", "www.x.com", "twitter.com"}
+        if parsed_url.scheme != "https" or parsed_url.hostname not in allowed_hosts:
+            raise ValueError("Social canonical_url must be an HTTPS URL on the matching provider domain.")
+
+    scored_fields = (payload.sentiment_label, payload.sentiment_score, payload.sentiment_model)
+    if any(value is not None for value in scored_fields) and not all(value is not None for value in scored_fields):
+        raise ValueError("Sentiment label, score, and evaluated model must be supplied together.")
+    if payload.sentiment_model is not None:
+        approved_models = source_metadata.get("evaluated_sentiment_models", [])
+        if not isinstance(approved_models, list) or payload.sentiment_model not in approved_models:
+            raise ValueError("Sentiment model is not registered as evaluated for this source.")
+
     row = session.scalar(select(SocialPost).where(
         SocialPost.source_key == payload.source_key, SocialPost.external_id == payload.external_id
     ))
+    supplied_metadata = payload.metadata if isinstance(payload.metadata, dict) else {}
+    # Provider-specific allowlists prevent nested raw post text or unrelated payload fields
+    # from being retained accidentally.
+    if payload.source_key == "reddit":
+        metadata = {
+            key: supplied_metadata[key]
+            for key in ("subreddit", "kind")
+            if key in supplied_metadata and isinstance(supplied_metadata[key], (str, int, bool))
+        }
+    else:
+        metrics = supplied_metadata.get("public_metrics")
+        safe_metrics = (
+            {key: int(value) for key, value in metrics.items()
+             if key in {"like_count", "reply_count", "retweet_count", "quote_count"}
+             and isinstance(value, int) and not isinstance(value, bool) and value >= 0}
+            if isinstance(metrics, dict) else {}
+        )
+        metadata = {}
+        if isinstance(supplied_metadata.get("lang"), str):
+            metadata["lang"] = supplied_metadata["lang"][:12]
+        if safe_metrics:
+            metadata["public_metrics"] = safe_metrics
     values = {
         "related_entity_id": payload.related_entity_id,
         "canonical_url": str(payload.canonical_url) if payload.canonical_url else None,
-        "text_excerpt": None, "content_hash": payload.content_hash,
-        "published_at": payload.published_at, "engagement_count": payload.engagement_count,
-        "sentiment_label": payload.sentiment_label, "sentiment_score": payload.sentiment_score,
-        "sentiment_model": payload.sentiment_model, "is_spam": payload.is_spam,
-        "expires_at": payload.expires_at, "metadata_json": payload.metadata,
+        "text_excerpt": None,
+        "content_hash": digest,
+        "published_at": payload.published_at,
+        "engagement_count": payload.engagement_count,
+        "sentiment_label": payload.sentiment_label,
+        "sentiment_score": payload.sentiment_score,
+        "sentiment_model": payload.sentiment_model,
+        "is_spam": payload.is_spam,
+        "expires_at": expires_at,
+        "metadata_json": metadata,
     }
     if row is None:
         row = SocialPost(source_key=payload.source_key, external_id=payload.external_id, **values)
@@ -479,13 +647,20 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     session.refresh(row)
     return row
 
-
-def social_analytics(session: Session, entity_id: int | None, start: date | None, end: date | None) -> dict[str, Any]:
+def social_analytics(
+    session: Session,
+    entity_id: int | None,
+    start: date | None,
+    end: date | None,
+    source_key: str | None = None,
+) -> dict[str, Any]:
     stmt = select(SocialPost).where(SocialPost.is_spam.is_(False)).where(
         (SocialPost.expires_at.is_(None)) | (SocialPost.expires_at > datetime.now(timezone.utc))
     )
     if entity_id:
         stmt = stmt.where(SocialPost.related_entity_id == entity_id)
+    if source_key:
+        stmt = stmt.where(SocialPost.source_key == source_key)
     if start:
         stmt = stmt.where(func.date(SocialPost.published_at) >= start)
     if end:
@@ -506,6 +681,9 @@ def social_analytics(session: Session, entity_id: int | None, start: date | None
     return {
         "from_date": start, "to_date": end, "post_count": len(rows),
         "coverage_entity_count": len({r.related_entity_id for r in rows if r.related_entity_id}),
+        "source_counts": {key: sum(1 for row in rows if row.source_key == key) for key in sorted({row.source_key for row in rows})},
+        "scored_post_count": scored,
+        "unscored_post_count": len(rows) - scored,
         "average_sentiment": total_score / scored if scored else None,
         "sentiment_distribution": distribution,
         "discussion_volume_by_day": [{"date": k, "count": v} for k, v in sorted(daily.items())],
@@ -730,9 +908,12 @@ def fund_social_sentiment(
         )).all()
         weight_by_entity: dict[int, Decimal] = defaultdict(lambda: D("0"))
         for row in holdings:
-            if row.company_entity_id is not None and row.weight_pct is not None:
+            if row.asset_class == "equity" and row.company_entity_id is not None and row.weight_pct is not None:
                 weight_by_entity[row.company_entity_id] += row.weight_pct
-        total_weight = sum((row.weight_pct or D("0") for row in holdings), D("0"))
+        total_weight = sum(
+            (row.weight_pct or D("0") for row in holdings if row.asset_class == "equity"),
+            D("0"),
+        )
         total_weight_days += total_weight * days
         relevant = [
             post for post in posts
@@ -768,7 +949,12 @@ def fund_social_sentiment(
         "total_weight_days": total_weight_days,
         "intervals": intervals,
         "coverage_start_date": max(start, snapshots[0].effective_date),
-        "method": "time-weighted company sentiment using disclosure-effective portfolio weights",
+        "method": "time-weighted company sentiment using disclosure-effective equity weights",
+        "eligible_asset_class": "equity",
+        "source_counts": {
+            key: sum(1 for post in posts if post.source_key == key)
+            for key in sorted({post.source_key for post in posts})
+        },
         "warning": "Experimental discussion indicator; it is not a NAV, return, or investment recommendation.",
     }
 
