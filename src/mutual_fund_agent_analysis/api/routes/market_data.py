@@ -301,12 +301,14 @@ def ingest_security_observation(
             if event.source_url
             else source_url
         )
-        corporate_events.append({
-            **event.model_dump(mode="json"),
-            "source_key": source_key,
-            "source_url": event_url,
-            "verification_status": "unverified",
-        })
+        corporate_events.append(
+            {
+                **event.model_dump(mode="json"),
+                "source_key": source_key,
+                "source_url": event_url,
+                "verification_status": "unverified",
+            }
+        )
     canonical = payload.model_dump(mode="json")
     canonical.update(
         {
