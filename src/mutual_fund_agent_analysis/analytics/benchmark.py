@@ -4,6 +4,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
+from mutual_fund_agent_analysis.analytics.coverage import (
+    ReturnCoverage,
+    validate_observation_frequency,
+)
 from mutual_fund_agent_analysis.analytics.risk import DEFAULT_PERIODS_PER_YEAR, _mean
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint, normalize_returns
 
@@ -16,6 +20,11 @@ class BenchmarkMetrics:
     annualized_fund_return: Decimal | None
     annualized_benchmark_return: Decimal | None
     mean_period_excess_return: Decimal | None
+    fund_observation_count: int
+    benchmark_observation_count: int
+    coverage_ratio: Decimal
+    fund_coverage: ReturnCoverage
+    benchmark_coverage: ReturnCoverage
 
 
 def align_returns(
@@ -36,7 +45,7 @@ def calculate_benchmark_metrics(
     annual_risk_free_rate: Decimal = Decimal("0"),
     periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
 ) -> BenchmarkMetrics:
-    """Calculate beta and arithmetic annualized Jensen alpha on aligned returns."""
+    """Calculate beta/alpha on common intervals and disclose alignment coverage."""
     if (
         isinstance(periods_per_year, bool)
         or not isinstance(periods_per_year, int)
@@ -47,10 +56,24 @@ def calculate_benchmark_metrics(
         raise TypeError("annual_risk_free_rate must be a Decimal.")
     if not annual_risk_free_rate.is_finite() or annual_risk_free_rate <= Decimal("-1"):
         raise ValueError("annual_risk_free_rate must be finite and greater than -1.")
-    fund, benchmark = align_returns(fund_returns, benchmark_returns)
+
+    fund_points = normalize_returns(fund_returns)
+    benchmark_points = normalize_returns(benchmark_returns)
+    fund_coverage = validate_observation_frequency(fund_points, periods_per_year)
+    benchmark_coverage = validate_observation_frequency(benchmark_points, periods_per_year)
+    fund, benchmark = align_returns(fund_points, benchmark_points)
     count = len(fund)
+    denominator = max(len(fund_points), len(benchmark_points))
+    coverage_ratio = Decimal(count) / Decimal(denominator) if denominator else Decimal("0")
+    metadata = (
+        len(fund_points),
+        len(benchmark_points),
+        coverage_ratio,
+        fund_coverage,
+        benchmark_coverage,
+    )
     if count < 2:
-        return BenchmarkMetrics(count, None, None, None, None, None)
+        return BenchmarkMetrics(count, None, None, None, None, None, *metadata)
 
     f_values = [point.value for point in fund]
     b_values = [point.value for point in benchmark]
@@ -63,12 +86,7 @@ def calculate_benchmark_metrics(
     b_variance = sum(((value - b_mean) ** 2 for value in b_values), Decimal("0"))
     if b_variance == 0:
         return BenchmarkMetrics(
-            count,
-            None,
-            None,
-            annualized_fund,
-            annualized_benchmark,
-            mean_excess,
+            count, None, None, annualized_fund, annualized_benchmark, mean_excess, *metadata
         )
 
     covariance = sum(
@@ -82,10 +100,5 @@ def calculate_benchmark_metrics(
     periodic_rf = annual_risk_free_rate / Decimal(periods_per_year)
     alpha = ((f_mean - periodic_rf) - beta * (b_mean - periodic_rf)) * Decimal(periods_per_year)
     return BenchmarkMetrics(
-        count,
-        beta,
-        alpha,
-        annualized_fund,
-        annualized_benchmark,
-        mean_excess,
+        count, beta, alpha, annualized_fund, annualized_benchmark, mean_excess, *metadata
     )
