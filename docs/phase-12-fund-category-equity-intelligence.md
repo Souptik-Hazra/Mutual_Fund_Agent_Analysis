@@ -5,7 +5,7 @@
 Phase 12 adds three deterministic research surfaces on top of the existing reconciled NAV and AMC holdings-disclosure data:
 
 1. **Category-relative fund analysis** — the selected scheme is compared only with schemes sharing its exact stored category, scheme type, plan and option. CAGR, absolute return, annualized volatility, Sharpe ratio and maximum drawdown are calculated from reconciled NAV. Optional TRI benchmark selection is supported. Peers without sufficient NAV history are explicitly excluded.
-2. **Multi-fund disclosed-equity comparison** — pairwise overlap uses the sum of the lower disclosed NAV weight for each common security. Combined exposure is an equal-weighted average across selected funds and is explicitly not represented as the user's actual portfolio allocation.
+2. **Multi-fund disclosed-equity comparison** — pairwise overlap uses the sum of the lower disclosed NAV weight for each common security. If either snapshot is partial, the overlap is explicitly flagged as a lower bound. Combined exposure is an equal-weighted average across selected funds and is explicitly not represented as the user's actual portfolio allocation.
 3. **Underlying-security status** — latest provider observations can be stored with price, percentage change, exchange status, fundamentals and corporate events. Quote time and fundamentals effective date are stored separately. Fund-level equity status joins those observations to the latest available AMC holdings disclosure by security key or ISIN.
 
 ## API
