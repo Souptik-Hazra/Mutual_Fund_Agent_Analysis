@@ -216,6 +216,88 @@ def upgrade() -> None:
          "metadata": {"domain": "social", "role": "public_discussion"}},
     ])
 
+    # Backfill stable identities for the already-ingested scheme and benchmark catalogues.
+    op.execute("""
+        INSERT INTO research_entities (
+            entity_type, canonical_name, normalized_name, status
+        )
+        SELECT
+            'scheme',
+            scheme_name || ' [' || scheme_code::text || ']',
+            lower(regexp_replace(btrim(scheme_name || ' [' || scheme_code::text || ']'),
+                                 '\\s+', ' ', 'g')),
+            'active'
+        FROM mutual_fund_schemes
+        ON CONFLICT (entity_type, normalized_name) DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO entity_aliases (
+            entity_id, alias, normalized_alias, alias_type, source_key, is_primary
+        )
+        SELECT e.entity_id, s.scheme_name,
+               lower(regexp_replace(btrim(s.scheme_name), '\\s+', ' ', 'g')),
+               'provider_name', s.source, true
+        FROM mutual_fund_schemes s
+        JOIN research_entities e
+          ON e.entity_type = 'scheme'
+         AND e.normalized_name = lower(regexp_replace(
+             btrim(s.scheme_name || ' [' || s.scheme_code::text || ']'), '\\s+', ' ', 'g'
+         ))
+        ON CONFLICT DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO entity_identifiers (
+            entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
+        )
+        SELECT e.entity_id, 'AMFI_SCHEME_CODE', s.scheme_code::text,
+               s.scheme_code::text, 'amfi', true
+        FROM mutual_fund_schemes s
+        JOIN research_entities e
+          ON e.entity_type = 'scheme'
+         AND e.normalized_name = lower(regexp_replace(
+             btrim(s.scheme_name || ' [' || s.scheme_code::text || ']'), '\\s+', ' ', 'g'
+         ))
+        ON CONFLICT (namespace, normalized_value) DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO entity_identifiers (
+            entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
+        )
+        SELECT e.entity_id, 'ISIN', i.isin, upper(btrim(i.isin)), 'amfi', false
+        FROM mutual_fund_schemes s
+        JOIN research_entities e
+          ON e.entity_type = 'scheme'
+         AND e.normalized_name = lower(regexp_replace(
+             btrim(s.scheme_name || ' [' || s.scheme_code::text || ']'), '\\s+', ' ', 'g'
+         ))
+        CROSS JOIN LATERAL (
+            VALUES (s.isin_growth), (s.isin_div_reinvestment)
+        ) AS i(isin)
+        WHERE i.isin IS NOT NULL AND btrim(i.isin) <> ''
+        ON CONFLICT (namespace, normalized_value) DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO research_entities (
+            entity_type, canonical_name, normalized_name, status
+        )
+        SELECT 'benchmark', benchmark_name || ' [' || benchmark_code || ']',
+               lower(btrim(benchmark_name || ' [' || benchmark_code || ']')), 'active'
+        FROM benchmark_indices
+        ON CONFLICT (entity_type, normalized_name) DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO entity_identifiers (
+            entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
+        )
+        SELECT e.entity_id, 'BENCHMARK_CODE', b.benchmark_code,
+               upper(btrim(b.benchmark_code)), 'niftyindices', true
+        FROM benchmark_indices b
+        JOIN research_entities e
+          ON e.entity_type = 'benchmark'
+         AND e.normalized_name = lower(btrim(b.benchmark_name || ' [' || b.benchmark_code || ']'))
+        ON CONFLICT (namespace, normalized_value) DO NOTHING
+    """)
+
 
 def downgrade() -> None:
     op.drop_index("ix_entity_evidence_links_evidence", table_name="entity_evidence_links")
