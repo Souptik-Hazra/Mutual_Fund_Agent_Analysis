@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from mutual_fund_agent_analysis.api.routes import research as research_routes
 from mutual_fund_agent_analysis.api.schemas.research import (
     EventInput,
     HoldingInput,
@@ -16,7 +17,6 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     split_document,
 )
 from mutual_fund_agent_analysis.models import DataSource
-from mutual_fund_agent_analysis.api.routes import research as research_routes
 
 
 def test_document_split_preserves_page_markers_and_overlap():
@@ -86,7 +86,6 @@ def test_event_status_is_explicit_and_validated():
 def test_rss_adapter_rejects_non_allowlisted_host_before_network_call():
     with pytest.raises(ValueError, match="registered source host"):
         fetch_feed("https://example.com/feed.xml", "www.nseindia.com")
-
 
 
 def test_social_retention_uses_source_override_and_global_fallback():
