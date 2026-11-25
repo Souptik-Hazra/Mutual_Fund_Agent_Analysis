@@ -12,16 +12,34 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.api.schemas.research import (
-    DocumentAskRequest, EventInput, PortfolioCompareRequest, PortfolioImportRequest,
+    DocumentAskRequest,
+    EventInput,
+    PortfolioCompareRequest,
+    PortfolioImportRequest,
     SocialPostInput,
 )
 from mutual_fund_agent_analysis.core.config import get_settings
-from mutual_fund_agent_analysis.data.providers.social import (\n    SocialProviderError,\n    search_reddit,\n    search_x,\n)
+from mutual_fund_agent_analysis.data.providers.social import (
+    SocialProviderError,
+    search_reddit,
+    search_x,
+)
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
-    collect_rss_events, compare_portfolios, create_market_event, create_social_post,
-    events_for_fund_exposure, extract_pdf_text, fund_social_sentiment,
-    import_portfolio_snapshot, latest_snapshot, portfolio_history, portfolio_payload,
-    search_documents, security_fund_exposure, social_analytics, store_document,
+    collect_rss_events,
+    compare_portfolios,
+    create_market_event,
+    create_social_post,
+    events_for_fund_exposure,
+    extract_pdf_text,
+    fund_social_sentiment,
+    import_portfolio_snapshot,
+    latest_snapshot,
+    portfolio_history,
+    portfolio_payload,
+    search_documents,
+    security_fund_exposure,
+    social_analytics,
+    store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models import DataSource, MarketEvent, PortfolioSnapshot
