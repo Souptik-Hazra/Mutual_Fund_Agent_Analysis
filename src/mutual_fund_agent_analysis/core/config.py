@@ -2,7 +2,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     reddit_client_secret: SecretStr | None = None
     reddit_user_agent: str = "MutualFundResearch/1.0"
     x_bearer_token: SecretStr | None = None
+    social_retention_days: int = Field(default=30, ge=1, le=365)
 
     @model_validator(mode="after")
     def validate_production_database_url(self) -> "Settings":
