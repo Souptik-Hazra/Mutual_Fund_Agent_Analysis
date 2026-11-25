@@ -81,7 +81,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Add source-backed expense-ratio observations with effective dates, plan/option mapping, source, and freshness.
 - [ ] Audit AMC, category, scheme type, benchmark mapping, launch/closure dates, and ISIN coverage.
 - [x] Add source-attributed effective-dated metadata history; current scheme fields are promoted only from verified official observations.
-- [ ] Add source-coverage and staleness indicators to scheme details and filters.
+- [x] Add a scheme metadata-quality endpoint with source observation age, verification status, catalogue completeness, and missing-field list. Automatic bulk metadata ingestion remains source-dependent.
 
 **Exit criteria:** Metadata fields are source-backed, effective-dated, auditable, and correctly filtered; no inferred plan labels are presented as verified.
 
@@ -107,7 +107,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Build source-specific AMC disclosure adapters only for verified official file formats and publication schedules.
 - [ ] Add schema/version detection and mapping tests for CSV/XLSX/PDF-derived holdings; retain manual import as a supported fallback.
 - [ ] Validate ISIN/security resolution, corporate actions/name changes, cash/debt/derivative/other asset classes, and unresolved holdings.
-- [ ] Add snapshot coverage metrics, unresolved-weight percentage, source freshness, and effective-date confidence. (Unresolved equity weight and resolved-coverage diagnostics are now available; source freshness/effective-date confidence still need independent calibration.)
+- [x] Add snapshot coverage metrics, missing-weight count, unresolved-weight percentage, source publication lag, and effective-date age/freshness bands. Confidence still requires external AMC data calibration.
 - [ ] Verify sector allocation, concentration/HHI, overlap, holdings change, and stock-to-fund exposure against independent fixtures.
 - [ ] Add reconciliation for corrected/reissued portfolio disclosures and audited entity merge workflow before any fuzzy matching.
 - [ ] Add historical AMC/scheme relationship validity review where provider metadata changes over time.
@@ -123,7 +123,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Distinguish official disclosure, reputable reporting, reported/unverified event, confirmed event, opinion, rumour, and speculation in schemas and UI.
 - [ ] Add publication-time versus retrieval-time versus effective-time handling, source freshness, duplicate detection, and correction/retraction tracking.
 - [ ] Ensure event-to-fund exposure uses the holdings snapshot effective on the event date and reports missing historical coverage.
-- [ ] Harden document extraction for malformed/encrypted PDFs and explicitly report that scanned-PDF OCR is unsupported until implemented and tested.
+- [x] Reject malformed and password-protected PDFs with explicit errors; scanned-PDF OCR remains unsupported and is reported distinctly.
 - [ ] Test lexical fallback and optional Qdrant retrieval, index consistency, chunk provenance, citation resolution, and deletion/purge behaviour.
 - [ ] Treat social posts and document text as untrusted input; test prompt injection and unsupported-claim abstention.
 - [ ] Add auditable entity merge/reconciliation and reviewed temporal validity workflows; never auto-merge ambiguous aliases.
@@ -138,8 +138,8 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Add numerical parity tests: agent outputs must match deterministic analytics API results exactly within documented Decimal/serialization tolerances.
 - [x] Add offline evaluation for citation provenance completeness, verification ratio, stale/future timestamps, malformed citations, and unsupported claims. Broader labelled agent-response datasets remain open.
 - [ ] Test ambiguity, missing data, conflicting NAVs, stale snapshots, unavailable providers, empty retrieval, and out-of-scope questions.
-- [ ] Add adversarial tests for prompt injection in PDFs/social content and ensure untrusted content cannot alter tool policy.
-- [ ] Measure deterministic fallback behaviour when no LLM key exists or the model provider fails.
+- [x] Add an adversarial document-injection prompt-contract regression test; broader live-model red-team testing remains open.
+- [x] Add tests for deterministic no-key fallback and provider-error fallback.
 - [ ] Add regression thresholds and fail CI for critical financial or evidence-contract regressions; keep external network tests separately gated.
 
 **Exit criteria:** Offline evaluation is reproducible; critical financial facts are grounded in deterministic tools; the assistant abstains when evidence is insufficient.

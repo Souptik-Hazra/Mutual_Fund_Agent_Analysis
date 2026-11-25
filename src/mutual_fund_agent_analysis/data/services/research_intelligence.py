@@ -398,14 +398,31 @@ def social_analytics(session: Session, entity_id: int | None, start: date | None
 
 
 def extract_pdf_text(content: bytes) -> tuple[str, int]:
-    """Extract text and page count from a PDF; scanned PDFs require OCR and are rejected."""
+    """Extract embedded PDF text and reject malformed, encrypted, or scanned documents."""
     import fitz
-    document = fitz.open(stream=content, filetype="pdf")
-    pages = [page.get_text("text").strip() for page in document]
-    text = "\n\n".join(f"[Page {index + 1}]\n{value}" for index, value in enumerate(pages) if value)
-    if len(text.strip()) < 80:
-        raise ValueError("PDF has no usable embedded text; OCR is required for scanned documents.")
-    return text, len(document)
+
+    try:
+        document = fitz.open(stream=content, filetype="pdf")
+    except Exception as exc:
+        raise ValueError("PDF is malformed or cannot be opened.") from exc
+    try:
+        if document.is_encrypted or document.needs_pass:
+            raise ValueError("Password-protected PDFs are not supported.")
+        if document.page_count < 1:
+            raise ValueError("PDF contains no pages.")
+        pages = [page.get_text("text").strip() for page in document]
+        text = "\n\n".join(
+            f"[Page {index + 1}]\n{value}"
+            for index, value in enumerate(pages)
+            if value
+        )
+        if len(text.strip()) < 80:
+            raise ValueError(
+                "PDF has no usable embedded text; OCR is required for scanned documents."
+            )
+        return text, len(document)
+    finally:
+        document.close()
 
 
 def split_document(text: str, chunk_size: int = 1200, overlap: int = 180) -> list[str]:

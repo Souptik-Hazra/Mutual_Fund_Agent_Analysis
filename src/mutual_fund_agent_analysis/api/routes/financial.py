@@ -700,7 +700,7 @@ def get_portfolio_quality(
     scheme_code: int,
     session: Annotated[Session, Depends(get_db)],
 ) -> dict[str, Any]:
-    """Expose missing-weight and unresolved-equity coverage for the latest snapshot."""
+    """Expose holdings resolution, weight completeness, and disclosure freshness."""
     _scheme_or_404(session, scheme_code)
     snapshot = session.scalars(
         select(PortfolioSnapshot)
@@ -714,31 +714,75 @@ def get_portfolio_quality(
         select(PortfolioHolding).where(PortfolioHolding.snapshot_id == snapshot.snapshot_id)
     ).all()
     total_weight = sum((Decimal(item.weight_pct or 0) for item in holdings), Decimal("0"))
-    equity = [item for item in holdings if item.asset_class == "equity"]
-    equity_weight = sum((Decimal(item.weight_pct or 0) for item in equity), Decimal("0"))
-    unresolved_weight = sum(
-        (
-            Decimal(item.weight_pct or 0)
-            for item in equity
-            if not item.isin and not item.company_entity_id
-        ),
+    known_weight = sum(
+        (Decimal(item.weight_pct) for item in holdings if item.weight_pct is not None),
         Decimal("0"),
     )
+    missing_weight_count = sum(item.weight_pct is None for item in holdings)
+    equity = [item for item in holdings if item.asset_class == "equity"]
+    equity_weight = sum((Decimal(item.weight_pct or 0) for item in equity), Decimal("0"))
+    unresolved_equity = [
+        item for item in equity if not item.isin and not item.company_entity_id
+    ]
+    unresolved_weight = sum(
+        (Decimal(item.weight_pct or 0) for item in unresolved_equity), Decimal("0")
+    )
     resolved_equity = max(Decimal("0"), equity_weight - unresolved_weight)
+    today = datetime.now(UTC).date()
+    age_days = (today - snapshot.effective_date).days
+    freshness = (
+        "future_dated"
+        if age_days < 0
+        else "fresh"
+        if age_days <= 45
+        else "ageing"
+        if age_days <= 90
+        else "stale"
+    )
+    publication_lag_days = (
+        (snapshot.published_at.date() - snapshot.effective_date).days
+        if snapshot.published_at is not None
+        else None
+    )
+    warnings = []
+    if snapshot.status != "complete":
+        warnings.append("Portfolio snapshot is marked partial.")
+    if missing_weight_count:
+        warnings.append("One or more holdings have no reported weight.")
+    if total_weight > Decimal("105") or total_weight < Decimal("95"):
+        warnings.append("Reported holding weights do not sum to approximately 100%.")
+    if freshness in {"ageing", "stale", "future_dated"}:
+        warnings.append("Portfolio disclosure is outside the fresh-date window.")
+    if publication_lag_days is not None and publication_lag_days < 0:
+        warnings.append("Publication date precedes the portfolio effective date.")
     return {
         "scheme_code": scheme_code,
         "snapshot_id": snapshot.snapshot_id,
         "effective_date": snapshot.effective_date,
+        "published_at": snapshot.published_at,
+        "snapshot_age_days": age_days,
+        "freshness": freshness,
+        "freshness_policy_days": {"fresh_max": 45, "ageing_max": 90},
+        "publication_lag_days": publication_lag_days,
+        "publication_precedes_effective_date": (
+            publication_lag_days is not None and publication_lag_days < 0
+        ),
+        "snapshot_status": snapshot.status,
         "holding_count": len(holdings),
+        "missing_weight_count": missing_weight_count,
         "reported_weight_pct": total_weight,
+        "weight_coverage_pct": known_weight,
         "equity_weight_pct": equity_weight,
+        "unresolved_equity_holding_count": len(unresolved_equity),
         "unresolved_equity_weight_pct": unresolved_weight,
         "resolved_equity_coverage_pct": (
             resolved_equity / equity_weight * Decimal("100") if equity_weight else None
         ),
         "weight_total_warning": total_weight > Decimal("105") or total_weight < Decimal("95"),
+        "quality_warnings": warnings,
         "methodology_note": (
             "An equity holding is unresolved only when both ISIN and canonical company entity "
-            "are absent; non-equity rows are reported separately."
+            "are absent; non-equity rows are reported separately. Freshness uses the disclosure "
+            "effective date, not the local import timestamp."
         ),
     }

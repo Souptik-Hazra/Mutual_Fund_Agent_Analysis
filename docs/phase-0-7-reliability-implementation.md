@@ -72,3 +72,12 @@ The evaluation runner adds provenance completeness, verified citation ratio, sta
 ## Portfolio source-format limitation
 
 The importer continues to accept normalized CSV/XLSX holdings and requires explicit asset classes rather than guessing them. A source-specific AMC adapter is not claimed as complete without a representative official file, its publication notes and a tested column mapping. The quality endpoint reports the unresolved equity share so these limitations are visible rather than hidden.
+
+
+## Additional Phase 0–7 hardening
+
+- `GET /api/v1/schemes/{scheme_code}/metadata-quality` reports missing catalogue fields, completeness percentage, latest source observation, verification status and observation age. Freshness bands are explicit (up to 90 days fresh, 91–180 ageing, over 180 stale); these are application review thresholds, not regulator-defined freshness guarantees.
+- `GET /api/v1/portfolios/{scheme_code}/quality` reports missing holding weights, weight coverage, disclosure publication lag, effective-date age, stale/future-dated status, and quality warnings.
+- The CSV/XLSX normalizer recognizes common portfolio disclosure columns (ISIN, instrument name, industry, percent to NAV, and market value in INR lakhs) while still requiring an explicit asset class.
+- PDF extraction now reports malformed and password-protected files distinctly; scanned documents remain unsupported because OCR has not been implemented.
+- Offline agent tests cover no-key deterministic fallback and the untrusted-document instruction boundary.

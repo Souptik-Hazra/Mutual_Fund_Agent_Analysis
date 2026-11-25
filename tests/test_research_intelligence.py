@@ -213,3 +213,24 @@ def test_portfolio_kind_column_is_used_only_as_an_explicit_asset_class():
     from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
 
     assert _normalize_portfolio_row({"Kind": "debt"})["asset_class"] == "debt"
+
+
+def test_pdf_extraction_rejects_malformed_and_encrypted_documents():
+    import fitz
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import extract_pdf_text
+
+    with pytest.raises(ValueError, match="malformed"):
+        extract_pdf_text(b"not a PDF document")
+
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "A protected financial document.")
+    encrypted = document.tobytes(
+        encryption=fitz.PDF_ENCRYPT_AES_256,
+        owner_pw="owner",
+        user_pw="secret",
+    )
+    document.close()
+    with pytest.raises(ValueError, match="Password-protected"):
+        extract_pdf_text(encrypted)

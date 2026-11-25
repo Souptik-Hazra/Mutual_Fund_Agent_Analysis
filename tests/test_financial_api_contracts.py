@@ -27,3 +27,11 @@ def test_analytics_contract_exposes_all_sampling_frequencies():
 def test_metadata_quality_route_is_registered():
     paths = create_app().openapi()["paths"]
     assert "/api/v1/schemes/{scheme_code}/metadata-quality" in paths
+
+
+def test_metadata_quality_and_idcw_payout_contracts_are_registered():
+    paths = create_app().openapi()["paths"]
+    assert "/api/v1/schemes/{scheme_code}/metadata-quality" in paths
+    assert "idcw_payout_total_return" in str(
+        paths["/api/v1/schemes/{scheme_code}/idcw-total-return"]
+    )
