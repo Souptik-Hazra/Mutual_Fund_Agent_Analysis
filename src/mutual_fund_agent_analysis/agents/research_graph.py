@@ -229,10 +229,12 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         citations.append({
                             "type": "security_market_observation",
                             "security_key": security.get("security_key"),
-                            "source_key": market.get("source_key") or fundamentals.get("source_key"),
+                            "source_key": market.get("source_key")
+                            or fundamentals.get("source_key"),
                             "observed_at": market.get("observed_at"),
                             "fundamentals_as_of": fundamentals.get("as_of"),
-                            "source_url": market.get("source_url") or fundamentals.get("source_url"),
+                            "source_url": market.get("source_url")
+                            or fundamentals.get("source_url"),
                         })
             elif intent == "events":
                 if codes:
