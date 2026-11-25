@@ -51,7 +51,7 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
         {
             "scheme_code": 1,
             "scheme_category": "Large Cap",
-            "scheme_type": "Open Ended",
+            "scheme_type": None,
             "plan_type": "direct",
             "option_type": "growth",
         },
@@ -84,10 +84,13 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
             return peers
 
     class Session:
+        statement = None
+
         def get(self, _model, _key):
             return selected
 
-        def scalars(self, _statement):
+        def scalars(self, statement):
+            self.statement = statement
             return Rows()
 
     def fake_analyze(_session, code, **_kwargs):
@@ -116,7 +119,11 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
         )()
 
     monkeypatch.setattr(fund_intelligence, "analyze_fund", fake_analyze)
-    result = fund_intelligence.analyze_category_peers(Session(), 1)
+    session = Session()
+    result = fund_intelligence.analyze_category_peers(session, 1)
+    assert "mutual_fund_schemes.scheme_type IS NULL" in str(
+        session.statement.compile(compile_kwargs={"literal_binds": True})
+    )
     assert result["peer_count"] == 2
     assert result["selected_fund"]["cagr_rank"] == 1
     assert result["selected_fund"]["sharpe_ratio_rank"] == 1
@@ -134,7 +141,7 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
         2: SimpleNamespace(
             snapshot_id=22,
             effective_date=datetime(2026, 9, 30).date(),
-            status="complete",
+            status="partial",
         ),
     }
     schemes = [
@@ -193,6 +200,10 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
     pair = result["pairwise_overlap"][0]
     assert pair["common_security_count"] == 1
     assert pair["overlap_pct"] == Decimal("3")
+    assert pair["overlap_is_lower_bound"] is True
+    assert pair["disclosure_status_b"] == "partial"
+    assert result["has_partial_disclosures"] is True
+    assert result["aggregate_exposure_is_incomplete"] is True
     alpha = next(
         row for row in result["aggregated_equity_exposure"]
         if row["security_key"] == "INE000A01001"
