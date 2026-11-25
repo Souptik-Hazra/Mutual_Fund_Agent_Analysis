@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Planning / initial setup. The capabilities described below are the intended product scope; they should not be interpreted as already implemented.
+> **Project status:** Foundation and the first NAV-ingestion vertical slice are implemented on the current development branch. The broader analytics, benchmark verification, holdings, social/news integrations, agent workflows, and frontend remain planned roadmap work.
 
 ## Table of Contents
 
@@ -359,7 +359,7 @@ The platform should maintain a clear separation between source ingestion, normal
 
 ### Data engineering principles
 
-- Store raw source responses or source references where permitted.
+- Store raw provider responses in the append-only `provider_sync_runs` audit table alongside normalized NAV observations, source, fetch time, and observation count.
 - Normalize scheme identifiers, company identifiers, dates, currencies, and units.
 - Record source, retrieval timestamp, effective date, and publication date.
 - Make ingestion jobs idempotent and safe to rerun.
@@ -375,15 +375,15 @@ Implementation should proceed in working milestones rather than creating all age
 
 | Phase | Scope | Deliverable |
 |---|---|---|
-| 1. Foundation | Repository setup, configuration, FastAPI, PostgreSQL, provider abstraction | Working application skeleton |
-| 2. Data ingestion | Scheme master, historical NAV, validation, benchmark data | Reliable financial data layer |
-| 3. Analytics engine | Returns, risk, rolling metrics, SIP calculations | Tested quantitative library |
-| 4. Fund analysis | Explorer, filters, single-fund views, comparison engine | Usable fund analytics |
-| 5. Agent orchestration | LangGraph state, supervisor, financial tools and agents | Working financial agent workflow |
-| 6. Portfolio intelligence | AMC disclosures, holdings, sector exposure, overlap | Stock-level fund exposure |
-| 7. Social intelligence | Reddit and X connectors, entity resolution, sentiment, topics | Stock and fund discussion analysis |
-| 8. News and events | Exchange filings, event calendar, news discovery, watchlists | News and event radar |
-| 9. Document intelligence | PDF parsing, embeddings, Qdrant, retrieval and citations | Financial-document RAG |
+| 1. Foundation and ingestion | Repository setup, configuration, FastAPI, PostgreSQL, NAV reconciliation, benchmark TRI | Reliable application and financial data foundation |
+| 2. Deterministic analytics | Returns, rolling metrics, risk, benchmark attribution, drawdown | Tested quantitative calculation library |
+| 3. Fund analysis | Explorer, filters, single-fund views, comparison engine | Usable fund analytics |
+| 4. Common intelligence foundation | Canonical entities, identifiers, aliases, sources, evidence provenance | Shared identity and evidence layer |
+| 5. Portfolio intelligence | AMC disclosures, holdings, sector exposure, overlap | Stock-level fund exposure |
+| 6. News and events | Exchange filings, event calendar, news discovery, watchlists | Verified news and event radar |
+| 7. Social intelligence | Reddit and X connectors, entity resolution, sentiment, topics | Qualified public-discussion intelligence |
+| 8. Document intelligence | PDF parsing, embeddings, Qdrant, retrieval and citations | Financial-document RAG |
+| 9. Agent orchestration | LangGraph state, supervisor, specialist tools and synthesis | Evidence-grounded research workflow |
 | 10. Frontend integration | Dashboard, comparison studio, charts, AI research interface | Complete user experience |
 | 11. Evaluation and deployment | Financial tests, agent/RAG evaluation, Docker, monitoring | Tested deployable system |
 
@@ -474,6 +474,75 @@ Only configure providers that are actually used. Keep `.env` out of version cont
 
 ---
 
+
+## Local Development
+
+### Requirements
+
+- Python 3.11, 3.12, or 3.13.
+- Docker Engine with Docker Compose.
+- Git.
+
+### Setup
+
+```bash
+git clone https://github.com/Souptik-Hazra/Mutual_Fund_Agent_Analysis.git
+cd Mutual_Fund_Agent_Analysis
+
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# Linux / macOS:
+source .venv/bin/activate
+
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+Create the local environment file and start PostgreSQL:
+
+```bash
+# Windows PowerShell
+Copy-Item .env.example .env
+# Linux / macOS
+cp .env.example .env
+
+docker compose up -d db
+alembic upgrade head
+```
+
+Run the API locally:
+
+```bash
+uvicorn mutual_fund_agent_analysis.main:app --reload
+```
+
+Alternatively, start the complete Docker Compose stack with `docker compose up --build`. The one-shot `migrate` service applies Alembic migrations before the API starts.
+
+- API documentation: http://localhost:8000/docs
+- Liveness: http://localhost:8000/api/v1/health/live
+- Readiness: http://localhost:8000/api/v1/health/ready
+
+### Sync a scheme's NAV history
+
+Find a scheme code using the [MFAPI scheme search endpoint](https://api.mfapi.in/mf/search?q=HDFC), then run:
+
+```bash
+mfa-sync-nav 125497 --start-date 2020-01-01
+```
+
+The command validates the provider response, upserts scheme metadata and source-specific NAV observations, and records the original provider payload in `provider_sync_runs`. NAV rows are keyed by scheme, date, and provider so different sources can be reconciled without overwriting one another. Re-running it is safe for the same scheme/date range. Use a real scheme code from the provider rather than assuming the example code is current.
+
+### Quality checks
+
+```bash
+ruff check .
+ruff format --check .
+pytest
+```
+
+The credentials in the local Docker Compose configuration are development-only. Replace them and use managed secrets before deploying anywhere beyond a personal development machine. Never commit `.env` or API keys.
+
 ## Initial Build Priority
 
 Start by validating the data sources and scheme identifiers, then build NAV ingestion and a verified financial analytics engine. Implement single-fund analysis and daily/weekly/monthly/quarterly/yearly views, followed by multi-fund comparison. Add portfolio holdings and event/news ingestion next. Introduce LangGraph only after the core Python services and APIs work reliably; then add social intelligence and document RAG as separate subsystems. This keeps the first release useful even before every API or LLM integration is available.
@@ -481,3 +550,195 @@ Start by validating the data sources and scheme identifiers, then build NAV inge
 The central design principle is:
 
 **Reliable data + deterministic financial analytics + specialized AI agents + traceable research.**
+
+
+## Multi-provider NAV ingestion and reconciliation
+
+NAV ingestion supports two adapters behind one provider-neutral contract:
+
+- \`mfapi\`: convenient scheme-specific historical JSON API.
+- \`amfi\`: AMFI's public historical NAV report, fetched in windows of at most 7 days.
+
+AMFI history is retrieved from \`https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx\`
+using the \`tp=1\` open-ended-scheme report. The adapter parses the observed eight-column
+historical layout and legacy six-column rows, filters the requested scheme, validates
+dates and positive Decimal NAVs, and retains fetched source text in the provider audit
+record. Zero-valued liquidation rows are excluded from price history. AMC/category
+metadata is not inferred from report headings.
+
+Examples:
+
+\`\`\`bash
+mfa-sync-nav 125497 --provider amfi --start-date 2024-01-01 --end-date 2024-12-31
+mfa-sync-nav 125497 --provider mfapi --start-date 2024-01-01 --end-date 2024-12-31
+\`\`\`
+
+### Reconciliation policy (version 1)
+
+- Preserve every provider observation independently using \`(scheme_code, nav_date, source)\`.
+- Prefer AMFI as the canonical source; use MFAPI only when an AMFI observation is not yet present.
+- Compare the maximum and minimum available provider NAVs for the same scheme/date.
+- Classify a date as \`matched\` when the absolute spread is at most ₹0.0001, \`conflict\` when it is larger, and \`single_source\` when only one provider is available.
+- Store all source values, canonical NAV/source, absolute and relative differences, tolerance, and evaluation timestamp in \`nav_reconciliations\`.
+- Recompute reconciliation whenever a new observation for that date is ingested. Conflicts never overwrite or delete either provider's original NAV.
+
+The ₹0.0001 threshold is an initial tolerance aligned to four-decimal NAV publication precision;
+validate it against a larger sample before treating it as a permanent business rule. Canonical
+source selection is a data convention, not a claim that independent published values are
+economically identical.
+
+AMFI adapter coverage currently targets open-ended scheme history (\`tp=1\`). Close-ended and
+interval schemes, daily NAVAll bulk refresh, and scheme-master lifecycle tracking remain
+separate follow-up work. Raw provider-response audit data has no automated purge job yet;
+define deployment retention and backup policies before large-scale ingestion.
+
+
+## Benchmark TRI ingestion
+
+Benchmark ingestion stores the official Nifty Total Return Index (TRI) and Net Total Return
+(NTR) series separately from mutual-fund NAVs. The Nifty Indices historical-data page publishes
+a dedicated Total Returns Index Values report, with TRI and NTR columns. TRI includes
+constituent dividends reinvested; compare a fund's Growth-option returns with TRI rather than
+a price-only index. See the [Nifty Indices TRI explanation](https://www.niftyindices.com/resources/index-concepts/total-return-index)
+and [historical-data reports](https://www.niftyindices.com/reports/historical-data).
+
+The adapter currently calls the historical-data page's TRI endpoint. That endpoint is
+reverse-engineered and is not a versioned public API, so it is isolated behind
+\`NiftyIndicesClient\`, validates every row, and should be monitored for upstream schema or
+access changes. Use canonical index names exactly as shown by Nifty Indices (for example,
+\`NIFTY 50\`); an invalid/unavailable name returns no rows and is treated as an error.
+
+Example:
+
+\`\`\`bash
+mfa-sync-benchmark "NIFTY 50" --start-date 2020-01-01 --end-date 2026-11-25
+\`\`\`
+
+The \`benchmark_indices\` table stores the benchmark master;
+\`benchmark_observations\` stores daily TRI and optional NTR values keyed by benchmark,
+date, and source; \`benchmark_sync_runs\` stores the original response and ingestion audit
+metadata. Re-running a date range is idempotent. No TRI is synthesized from price-index
+values or fund NAVs, and missing benchmark dates are not forward-filled.
+
+
+## Deterministic financial analytics (Phase 2)
+
+The analytics core accepts dated `Decimal` observations and performs deterministic calculations without network or LLM calls. The adjacent `analytics.service` module loads reconciled NAV and benchmark TRI observations from PostgreSQL and assembles a reproducible report. The public API exposes:
+
+- Absolute point-to-point return and date-aware CAGR (365.25-day year).
+- Consecutive-observation returns, 1Y/3Y/5Y rolling returns, trailing returns with explicit anchor-date staleness, and completed calendar-year returns.
+- Annualized sample volatility, downside deviation, Sharpe, and Sortino ratios.
+- Exact-date fund/benchmark return alignment, beta, arithmetic annualized Jensen alpha, and excess return.
+- Maximum drawdown, peak/trough dates, recovery date, trough-to-recovery duration, and underwater duration.
+
+Example:
+
+```python
+from datetime import date
+from decimal import Decimal
+
+from mutual_fund_agent_analysis.analytics import (
+    PricePoint,
+    absolute_return,
+    cagr,
+    calculate_drawdown,
+    period_returns,
+    calculate_risk_metrics,
+)
+
+navs = [
+    PricePoint(date(2023, 1, 2), Decimal("100")),
+    PricePoint(date(2023, 7, 3), Decimal("105")),
+    PricePoint(date(2024, 1, 2), Decimal("112")),
+]
+print(absolute_return(navs))
+print(cagr(navs))
+sample_returns = period_returns(navs)
+print(calculate_risk_metrics(sample_returns, periods_per_year=2))
+print(calculate_drawdown(navs))
+```
+
+### Calculation conventions and limitations
+
+- Inputs must be positive, finite prices with unique dates. They are sorted chronologically; duplicate dates are rejected.
+- Returns are calculated between consecutive available observations. The package does not invent missing trading-day values or forward-fill NAV/benchmark series. If a source has missing sessions, the multi-session return is still treated as one observation; callers must validate coverage before applying a daily annualization factor.
+- Rolling/trailing windows use calendar anniversaries (a leap-day anchor maps to February 28) and the closest observed value on or before the anchor date. `trailing_return_details` reports the target anchor, actual observation date, and staleness in days; callers may set `max_staleness_days` to reject stale anchors. CAGR uses 365.25 days per year.
+- Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 52 weekly, 12 monthly, 4 quarterly, 2 semiannual, or 1 yearly). Common frequencies are checked against median calendar spacing. The report includes median/max interval, long-gap count, and an estimated coverage ratio; these diagnostics do not fill missing observations.
+- The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers; the report retains the assumption used.
+- Sharpe and Sortino are undefined when their respective denominators are zero or fewer than two return observations are available; these return `None`, not infinity.
+- Beta and alpha use only exact common return intervals (both start and end dates). No date interpolation or forward-fill is performed. Benchmark output reports the fund/benchmark observation counts and aligned coverage ratio. Beta/alpha are undefined with fewer than two aligned observations or zero benchmark variance.
+- Jensen alpha is arithmetic and annualized by multiplying the mean periodic CAPM intercept by the periods per year; it is not CAGR alpha. Reported annualized fund and benchmark returns are arithmetic mean returns multiplied by the periods per year, not geometric annualized returns.
+- NAV price returns do not include cash distributions. Growth-option NAVs are the intended input for total-return comparisons; IDCW cash flows require a distribution-aware total-return series or cash-flow methodology.
+- Calendar-year returns include a latest year ending on the final trading day only when that date is December 31 or the caller supplies an explicit `calendar_year_as_of_date` after December 31. The latest NAV must fall within the final seven calendar days of December when the explicit as-of date is used; this avoids marking stale mid-year data complete.
+- The `analyze_fund(session, scheme_code, ...)` service reads canonical values from `nav_reconciliations` and benchmark TRI from `benchmark_observations`. It rejects unresolved NAV conflicts by default; callers must explicitly opt in to include canonical values from conflict dates. An HTTP endpoint is subsequent integration work.
+
+Run the analytics tests with:
+
+```bash
+pytest tests/test_analytics.py
+```
+
+
+## Fund analysis API (Phase 3)
+
+The Phase 3 backend exposes a scheme explorer and deterministic single-/multi-fund analysis. All analysis reads canonical reconciled NAVs; unresolved NAV conflicts are rejected unless the caller explicitly opts in. The API never fabricates missing NAV or TRI observations.
+
+### Scheme discovery and explorer
+
+- `GET /api/v1/schemes/discover?q=HDFC` searches MFAPI's scheme directory. This is an upstream lookup and does not write to PostgreSQL.
+- `GET /api/v1/schemes?q=HDFC&fund_house=...&category=...&scheme_type=...&plan=direct&option=growth&limit=25&offset=0` filters the locally ingested scheme catalogue.
+- `GET /api/v1/schemes/{scheme_code}` returns cached scheme metadata and the latest reconciled NAV/status.
+
+The local explorer is intentionally backed by the database, so it only lists schemes already ingested through the NAV sync workflow. Use discovery to identify a scheme code, then ingest its NAV history before requesting analytics.
+
+### Single-fund analysis
+
+`GET /api/v1/schemes/{scheme_code}/analytics` accepts optional `start_date`, `end_date`, `benchmark_code`, `benchmark_source`, `annual_risk_free_rate`, `periods_per_year`, `allow_nav_conflicts`, and `calendar_year_as_of_date` query parameters. The response includes point-to-point return, CAGR, rolling and completed calendar-year returns, risk metrics, drawdown/recovery, benchmark attribution, and data-conflict provenance.
+
+Example:
+
+```http
+GET /api/v1/schemes/125497/analytics?start_date=2020-01-01&benchmark_code=NIFTY%2050&periods_per_year=252
+```
+
+### Multi-fund comparison
+
+`POST /api/v1/schemes/compare` accepts 2–5 unique scheme codes and a shared date range, optional benchmark, annual risk-free rate, annualization frequency, and NAV-conflict policy. Each fund is evaluated on the exact intersection of available NAV dates across all selected funds. When a benchmark is selected, TRI dates are also intersected. The response reports the common date range and observation count. No forward filling, interpolation, or raw-NAV-level comparison is performed.
+
+Example request:
+
+```json
+{
+  "scheme_codes": [125497, 120503],
+  "start_date": "2021-01-01",
+  "end_date": "2026-11-25",
+  "benchmark_code": "NIFTY 50",
+  "annual_risk_free_rate": "0",
+  "periods_per_year": 252
+}
+```
+
+### Phase 3 boundaries
+
+This phase delivers backend API contracts and services, not a React dashboard. Expense ratios, AUM, fund-manager history, holdings, IDCW distribution-aware total returns, SIP/XIRR, and agent-generated narratives are not included because the current normalized database does not yet contain the required source data or workflows. Add those only with their own verified data models and methodology.
+
+
+## Phase 4 — Common intelligence foundation
+
+The shared identity and provenance layer is implemented on the development branch. It provides canonical entities, source-aware temporal aliases, namespaced identifiers, a source-authority registry, evidence records, entity-evidence links, and deterministic exact-match resolution. Ambiguous aliases are returned as candidates rather than silently resolved.
+
+All endpoints are under `/api/v1/intelligence`:
+
+- `GET /sources`: list registered sources and authority metadata.
+- `POST /entities`, `GET /entities`, `GET /entities/{entity_id}`: create, search, list, and retrieve canonical entities with bounded pagination and type/status filters.
+- `POST /entities/{entity_id}/aliases`, `GET /entities/{entity_id}/aliases`: register and list source-aware aliases and validity intervals.
+- `POST /entities/{entity_id}/identifiers`, `GET /entities/{entity_id}/identifiers`: register and list unique namespaced identifiers.
+- `POST /evidence`: record source references, publication/retrieval/effective dates, content hash, verification status, and confidence.
+- `POST /entities/{entity_id}/evidence/{evidence_id}`: link evidence to an entity.
+- `GET /entities/{entity_id}/evidence?limit=50&offset=0`: retrieve linked evidence with bounded pagination.
+- `POST /entities/{entity_id}/relationships`, `GET /entities/{entity_id}/relationships`: manage typed, temporal links between entities.
+- `POST /resolve`: resolve exact identifiers first and exact aliases second.
+
+The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. It also backfills canonical identities for existing schemes, AMCs, and benchmarks, including unverified scheme-to-AMC relationships. New NAV and benchmark ingestion maintains those identities and identifiers. NAV ingestion also registers AMC entities and an unverified `managed_by` relationship from the provider's fund-house field. NAV and benchmark sync runs now create hashed evidence references linked to their canonical entities while keeping full provider payloads in the existing audit tables. The original NAV/benchmark schemas and provider-sync audit records remain intact.
+
+See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.md).
