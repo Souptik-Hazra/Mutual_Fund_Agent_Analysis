@@ -4,6 +4,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
+from mutual_fund_agent_analysis.analytics.coverage import (
+    ReturnCoverage,
+    validate_observation_frequency,
+)
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint, normalize_returns
 
 DEFAULT_PERIODS_PER_YEAR = 252
@@ -16,6 +20,7 @@ class RiskMetrics:
     annualized_downside_deviation: Decimal | None
     sharpe_ratio: Decimal | None
     sortino_ratio: Decimal | None
+    coverage: ReturnCoverage
 
 
 def _mean(values: list[Decimal]) -> Decimal:
@@ -37,11 +42,12 @@ def calculate_risk_metrics(
     annual_risk_free_rate: Decimal = Decimal("0"),
     periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
 ) -> RiskMetrics:
-    """Calculate sample volatility, downside deviation, Sharpe and Sortino.
+    """Calculate sample risk metrics and validate the supplied observation frequency.
 
-    The annual risk-free rate is treated as a nominal rate and divided by the
-    observation frequency. Use 252 for daily trading observations or 12 for
-    monthly observations; the caller must supply a consistent return frequency.
+    The nominal annual risk-free rate is divided by periods_per_year. Common
+    frequencies (252 daily, 52 weekly, 12 monthly, 4 quarterly, 1 yearly) are
+    checked against median calendar spacing. Coverage diagnostics expose long
+    gaps; they do not synthesize missing observations.
     """
     observations = normalize_returns(returns)
     values = [point.value for point in observations]
@@ -58,8 +64,9 @@ def calculate_risk_metrics(
     if any(not value.is_finite() or value <= Decimal("-1") for value in values):
         raise ValueError("Returns must be finite and greater than -100%.")
 
+    coverage = validate_observation_frequency(observations, periods_per_year)
     if len(values) < 2:
-        return RiskMetrics(len(values), None, None, None, None)
+        return RiskMetrics(len(values), None, None, None, None, coverage)
 
     periodic_rf = annual_risk_free_rate / Decimal(periods_per_year)
     excess = [value - periodic_rf for value in values]
@@ -77,4 +84,4 @@ def calculate_risk_metrics(
         else None
     )
     sortino = mean_excess * Decimal(periods_per_year) / downside if downside != 0 else None
-    return RiskMetrics(len(values), volatility, downside, sharpe, sortino)
+    return RiskMetrics(len(values), volatility, downside, sharpe, sortino, coverage)
