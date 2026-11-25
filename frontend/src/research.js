@@ -7,5 +7,7 @@ export function buildDocumentSearchPath(query, schemeCode, limit = 8) {
 }
 
 export function eventRows(payload) {
-  return Array.isArray(payload?.events) ? payload.events : [];
+  if (Array.isArray(payload?.events)) return payload.events;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
 }
