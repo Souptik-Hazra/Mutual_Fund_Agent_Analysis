@@ -1,15 +1,15 @@
 """Deterministic mutual-fund performance and risk analytics."""
 
+from mutual_fund_agent_analysis.analytics.benchmark import (
+    BenchmarkMetrics,
+    align_returns,
+    calculate_benchmark_metrics,
+)
 from mutual_fund_agent_analysis.analytics.cashflows import (
     CashFlow,
     normalize_cash_flows,
     xirr,
     xnpv,
-)
-from mutual_fund_agent_analysis.analytics.benchmark import (
-    BenchmarkMetrics,
-    align_returns,
-    calculate_benchmark_metrics,
 )
 from mutual_fund_agent_analysis.analytics.coverage import ReturnCoverage, assess_return_coverage
 from mutual_fund_agent_analysis.analytics.drawdown import DrawdownMetrics, calculate_drawdown
