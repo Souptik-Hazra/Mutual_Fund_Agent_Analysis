@@ -1,9 +1,9 @@
 """Peak-to-trough drawdown and recovery analysis."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from collections.abc import Iterable
 
 from mutual_fund_agent_analysis.analytics.series import PricePoint, normalize_prices
 
