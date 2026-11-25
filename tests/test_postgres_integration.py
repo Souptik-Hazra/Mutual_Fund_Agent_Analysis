@@ -26,8 +26,10 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkObservation,
     BenchmarkSyncRun,
     EntityAlias,
+    EntityEvidenceLink,
     EntityIdentifier,
     EntityRelationship,
+    EvidenceRecord,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -179,6 +181,17 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         )
         assert manager_relationship is not None
         assert manager_relationship.verification_status == "unverified"
+        sync_evidence = session.scalars(
+            select(EvidenceRecord).where(
+                EvidenceRecord.source_key.in_(["amfi", "mfapi"]),
+                EvidenceRecord.external_id.like("provider-sync-run:%"),
+            )
+        ).all()
+        assert len(sync_evidence) == 3
+        assert all(
+            session.get(EntityEvidenceLink, (scheme_entity.entity_id, item.evidence_id))
+            for item in sync_evidence
+        )
 
 
 def test_scheme_identity_survives_provider_name_changes(migrated_postgres: Engine) -> None:
@@ -336,3 +349,14 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         benchmark_entity = session.get(ResearchEntity, benchmark_identifier.entity_id)
         assert benchmark_entity is not None
         assert benchmark_entity.entity_type == "benchmark"
+        benchmark_evidence = session.scalars(
+            select(EvidenceRecord).where(
+                EvidenceRecord.source_key == "niftyindices",
+                EvidenceRecord.external_id.like("benchmark-sync-run:%"),
+            )
+        ).all()
+        assert len(benchmark_evidence) == 2
+        assert all(
+            session.get(EntityEvidenceLink, (benchmark_entity.entity_id, item.evidence_id))
+            for item in benchmark_evidence
+        )
