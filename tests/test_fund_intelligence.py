@@ -119,9 +119,7 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
                         "sharpe_ratio": Decimal("0.8") if code == 1 else Decimal("0.7"),
                     },
                 )(),
-                "drawdown": type(
-                    "Drawdown", (), {"maximum_drawdown": Decimal("-0.10")}
-                )(),
+                "drawdown": type("Drawdown", (), {"maximum_drawdown": Decimal("-0.10")})(),
                 "benchmark": None,
                 "observation_count": 250,
                 "start_date": datetime(2025, 1, 1).date(),
@@ -216,8 +214,7 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
     assert result["has_partial_disclosures"] is True
     assert result["aggregate_exposure_is_incomplete"] is True
     alpha = next(
-        row for row in result["aggregated_equity_exposure"]
-        if row["security_key"] == "INE000A01001"
+        row for row in result["aggregated_equity_exposure"] if row["security_key"] == "INE000A01001"
     )
     assert alpha["equal_weight_exposure_pct"] == Decimal("4")
     assert alpha["funds_present"] == 2
