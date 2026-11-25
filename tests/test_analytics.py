@@ -137,3 +137,16 @@ def test_drawdown_reports_peak_trough_and_recovery() -> None:
     assert result.recovery_date == date(2024, 2, 1)
     assert result.drawdown_duration_days == 10
     assert result.recovery_duration_days == 22
+
+
+
+def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
+    fund = [
+        ReturnPoint(date(2024, 1, 3), Decimal("0.02"), date(2024, 1, 1)),
+    ]
+    benchmark = [
+        ReturnPoint(date(2024, 1, 3), Decimal("0.01"), date(2024, 1, 2)),
+    ]
+    aligned_fund, aligned_benchmark = align_returns(fund, benchmark)
+    assert aligned_fund == []
+    assert aligned_benchmark == []
