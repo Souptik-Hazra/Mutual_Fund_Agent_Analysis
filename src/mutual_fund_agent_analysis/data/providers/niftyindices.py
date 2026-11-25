@@ -151,7 +151,9 @@ class NiftyIndicesClient:
         points = self._parse_rows(raw_payload, name)
         for point in points:
             if not start_date <= point.date <= end_date:
-                raise ValueError("Nifty Indices returned an observation outside the requested range.")
+                raise ValueError(
+                    "Nifty Indices returned an observation outside the requested range."
+                )
         if not points:
             raise ValueError(
                 f"No TRI observations returned for {name} between {start_date} and {end_date}. "
