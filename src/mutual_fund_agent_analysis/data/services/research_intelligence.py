@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models import (
@@ -495,3 +495,15 @@ def search_documents(session: Session, query: str, scheme_code: int | None, limi
                      "title": doc.title, "content_hash": doc.content_hash},
     } for score, chunk, doc in scored[:limit]]
     return {"query": query, "results": results, "retrieval_mode": "lexical_fallback"}
+
+
+def purge_expired_social_posts(session: Session) -> int:
+    """Delete expired social identifiers and derived metadata according to provider retention."""
+    result = session.execute(
+        delete(SocialPost).where(
+            SocialPost.expires_at.is_not(None),
+            SocialPost.expires_at <= datetime.now(timezone.utc),
+        )
+    )
+    session.commit()
+    return int(result.rowcount or 0)
