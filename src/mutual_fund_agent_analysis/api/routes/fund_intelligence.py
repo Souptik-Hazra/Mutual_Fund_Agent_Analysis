@@ -25,13 +25,13 @@ router = APIRouter(prefix="/fund-intelligence", tags=["fund-intelligence"])
 
 
 class FundCompareRequest(BaseModel):
-    scheme_codes: list[int] = Field(min_length=2, max_length=5)
+    scheme_codes: list[Annotated[int, Field(strict=True, gt=0)]] = Field(
+        min_length=2, max_length=5
+    )
 
     @field_validator("scheme_codes")
     @classmethod
     def unique_positive_codes(cls, value: list[int]) -> list[int]:
-        if any(isinstance(code, bool) or code <= 0 for code in value):
-            raise ValueError("scheme_codes must contain positive integer values.")
         if len(value) != len(set(value)):
             raise ValueError("scheme_codes must be unique.")
         return value
@@ -97,21 +97,39 @@ class MarketObservationRequest(BaseModel):
     @field_validator("security_key")
     @classmethod
     def normalize_security_key(cls, value: str) -> str:
-        return value.strip().upper()
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("security_key cannot be blank.")
+        return normalized
+
+    @field_validator("isin")
+    @classmethod
+    def normalize_isin(cls, value: str | None) -> str | None:
+        return value.strip().upper() or None if value is not None else None
 
 
 def _latest_market_observation(session: Session, security_key: str, isin: str | None = None):
-    conditions = [SecurityMarketObservation.security_key == security_key]
+    query = select(SecurityMarketObservation).order_by(
+        SecurityMarketObservation.observed_at.desc(),
+        SecurityMarketObservation.observation_id.desc(),
+    )
     if isin:
-        conditions.append(SecurityMarketObservation.isin == isin)
+        exact_key_match = session.scalars(
+            query.where(
+                SecurityMarketObservation.security_key == security_key,
+                or_(
+                    SecurityMarketObservation.isin.is_(None),
+                    SecurityMarketObservation.isin == isin,
+                ),
+            ).limit(1)
+        ).first()
+        if exact_key_match is not None:
+            return exact_key_match
+        return session.scalars(
+            query.where(SecurityMarketObservation.isin == isin).limit(1)
+        ).first()
     return session.scalars(
-        select(SecurityMarketObservation)
-        .where(or_(*conditions))
-        .order_by(
-            SecurityMarketObservation.observed_at.desc(),
-            SecurityMarketObservation.observation_id.desc(),
-        )
-        .limit(1)
+        query.where(SecurityMarketObservation.security_key == security_key).limit(1)
     ).first()
 
 
