@@ -519,3 +519,19 @@ def test_rss_entity_resolution_requires_one_unique_exact_company_alias():
         "Example Industries announces quarterly results",
         date(2026, 11, 1),
     ) is None
+
+
+
+def test_rss_event_date_is_not_inferred_from_publication_date():
+    from xml.etree import ElementTree
+
+    from mutual_fund_agent_analysis.data.providers.rss import _parse_event_date
+
+    no_effective_date = ElementTree.fromstring(
+        "<item><pubDate>Tue, 25 Nov 2026 10:00:00 GMT</pubDate></item>"
+    )
+    explicit_event_date = ElementTree.fromstring(
+        "<item><eventDate>2026-11-20</eventDate><pubDate>Tue, 25 Nov 2026 10:00:00 GMT</pubDate></item>"
+    )
+    assert _parse_event_date(no_effective_date) is None
+    assert _parse_event_date(explicit_event_date) == date(2026, 11, 20)
