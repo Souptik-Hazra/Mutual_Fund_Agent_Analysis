@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -63,15 +64,14 @@ print(version)
 ')"
 
 printf 'Dumping PostgreSQL from the Compose db service ...\n'
-DB_NAME="$(docker compose exec -T db sh -lc 'printf "%s" "$POSTGRES_DB"')"
-DB_USER="$(docker compose exec -T db sh -lc 'printf "%s" "$POSTGRES_USER"')"
+DB_NAME="$(docker compose exec -T db printenv POSTGRES_DB)"
+DB_USER="$(docker compose exec -T db printenv POSTGRES_USER)"
 [[ -n "$DB_NAME" && -n "$DB_USER" ]] || {
   printf 'The db service did not expose POSTGRES_DB and POSTGRES_USER.\n' >&2
   exit 1
 }
-docker compose exec -T db sh -lc \
-  'pg_dump --format=custom --no-owner --no-acl --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
-  > "$PAYLOAD/postgres.dump"
+docker compose exec -T db pg_dump --format=custom --no-owner --no-acl \
+  --username="$DB_USER" --dbname="$DB_NAME" > "$PAYLOAD/postgres.dump"
 [[ -s "$PAYLOAD/postgres.dump" ]] || {
   printf 'PostgreSQL dump is empty.\n' >&2
   exit 1
