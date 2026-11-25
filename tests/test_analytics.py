@@ -258,3 +258,13 @@ def test_calendar_year_returns_exclude_incomplete_latest_year() -> None:
 def test_rolling_windows_reject_duplicates() -> None:
     with pytest.raises(ValueError, match="must not contain duplicates"):
         rolling_returns(prices(("2023-01-01", "100"), ("2024-01-01", "110")), (1, 1))
+
+
+
+def test_return_alignment_rejects_overlapping_intervals() -> None:
+    overlapping = [
+        ReturnPoint(date(2024, 1, 3), Decimal("0.02"), date(2024, 1, 1)),
+        ReturnPoint(date(2024, 1, 4), Decimal("0.03"), date(2024, 1, 2)),
+    ]
+    with pytest.raises(ValueError, match="must not overlap"):
+        align_returns(overlapping, overlapping)
