@@ -1,5 +1,4 @@
 """Typed application settings loaded from environment variables."""
-
 from functools import lru_cache
 from typing import Literal
 
@@ -9,7 +8,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Runtime configuration. Secrets are never logged or exposed in API responses."""
-
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
@@ -29,6 +27,14 @@ class Settings(BaseSettings):
     langsmith_api_key: SecretStr | None = None
     langsmith_tracing: bool = False
     langsmith_project: str = "mutual-fund-agent-analysis"
+    qdrant_url: str | None = None
+    qdrant_api_key: SecretStr | None = None
+    qdrant_collection: str = "mutual_fund_research"
+    document_embedding_model: str = "gemini-embedding-001"
+    reddit_client_id: SecretStr | None = None
+    reddit_client_secret: SecretStr | None = None
+    reddit_user_agent: str = "MutualFundResearch/1.0"
+    x_bearer_token: SecretStr | None = None
 
     @model_validator(mode="after")
     def validate_production_database_url(self) -> "Settings":
