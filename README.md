@@ -669,7 +669,7 @@ print(calculate_drawdown(navs))
 - Beta and alpha use only exact common return dates. No date interpolation or forward-fill is performed. Beta/alpha are undefined with fewer than two aligned observations or zero benchmark variance.
 - Jensen alpha is arithmetic and annualized by multiplying the mean periodic CAPM intercept by the periods per year; it is not CAGR alpha.
 - NAV price returns do not include cash distributions. Growth-option NAVs are the intended input for total-return comparisons; IDCW cash flows require a distribution-aware total-return series or cash-flow methodology.
-- The analytics package currently provides deterministic calculation primitives, not a database query/API endpoint. A repository-backed service and API integration are subsequent work.
+- The `analyze_fund(session, scheme_code, ...)` service reads canonical values from `nav_reconciliations` and benchmark TRI from `benchmark_observations`. It rejects unresolved NAV conflicts by default; callers must explicitly opt in to include canonical values from conflict dates. An HTTP endpoint is subsequent integration work.
 
 Run the analytics tests with:
 
