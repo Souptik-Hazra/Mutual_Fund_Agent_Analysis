@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -47,7 +47,7 @@ def search_reddit(query: str, limit: int = 50) -> list[dict[str, Any]]:
             "external_id": str(data.get("id")),
             "text_excerpt": (data.get("title", "") + " " + data.get("selftext", ""))[:2000],
             "canonical_url": "https://www.reddit.com" + data.get("permalink", ""),
-            "published_at": datetime.fromtimestamp(created).astimezone() if created else None,
+            "published_at": datetime.fromtimestamp(created, tz=timezone.utc) if created else None,
             "engagement_count": int(data.get("score", 0)) + int(data.get("num_comments", 0)),
             "metadata": {"subreddit": data.get("subreddit"), "kind": "reddit_submission"},
         })
