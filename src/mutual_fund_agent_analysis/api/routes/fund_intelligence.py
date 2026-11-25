@@ -143,10 +143,7 @@ def _market_payload(row: SecurityMarketObservation | None) -> dict:
         signals.append(
             {
                 "field": "promoter_pledge_pct",
-                "message": (
-                    "Promoter shares are reported as pledged; "
-                    "review the disclosed percentage."
-                ),
+                "message": "Promoter shares are reported as pledged; review the disclosed percentage.",
             }
         )
     if row.market_status == "halted":
@@ -264,12 +261,12 @@ def fund_equity_status(
         items.append(
             {
                 "security_key": holding.security_key,
-            "isin": holding.isin,
-            "security_name": holding.security_name,
-            "sector": holding.sector,
-            "disclosed_weight_pct": holding.weight_pct,
-            "holding_asset_class": holding.asset_class,
-            **_market_payload(market),
+                "isin": holding.isin,
+                "security_name": holding.security_name,
+                "sector": holding.sector,
+                "disclosed_weight_pct": holding.weight_pct,
+                "holding_asset_class": holding.asset_class,
+                **_market_payload(market),
             }
         )
     return {
