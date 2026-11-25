@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.intelligence import (
@@ -338,8 +338,6 @@ def resolve_entity(
         )
     )
     if source_key:
-        from sqlalchemy import or_
-
         statement = statement.where(
             or_(EntityAlias.source_key == source_key, EntityAlias.source_key.is_(None))
         )
