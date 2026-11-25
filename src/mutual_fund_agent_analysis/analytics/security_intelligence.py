@@ -26,6 +26,9 @@ FUNDAMENTAL_UNITS = {
     "total_equity": "provider currency; magnitude is not normalized",
     "operating_margin_pct": "percent",
     "profit_margin_pct": "percent",
+    "revenue_growth_pct": "percent",
+    "profit_growth_pct": "percent",
+    "promoter_pledge_pct": "percent of promoter holding",
 }
 
 
