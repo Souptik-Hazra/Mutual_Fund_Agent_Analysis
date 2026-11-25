@@ -124,6 +124,7 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
         } for r in rows],
         "top_5": [{"security_key": r.security_key, "name": r.security_name, "weight_pct": r.weight_pct} for r in known[:5]],
         "top_10": [{"security_key": r.security_key, "name": r.security_name, "weight_pct": r.weight_pct} for r in known[:10]],
+        "top_20": [{"security_key": r.security_key, "name": r.security_name, "weight_pct": r.weight_pct} for r in known[:20]],
         "sector_allocation": [{"sector": k, "weight_pct": v} for k, v in sorted(sectors.items(), key=lambda x: x[1], reverse=True)],
         "asset_allocation": [{"asset_class": k, "weight_pct": v} for k, v in sorted(assets.items(), key=lambda x: x[1], reverse=True)],
         "hhi_0_to_1": hhi,
@@ -141,11 +142,17 @@ def portfolio_history(session: Session, scheme_code: int) -> list[dict[str, Any]
         holdings = session.scalars(select(PortfolioHolding).where(
             PortfolioHolding.snapshot_id == snap.snapshot_id
         )).all()
+        sectors: dict[str, Decimal] = defaultdict(lambda: D("0"))
+        for holding in holdings:
+            if holding.weight_pct is not None:
+                sectors[holding.sector or "Unclassified"] += holding.weight_pct
         result.append({
             "snapshot_id": snap.snapshot_id, "effective_date": snap.effective_date,
             "published_at": snap.published_at, "source_key": snap.source_key,
             "status": snap.status, "holding_count": len(holdings),
             "weight_coverage_pct": sum((h.weight_pct or D("0") for h in holdings), D("0")),
+            "sector_allocation": [{"sector": key, "weight_pct": value}
+                                  for key, value in sorted(sectors.items(), key=lambda item: item[1], reverse=True)],
         })
     return result
 
@@ -598,6 +605,7 @@ def fund_social_sentiment(
         "covered_weight_days": covered_weight_days,
         "total_weight_days": total_weight_days,
         "intervals": intervals,
+        "coverage_start_date": max(start, snapshots[0].effective_date),
         "method": "time-weighted company sentiment using disclosure-effective portfolio weights",
         "warning": "Experimental discussion indicator; it is not a NAV, return, or investment recommendation.",
     }
