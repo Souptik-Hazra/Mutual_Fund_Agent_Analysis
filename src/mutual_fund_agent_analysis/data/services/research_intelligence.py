@@ -293,8 +293,15 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
     from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
 
     source = session.get(DataSource, source_key)
-    if source is None or not source.enabled or not source.base_url:
-        raise ValueError("Source must be registered, enabled, and have an official base_url.")
+    if (
+        source is None
+        or not source.enabled
+        or not source.is_official
+        or source.source_type != "official"
+        or not source.base_url
+        or urlparse(source.base_url).scheme != "https"
+    ):
+        raise ValueError("Event feed source must be enabled, official, and registered with an HTTPS base_url.")
     allowed_host = urlparse(source.base_url).hostname
     if not allowed_host:
         raise ValueError("Registered source base_url is invalid.")
@@ -344,7 +351,12 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             evidence.title = item["title"]
             evidence.canonical_url = item["url"]
             evidence.published_at = item["published_at"]
-            if evidence.content_hash != digest:
+            if (
+                evidence.content_hash != digest
+                or evidence.title != item["title"]
+                or evidence.canonical_url != item["url"]
+                or evidence.published_at != item["published_at"]
+            ):
                 evidence.verification_status = "unverified"
             evidence.content_hash = digest
             evidence.retrieved_at = datetime.now(timezone.utc)
@@ -401,6 +413,8 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
         raise ValueError("Unknown evidence_id.")
     if payload.status in {"confirmed", "scheduled", "disproved"} and evidence is None:
         raise ValueError("Confirmed, scheduled, and disproved events require a linked evidence record.")
+    if payload.status in {"reported", "unverified", "speculative"} and evidence is None and not payload.canonical_url:
+        raise ValueError("Reported or speculative events require a source URL or linked evidence record.")
     if payload.status in {"confirmed", "scheduled"} and (
         evidence is None or evidence.verification_status not in {"verified", "corroborated"}
     ):
@@ -486,6 +500,10 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     scored_fields = (payload.sentiment_label, payload.sentiment_score, payload.sentiment_model)
     if any(value is not None for value in scored_fields) and not all(value is not None for value in scored_fields):
         raise ValueError("Sentiment label, score, and evaluated model must be supplied together.")
+    if payload.sentiment_model is not None:
+        approved_models = (source.metadata_json or {}).get("evaluated_sentiment_models", [])
+        if not isinstance(approved_models, list) or payload.sentiment_model not in approved_models:
+            raise ValueError("Sentiment model is not registered as evaluated for this source.")
 
     row = session.scalar(select(SocialPost).where(
         SocialPost.source_key == payload.source_key, SocialPost.external_id == payload.external_id
@@ -546,6 +564,9 @@ def social_analytics(session: Session, entity_id: int | None, start: date | None
     return {
         "from_date": start, "to_date": end, "post_count": len(rows),
         "coverage_entity_count": len({r.related_entity_id for r in rows if r.related_entity_id}),
+        "source_counts": {key: sum(1 for row in rows if row.source_key == key) for key in sorted({row.source_key for row in rows})},
+        "scored_post_count": scored,
+        "unscored_post_count": len(rows) - scored,
         "average_sentiment": total_score / scored if scored else None,
         "sentiment_distribution": distribution,
         "discussion_volume_by_day": [{"date": k, "count": v} for k, v in sorted(daily.items())],
