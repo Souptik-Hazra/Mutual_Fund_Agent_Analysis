@@ -238,3 +238,61 @@ class EntityEvidenceLink(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class EntityRelationship(Base):
+    """Typed, temporal relationship between two canonical entities."""
+
+    __tablename__ = "entity_relationships"
+    __table_args__ = (
+        CheckConstraint("from_entity_id <> to_entity_id", name="ck_entity_relationships_not_self"),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from",
+            name="ck_entity_relationships_valid_range",
+        ),
+        CheckConstraint(
+            "verification_status IN ('unverified', 'corroborated', 'verified', "
+            "'disputed', 'retracted')",
+            name="ck_entity_relationships_verification_status",
+        ),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+            name="ck_entity_relationships_confidence",
+        ),
+        UniqueConstraint(
+            "from_entity_id", "to_entity_id", "relation_type", "valid_from",
+            name="uq_entity_relationship_identity",
+        ),
+        Index("ix_entity_relationships_from", "from_entity_id", "relation_type"),
+        Index("ix_entity_relationships_to", "to_entity_id", "relation_type"),
+    )
+
+    relationship_id: Mapped[int] = mapped_column(_ID_TYPE, Identity(), primary_key=True)
+    from_entity_id: Mapped[int] = mapped_column(
+        _ID_TYPE, ForeignKey("research_entities.entity_id", ondelete="CASCADE"), nullable=False
+    )
+    to_entity_id: Mapped[int] = mapped_column(
+        _ID_TYPE, ForeignKey("research_entities.entity_id", ondelete="CASCADE"), nullable=False
+    )
+    relation_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_key: Mapped[str | None] = mapped_column(
+        String(60), ForeignKey("data_sources.source_key", ondelete="RESTRICT")
+    )
+    evidence_id: Mapped[int | None] = mapped_column(
+        _ID_TYPE, ForeignKey("evidence_records.evidence_id", ondelete="RESTRICT")
+    )
+    valid_from: Mapped[date | None] = mapped_column(Date)
+    valid_to: Mapped[date | None] = mapped_column(Date)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))
+    verification_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unverified"
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", _JSON_TYPE, nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
