@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -239,8 +239,9 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
 
 
 def create_market_event(session: Session, payload: Any) -> MarketEvent:
-    if session.get(DataSource, payload.source_key) is None:
-        raise ValueError("Unknown source_key.")
+    source = session.get(DataSource, payload.source_key)
+    if source is None or not source.enabled:
+        raise ValueError("Unknown or disabled source_key.")
     if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
         raise ValueError("Unknown related_entity_id.")
     if payload.evidence_id and session.get(EvidenceRecord, payload.evidence_id) is None:
@@ -301,7 +302,7 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
 
 def social_analytics(session: Session, entity_id: int | None, start: date | None, end: date | None) -> dict[str, Any]:
     stmt = select(SocialPost).where(SocialPost.is_spam.is_(False)).where(
-        (SocialPost.expires_at.is_(None)) | (SocialPost.expires_at > datetime.now().astimezone())
+        (SocialPost.expires_at.is_(None)) | (SocialPost.expires_at > datetime.now(timezone.utc))
     )
     if entity_id:
         stmt = stmt.where(SocialPost.related_entity_id == entity_id)
