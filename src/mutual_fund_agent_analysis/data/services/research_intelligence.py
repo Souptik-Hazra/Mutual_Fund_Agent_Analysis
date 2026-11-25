@@ -307,7 +307,7 @@ def _resolve_rss_entity_exact(
     for alias, entity in aliases:
         normalized_alias = " ".join(alias.normalized_alias.casefold().split())
         if normalized_alias and re.search(
-            rf"(?<![\\w]){re.escape(normalized_alias)}(?![\\w])",
+            rf"(?<![\w]){re.escape(normalized_alias)}(?![\w])",
             normalized_title,
         ):
             matches[entity.entity_id] = max(matches.get(entity.entity_id, 0), len(normalized_alias))
@@ -328,6 +328,7 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
         or not source.is_official
         or source.source_type != "official"
         or not source.base_url
+        or not source.terms_url
         or urlparse(source.base_url).scheme != "https"
         or not isinstance(source.metadata_json, dict)
         or source.metadata_json.get("terms_reviewed") is not True
@@ -409,6 +410,9 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
         resolved_entity_id = _resolve_rss_entity_exact(
             session, source_key, item["title"], item.get("event_date") or (item["published_at"].date() if item["published_at"] else None)
         )
+        if event is not None and event.related_entity_id is not None:
+            # Preserve an existing manually reviewed or previously resolved entity link.
+            resolved_entity_id = event.related_entity_id
         if resolved_entity_id is not None:
             existing_link = session.get(EntityEvidenceLink, (resolved_entity_id, evidence.evidence_id))
             if existing_link is None:
