@@ -134,3 +134,21 @@ def test_security_profile_abstains_when_no_provider_observation_exists():
     assert result["availability"] == "no_market_observation"
     assert result["fundamentals"]["availability"] == "unavailable"
     assert result["market"] is None
+
+
+def test_security_grounding_contract_requires_market_observation_citation():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_grounding_contract
+
+    result = evaluate_grounding_contract(
+        {
+            "answer": "Available stock observations are shown.",
+            "results": {"security": {"securities": []}},
+            "citations": [{"type": "security_market_observation"}],
+        }
+    )
+    assert result["grounding_contract_passed"] is True
+
+    missing = evaluate_grounding_contract(
+        {"answer": "Unsupported stock analysis.", "results": {"security": {}}, "citations": []}
+    )
+    assert missing["grounding_contract_passed"] is False
