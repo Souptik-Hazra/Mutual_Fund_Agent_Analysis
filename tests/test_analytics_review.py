@@ -37,9 +37,7 @@ def test_calendar_year_uses_final_trading_day_when_as_of_is_after_year_end() -> 
         ("2024-12-30", "110"),
     )
     assert calendar_year_returns(navs) == {}
-    assert calendar_year_returns(navs, date(2025, 1, 2)) == {
-        2024: Decimal("0.1")
-    }
+    assert calendar_year_returns(navs, date(2025, 1, 2)) == {2024: Decimal("0.1")}
 
 
 def test_calendar_year_does_not_treat_december_30_as_complete_without_as_of() -> None:
