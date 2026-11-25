@@ -192,9 +192,23 @@ def get_portfolio_changes(scheme_code: int, session: Annotated[Session, Depends(
             changed.append({"security_key": key, "name": new[key].security_name,
                             "previous_weight_pct": before, "current_weight_pct": after,
                             "change_percentage_points": (after or 0) - (before or 0)})
+    old_sectors: dict[str, Decimal] = {}
+    new_sectors: dict[str, Decimal] = {}
+    for holding in old.values():
+        if holding.weight_pct is not None:
+            old_sectors[holding.sector or "Unclassified"] = old_sectors.get(holding.sector or "Unclassified", Decimal("0")) + holding.weight_pct
+    for holding in new.values():
+        if holding.weight_pct is not None:
+            new_sectors[holding.sector or "Unclassified"] = new_sectors.get(holding.sector or "Unclassified", Decimal("0")) + holding.weight_pct
+    sector_changes = [{
+        "sector": sector,
+        "previous_weight_pct": old_sectors.get(sector, Decimal("0")),
+        "current_weight_pct": new_sectors.get(sector, Decimal("0")),
+        "change_percentage_points": new_sectors.get(sector, Decimal("0")) - old_sectors.get(sector, Decimal("0")),
+    } for sector in sorted(old_sectors.keys() | new_sectors.keys())]
     return {"scheme_code": scheme_code, "previous_effective_date": previous.effective_date,
             "current_effective_date": current.effective_date, "added": added, "removed": removed,
-            "weight_changes": changed,
+            "weight_changes": changed, "sector_changes": sector_changes,
             "caveat": "Snapshot differences can reflect issuer naming or classification changes; verify source rows before interpreting as trading activity."}
 
 
