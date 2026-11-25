@@ -114,7 +114,10 @@ def upgrade() -> None:
         Column("namespace", String(60), nullable=False),
         Column("identifier_value", String(160), nullable=False),
         Column("normalized_value", String(160), nullable=False),
-        Column("source_key", String(60), ForeignKey("data_sources.source_key", ondelete="RESTRICT")),
+        Column(
+            "source_key", String(60),
+            ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
+        ),
         Column("valid_from", Date()),
         Column("valid_to", Date()),
         Column("is_primary", Boolean(), nullable=False, server_default="false"),
