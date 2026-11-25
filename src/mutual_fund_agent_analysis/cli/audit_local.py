@@ -101,7 +101,10 @@ def build_coverage_report(session: Session) -> dict[str, Any]:
         },
         "limitations": [
             "Counts and date ranges do not establish source completeness or correctness.",
-            "Run with --live and explicit identifiers to verify current provider access and schemas.",
+            (
+                "Run with --live and explicit identifiers to verify current provider "
+                "access and schemas."
+            ),
             "AMC, distribution and source-rights coverage need individual provider verification.",
         ],
     }
