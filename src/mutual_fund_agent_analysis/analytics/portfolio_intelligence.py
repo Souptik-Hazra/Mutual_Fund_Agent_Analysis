@@ -153,8 +153,7 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
     return {
         "scheme_codes": scheme_codes,
         "valuation_basis": (
-            "Investor transaction units multiplied by latest accepted "
-            "reconciled NAV."
+            "Investor transaction units multiplied by latest accepted reconciled NAV."
         ),
         "total_valued_portfolio_inr": total,
         "valued_funds": [
