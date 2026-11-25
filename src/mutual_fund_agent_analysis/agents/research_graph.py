@@ -231,23 +231,59 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     session, codes, as_of=request.end_date, limit=min(request.top_k * 5, 50)
                 )
                 results[intent] = _jsonable(security_data)
+                for code in codes:
+                    snapshot = latest_snapshot(session, code, request.end_date)
+                    if snapshot:
+                        citations.append(
+                            {
+                                "type": "portfolio_disclosure",
+                                "scheme_code": code,
+                                "effective_date": snapshot.effective_date,
+                                "content_hash": snapshot.content_hash,
+                                "document_url": snapshot.document_url,
+                            }
+                        )
                 for security in security_data.get("securities", []):
                     market = security.get("market") or {}
                     fundamentals = security.get("fundamentals") or {}
-                    if market.get("source_key") or fundamentals.get("source_key"):
-                        citations.append({
-                            "type": "security_market_observation",
-                            "security_key": security.get("security_key"),
-                            "source_key": market.get("source_key")
-                            or fundamentals.get("source_key"),
-                            "observed_at": market.get("observed_at"),
-                            "fundamentals_as_of": fundamentals.get("as_of"),
-                            "canonical_url": market.get("source_url")
-                            or fundamentals.get("source_url"),
-                            "retrieved_at": market.get("retrieved_at")
-                            or fundamentals.get("retrieved_at"),
-                            "verification_status": "unverified",
-                        })
+                    if market.get("source_key"):
+                        citations.append(
+                            {
+                                "type": "security_market_observation",
+                                "data_scope": "market_quote",
+                                "security_key": security.get("security_key"),
+                                "source_key": market.get("source_key"),
+                                "canonical_url": market.get("source_url"),
+                                "retrieved_at": market.get("retrieved_at"),
+                                "observed_at": market.get("observed_at"),
+                                "verification_status": "unverified",
+                            }
+                        )
+                    if fundamentals.get("source_key"):
+                        citations.append(
+                            {
+                                "type": "security_market_observation",
+                                "data_scope": "fundamentals",
+                                "security_key": security.get("security_key"),
+                                "source_key": fundamentals.get("source_key"),
+                                "canonical_url": fundamentals.get("source_url"),
+                                "retrieved_at": fundamentals.get("retrieved_at"),
+                                "fundamentals_as_of": fundamentals.get("as_of"),
+                                "verification_status": "unverified",
+                            }
+                        )
+                    for event in security.get("corporate_events", []):
+                        citations.append(
+                            {
+                                "type": "security_corporate_event",
+                                "security_key": security.get("security_key"),
+                                "title": event.get("title"),
+                                "source_key": event.get("source_key"),
+                                "canonical_url": event.get("canonical_url"),
+                                "retrieved_at": event.get("retrieved_at"),
+                                "verification_status": event.get("verification_status", "unverified"),
+                            }
+                        )
             elif intent == "events":
                 if codes:
                     event_results = [
