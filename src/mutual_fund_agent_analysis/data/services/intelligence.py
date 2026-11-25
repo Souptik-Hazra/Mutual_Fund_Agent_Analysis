@@ -112,6 +112,9 @@ def add_entity_alias(
     entity = _require_entity(session, entity_id)
     _validate_date_range(valid_from, valid_to)
     normalized = normalize_name(alias)
+    normalized_alias_type = alias_type.strip().lower()
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,29}", normalized_alias_type):
+        raise ValueError("alias_type must be a 1–30 character lowercase identifier.")
     if source_key and session.get(DataSource, source_key) is None:
         raise ValueError(f"Unknown source_key: {source_key!r}.")
     existing = session.scalar(
@@ -123,7 +126,7 @@ def add_entity_alias(
     )
     if existing:
         existing.alias = alias.strip()
-        existing.alias_type = alias_type.strip().lower()
+        existing.alias_type = normalized_alias_type
         existing.source_key = source_key
         existing.valid_to = valid_to
         existing.is_primary = is_primary
@@ -134,7 +137,7 @@ def add_entity_alias(
         ).update({"is_primary": False}, synchronize_session="fetch")
     record = EntityAlias(
         entity_id=entity.entity_id, alias=alias.strip(), normalized_alias=normalized,
-        alias_type=alias_type.strip().lower(), source_key=source_key, valid_from=valid_from,
+        alias_type=normalized_alias_type, source_key=source_key, valid_from=valid_from,
         valid_to=valid_to, is_primary=is_primary,
     )
     session.add(record)
@@ -272,6 +275,9 @@ def link_entity_evidence(
         raise ValueError(f"Evidence {evidence_id} does not exist.")
     if resolution_method not in RESOLUTION_METHODS:
         raise ValueError("Unsupported resolution_method.")
+    normalized_relation = relation_type.strip().lower()
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,39}", normalized_relation):
+        raise ValueError("relation_type must be a 1–40 character lowercase identifier.")
     if confidence is not None and (
         not confidence.is_finite() or confidence < 0 or confidence > 1
     ):
@@ -280,12 +286,12 @@ def link_entity_evidence(
     if link is None:
         link = EntityEvidenceLink(
             entity_id=entity_id, evidence_id=evidence_id,
-            relation_type=relation_type.strip().lower(), confidence=confidence,
+            relation_type=normalized_relation, confidence=confidence,
             resolution_method=resolution_method, verified_at=verified_at,
         )
         session.add(link)
     else:
-        link.relation_type = relation_type.strip().lower()
+        link.relation_type = normalized_relation
         link.confidence = confidence
         link.resolution_method = resolution_method
         link.verified_at = verified_at
@@ -310,7 +316,9 @@ def resolve_entity(
         raise ValueError("namespace and identifier_value must be supplied together.")
     if not namespace and not alias:
         raise ValueError("Provide an identifier or an alias to resolve.")
-    effective_date = as_of or date.today()
+    if source_key and session.get(DataSource, source_key) is None:
+        raise ValueError(f"Unknown source_key: {source_key!r}.")
+    effective_date = as_of or datetime.now(UTC).date()
     if namespace and identifier_value:
         statement = (
             select(ResearchEntity)
@@ -332,8 +340,6 @@ def resolve_entity(
             return EntityResolution("resolved", entity, "identifier", (entity,))
         if not alias:
             return EntityResolution("not_found", None, None)
-    if source_key and session.get(DataSource, source_key) is None:
-        raise ValueError(f"Unknown source_key: {source_key!r}.")
     normalized_alias = normalize_name(alias) if alias else None
     statement = (
         select(ResearchEntity)
