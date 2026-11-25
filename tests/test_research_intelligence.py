@@ -1,10 +1,17 @@
+import asyncio
+import io
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
+
+import httpx
 
 import pytest
+from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
 
 from mutual_fund_agent_analysis.api.routes import research as research_routes
+from mutual_fund_agent_analysis.api.routes.market_data import _validate_registered_source_url
 from mutual_fund_agent_analysis.api.schemas.research import (
     EventInput,
     HoldingInput,
@@ -12,6 +19,7 @@ from mutual_fund_agent_analysis.api.schemas.research import (
     SocialPostInput,
 )
 from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
+from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     portfolio_payload,
     source_social_retention_days,
@@ -569,3 +577,60 @@ def test_rss_event_date_is_not_inferred_from_publication_date():
     )
     assert _parse_event_date(no_effective_date) is None
     assert _parse_event_date(explicit_event_date) == date(2026, 11, 20)
+
+
+
+def test_security_observation_source_url_must_match_registered_https_host():
+    source = SimpleNamespace(base_url="https://www.nseindia.com")
+    assert _validate_registered_source_url(
+        source, "https://www.nseindia.com/api/filings"
+    ) == "https://www.nseindia.com/api/filings"
+    assert _validate_registered_source_url(
+        source, "https://feeds.nseindia.com/announcements"
+    ) == "https://feeds.nseindia.com/announcements"
+    for candidate in (
+        "http://www.nseindia.com/filings",
+        "https://nseindia.com.attacker.example/filings",
+        "https://attacker.example/nse/filings",
+    ):
+        with pytest.raises(HTTPException):
+            _validate_registered_source_url(source, candidate)
+
+
+def test_twelve_data_http_errors_do_not_expose_api_key():
+    api_key = "sensitive-test-api-key"
+
+    def reject_request(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, request=request)
+
+    client = TwelveDataClient(
+        api_key,
+        client=httpx.Client(transport=httpx.MockTransport(reject_request)),
+    )
+    try:
+        with pytest.raises(ValueError) as error:
+            client.get_quote("INFY", "NSE")
+        assert api_key not in str(error.value)
+        assert "provider details were withheld" in str(error.value)
+    finally:
+        client.close()
+
+
+def test_portfolio_upload_rejects_more_than_5000_rows_before_persistence():
+    csv_content = "security_key,security_name,asset_class\n" + "".join(
+        f"INE{i:09d},Example {i},equity\n" for i in range(5001)
+    )
+    upload = UploadFile(
+        filename="holdings.csv",
+        file=io.BytesIO(csv_content.encode("utf-8")),
+    )
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_portfolio_file(
+                session=None,
+                file=upload,
+                scheme_code=100,
+                effective_date=date(2026, 11, 25),
+            )
+        )
+    assert error.value.status_code == 413
