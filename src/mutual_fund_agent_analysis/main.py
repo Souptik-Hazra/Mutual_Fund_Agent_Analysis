@@ -5,6 +5,9 @@ from fastapi import FastAPI
 from mutual_fund_agent_analysis import __version__
 from mutual_fund_agent_analysis.api.routes.assistant import router as assistant_router
 from mutual_fund_agent_analysis.api.routes.financial import router as financial_router
+from mutual_fund_agent_analysis.api.routes.fund_intelligence import (
+    router as fund_intelligence_router,
+)
 from mutual_fund_agent_analysis.api.routes.funds import router as funds_router
 from mutual_fund_agent_analysis.api.routes.health import router as health_router
 from mutual_fund_agent_analysis.api.routes.intelligence import router as intelligence_router
@@ -25,6 +28,7 @@ def create_app() -> FastAPI:
     application.include_router(health_router, prefix=settings.api_v1_prefix)
     application.include_router(funds_router, prefix=settings.api_v1_prefix)
     application.include_router(financial_router, prefix=settings.api_v1_prefix)
+    application.include_router(fund_intelligence_router, prefix=settings.api_v1_prefix)
     application.include_router(intelligence_router, prefix=settings.api_v1_prefix)
     application.include_router(research_router, prefix=settings.api_v1_prefix)
     application.include_router(assistant_router, prefix=settings.api_v1_prefix)
