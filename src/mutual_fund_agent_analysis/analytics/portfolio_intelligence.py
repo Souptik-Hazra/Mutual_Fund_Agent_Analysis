@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.investor import InvestorTransaction
-from mutual_fund_agent_analysis.models.nav import NavReconciliation
+from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
