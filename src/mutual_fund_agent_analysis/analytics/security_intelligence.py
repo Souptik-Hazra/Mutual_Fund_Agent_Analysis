@@ -102,6 +102,18 @@ def security_profile(
             for row in holdings
         ]
 
+    corporate_events = [
+        {
+            **event,
+            "source_key": event.get("source_key") or event_observation.source_key,
+            "canonical_url": event.get("source_url") or event_observation.source_url,
+            "retrieved_at": event_observation.retrieved_at,
+            "verification_status": event.get("verification_status") or "unverified",
+        }
+        for event in (event_observation.corporate_events_json or [])
+        if isinstance(event, dict)
+    ] if event_observation else []
+
     now = datetime.now(UTC)
     quote_age_hours = (
         max(0.0, (now - latest.observed_at.astimezone(UTC)).total_seconds() / 3600)
@@ -182,9 +194,7 @@ def security_profile(
             if fundamentals_observation
             else None,
         },
-        "corporate_events": event_observation.corporate_events_json
-        if event_observation
-        else [],
+        "corporate_events": corporate_events,
         "portfolio_positions": positions,
         "portfolio_coverage": {
             "matched_scheme_count": len({row["scheme_code"] for row in positions}),
