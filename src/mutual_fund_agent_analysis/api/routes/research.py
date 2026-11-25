@@ -4,6 +4,7 @@
 import csv
 import hashlib
 import io
+from itertools import islice
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
@@ -130,25 +131,34 @@ async def import_portfolio_file(
     filename = (file.filename or "").lower()
     try:
         if filename.endswith(".csv"):
-            rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+            reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+            rows = list(islice(reader, 5001))
         elif filename.endswith(".xlsx"):
             from openpyxl import load_workbook
 
             workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-            sheet = workbook.active
-            values = list(sheet.iter_rows(values_only=True))
-            if not values:
-                raise ValueError("Workbook is empty.")
-            headers = [str(value or "").strip().lower().replace(" ", "_") for value in values[0]]
-            rows = [
-                dict(zip(headers, row, strict=False))
-                for row in values[1:]
-                if any(v is not None for v in row)
-            ]
+            try:
+                sheet = workbook.active
+                values = list(islice(sheet.iter_rows(values_only=True), 5002))
+                if not values:
+                    raise ValueError("Workbook is empty.")
+                headers = [
+                    str(value or "").strip().lower().replace(" ", "_")
+                    for value in values[0]
+                ]
+                rows = [
+                    dict(zip(headers, row, strict=False))
+                    for row in values[1:]
+                    if any(v is not None for v in row)
+                ]
+            finally:
+                workbook.close()
         else:
             raise HTTPException(
                 status_code=415, detail="Only .csv and .xlsx portfolio files are supported."
             )
+        if len(rows) > 5000:
+            raise HTTPException(status_code=413, detail="Portfolio files are limited to 5,000 holding rows.")
         if not rows:
             raise ValueError("No holding rows were found.")
         holdings = []
