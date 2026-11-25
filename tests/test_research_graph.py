@@ -13,6 +13,10 @@ def test_router_selects_multiple_specialists_when_question_needs_them():
     assert routes == ["portfolio", "events"]
 
 
+def test_event_exposure_does_not_trigger_separate_portfolio_agent():
+    assert classify_intents("Show event exposure for my fund", [125497]) == ["events"]
+
+
 def test_router_does_not_call_fund_analytics_for_portfolio_overlap():
     assert classify_intents("Compare overlap between two portfolios", [125497, 120503]) == [
         "portfolio"
