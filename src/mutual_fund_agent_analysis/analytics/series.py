@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Iterable
+from collections.abc import Iterable
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,5 +41,5 @@ def period_returns(points: Iterable[PricePoint]) -> list[ReturnPoint]:
             current.value / previous.value - Decimal("1"),
             previous.date,
         )
-        for previous, current in zip(prices, prices[1:])
+        for previous, current in zip(prices, prices[1:], strict=False)
     ]
