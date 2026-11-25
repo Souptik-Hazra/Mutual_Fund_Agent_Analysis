@@ -1,5 +1,5 @@
 """Portfolio, event, social, and document intelligence APIs."""
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 import csv
 import hashlib
 import io
@@ -20,6 +20,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     import_portfolio_snapshot, latest_snapshot, portfolio_history, portfolio_payload,
     search_documents, security_fund_exposure, social_analytics, store_document,
 )
+from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models import DataSource, MarketEvent, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.research import ResearchDocument
@@ -304,6 +305,7 @@ def collect_social_posts(
                 content_hash=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
                 published_at=item.get("published_at"),
                 engagement_count=item.get("engagement_count", 0),
+                expires_at=datetime.now(timezone.utc) + timedelta(days=get_settings().social_retention_days),
                 metadata=item.get("metadata", {}),
             )
             create_social_post(session, payload)
