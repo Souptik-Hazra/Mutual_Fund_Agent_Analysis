@@ -275,8 +275,7 @@ def securities_for_funds(
     ).all()
     keys = list(dict.fromkeys(row.security_key for row in holdings))[: min(max(limit, 1), 100)]
     securities = [
-        security_profile(session, key, as_of=as_of, scheme_codes=scheme_codes)
-        for key in keys
+        security_profile(session, key, as_of=as_of, scheme_codes=scheme_codes) for key in keys
     ]
     return {
         "scheme_codes": scheme_codes,
