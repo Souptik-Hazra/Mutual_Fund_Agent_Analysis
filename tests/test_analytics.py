@@ -247,3 +247,13 @@ def test_risk_frequency_must_be_a_positive_integer() -> None:
             returns(("2024-01-02", "0.01"), ("2024-01-03", "0.02")),
             periods_per_year=12.5,  # type: ignore[arg-type]
         )
+
+
+
+def test_risk_metrics_require_two_observations_for_ratios() -> None:
+    result = calculate_risk_metrics(returns(("2024-01-02", "0.01")))
+    assert result.observation_count == 1
+    assert result.annualized_volatility is None
+    assert result.annualized_downside_deviation is None
+    assert result.sharpe_ratio is None
+    assert result.sortino_ratio is None
