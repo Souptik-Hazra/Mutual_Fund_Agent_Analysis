@@ -27,6 +27,7 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkSyncRun,
     EntityAlias,
     EntityIdentifier,
+    EntityRelationship,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -170,6 +171,14 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         )
         assert scheme_identifier is not None
         assert scheme_identifier.entity_id == scheme_entity.entity_id
+        manager_relationship = session.scalar(
+            select(EntityRelationship).where(
+                EntityRelationship.from_entity_id == scheme_entity.entity_id,
+                EntityRelationship.relation_type == "managed_by",
+            )
+        )
+        assert manager_relationship is not None
+        assert manager_relationship.verification_status == "unverified"
 
 
 def test_scheme_identity_survives_provider_name_changes(migrated_postgres: Engine) -> None:
