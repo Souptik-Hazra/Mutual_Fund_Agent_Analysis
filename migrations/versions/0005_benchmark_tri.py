@@ -7,14 +7,14 @@ Create Date: 2026-11-25
 
 from alembic import op
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Column,
     Date,
     DateTime,
-    BigInteger,
+    ForeignKeyConstraint,
     Identity,
     Integer,
-    ForeignKeyConstraint,
     Numeric,
     PrimaryKeyConstraint,
     String,
