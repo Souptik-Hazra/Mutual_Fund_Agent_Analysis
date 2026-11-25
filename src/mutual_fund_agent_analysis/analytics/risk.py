@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from mutual_fund_agent_analysis.analytics.series import ReturnPoint
+from mutual_fund_agent_analysis.analytics.series import ReturnPoint, normalize_returns
 
 DEFAULT_PERIODS_PER_YEAR = 252
 
@@ -43,7 +43,8 @@ def calculate_risk_metrics(
     observation frequency. Use 252 for daily trading observations or 12 for
     monthly observations; the caller must supply a consistent return frequency.
     """
-    values = [point.value for point in returns]
+    observations = normalize_returns(returns)
+    values = [point.value for point in observations]
     if isinstance(periods_per_year, bool) or not isinstance(periods_per_year, int) or periods_per_year <= 0:
         raise ValueError("periods_per_year must be a positive integer.")
     if not isinstance(annual_risk_free_rate, Decimal):
@@ -53,8 +54,8 @@ def calculate_risk_metrics(
     if any(not value.is_finite() or value <= Decimal("-1") for value in values):
         raise ValueError("Returns must be finite and greater than -100%.")
 
-    if not values:
-        return RiskMetrics(0, None, None, None, None)
+    if len(values) < 2:
+        return RiskMetrics(len(values), None, None, None, None)
 
     periodic_rf = annual_risk_free_rate / Decimal(periods_per_year)
     excess = [value - periodic_rf for value in values]
