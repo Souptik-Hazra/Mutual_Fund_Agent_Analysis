@@ -20,7 +20,7 @@ def test_amfi_history_parses_historical_eight_column_layout() -> None:
         assert request.url.params["frmdt"] == "26-Oct-2024"
         return httpx.Response(200, text=HISTORY_ROW)
 
-    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), minimum_report_bytes=0) as client:
         response = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
 
     assert response.meta.scheme_code == 125497
@@ -86,7 +86,11 @@ def test_amfi_chunks_long_date_ranges() -> None:
         row = f"125497;HDFC Test Fund;ISIN;-;10.2500;0;0;{chunk_date.strftime('%d-%b-%Y')}"
         return httpx.Response(200, text=row)
 
-    with AMFIClient(transport=httpx.MockTransport(handler), chunk_days=7) as client:
+    with AMFIClient(
+        transport=httpx.MockTransport(handler),
+        chunk_days=7,
+        minimum_report_bytes=0,
+    ) as client:
         response = client.get_nav_history(125497, date(2024, 10, 1), date(2024, 10, 20))
 
     assert len(requests) == 3
@@ -125,6 +129,34 @@ def test_amfi_retries_http_200_stub_response(monkeypatch) -> None:
 
     monkeypatch.setattr(amfi_module.time, "sleep", sleeps.append)
     with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+        result = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
+
+    assert len(result.data) == 1
+    assert calls == 2
+    assert sleeps == [1.0]
+
+
+def test_amfi_retries_short_partial_body(monkeypatch) -> None:
+    import mutual_fund_agent_analysis.data.providers.amfi as amfi_module
+
+    calls = 0
+    sleeps: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(
+                200,
+                text="125497;HDFC;ISIN;-;10;0;0;26-Oct-2024",
+            )
+        return httpx.Response(200, text=HISTORY_ROW)
+
+    monkeypatch.setattr(amfi_module.time, "sleep", sleeps.append)
+    with AMFIClient(
+        transport=httpx.MockTransport(handler),
+        minimum_report_bytes=50,
+    ) as client:
         result = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
 
     assert len(result.data) == 1

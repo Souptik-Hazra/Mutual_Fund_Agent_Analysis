@@ -61,13 +61,17 @@ class AMFIClient:
         transport: httpx.BaseTransport | None = None,
         chunk_days: int = 7,
         max_attempts: int = 3,
+        minimum_report_bytes: int = 50_000,
     ) -> None:
         if not 1 <= chunk_days <= 7:
             raise ValueError("chunk_days must be between 1 and 7.")
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1.")
+        if minimum_report_bytes < 0:
+            raise ValueError("minimum_report_bytes cannot be negative.")
         self.chunk_days = chunk_days
         self.max_attempts = max_attempts
+        self.minimum_report_bytes = minimum_report_bytes
         self._client = httpx.Client(
             base_url=self.base_url,
             timeout=httpx.Timeout(timeout_seconds, connect=10.0),
@@ -86,7 +90,9 @@ class AMFIClient:
         self.close()
 
     @staticmethod
-    def _is_error_or_stub(report: str) -> bool:
+    def _is_error_or_stub(report: str, minimum_report_bytes: int) -> bool:
+        if len(report.encode("utf-8")) < minimum_report_bytes:
+            return True
         normalized = report.lstrip("\ufeff \t\r\n").lower()
         markers = (
             "<!doctype html", "<html", "<head", "<body",
@@ -128,7 +134,7 @@ class AMFIClient:
                 response = self._client.get("/DownloadNAVHistoryReport_Po.aspx", params=params)
                 response.raise_for_status()
                 report = response.text.lstrip("\ufeff")
-                if self._is_error_or_stub(report):
+                if self._is_error_or_stub(report, self.minimum_report_bytes):
                     raise ValueError("AMFI returned an error/stub body with HTTP success.")
                 return report
             except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError, ValueError) as exc:
