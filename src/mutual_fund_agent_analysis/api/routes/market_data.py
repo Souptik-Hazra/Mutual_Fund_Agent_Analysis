@@ -2,12 +2,13 @@
 
 import hashlib
 import json
-from datetime import UTC, datetime
-from typing import Annotated
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,8 +16,8 @@ from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import DataSource
-from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
+from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
@@ -144,16 +145,6 @@ def sync_twelvedata_quote(
         ],
     }
 
-
-from datetime import date
-from decimal import Decimal
-from typing import Any, Literal
-
-from pydantic import AnyHttpUrl, field_validator, model_validator
-from sqlalchemy import select
-
-from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
-from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 
 
 class SecurityCorporateEvent(BaseModel):
