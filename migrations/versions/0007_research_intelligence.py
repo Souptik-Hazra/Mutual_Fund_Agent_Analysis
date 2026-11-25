@@ -1,5 +1,6 @@
 """Persist portfolio, event, social, and document intelligence."""
 from alembic import op
+from sqlalchemy import text
 
 revision = "0007_research_intelligence"
 down_revision = "0006_common_intelligence_foundation"
@@ -24,6 +25,16 @@ def upgrade() -> None:
         tables=[Base.metadata.tables[name] for name in names],
         checkfirst=True,
     )
+    op.get_bind().execute(text("""
+        INSERT INTO data_sources (
+            source_key, display_name, source_type, authority_tier, is_official,
+            base_url, attribution_required, enabled, metadata
+        ) VALUES (
+            'amc_disclosures', 'AMC Portfolio and Scheme Disclosures', 'official',
+            1, true, NULL, false, true,
+            '{"domain":"portfolio_disclosure","role":"primary_scheme_disclosure"}'::jsonb
+        ) ON CONFLICT (source_key) DO NOTHING
+    """))
 
 
 def downgrade() -> None:
