@@ -12,9 +12,10 @@ dependencies = [
   "alembic>=1.14,<2",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
-  "langchain-core>=0.3,<2",
-  "langchain-google-genai>=2,<4",
-  "langchain-groq>=0.3,<1",
+  "langchain>=1.5.2,<2",
+  "langchain-core>=1.8.4,<2",
+  "langchain-google-genai>=4.5.2,<5",
+  "langchain-groq>=1.2.1,<2",
   "psycopg[binary]>=3.2,<4",
   "pydantic-settings>=2.7,<3",
   "python-multipart>=0.0.20,<1",
@@ -35,9 +36,9 @@ mfa-import-idcw = "mutual_fund_agent_analysis.cli.import_financial_csv:import_id
 mfa-register-source = "mutual_fund_agent_analysis.cli.register_source:main"
 
 [project.optional-dependencies]
-openai = ["langchain-openai>=0.3,<2"]
-vectors = ["langchain-qdrant>=0.2,<2", "qdrant-client>=1.13,<2"]
-agents = ["langgraph>=0.2,<2"]
+openai = ["langchain-openai>=1.8.3,<2"]
+vectors = ["langchain-qdrant>=1.2.0,<2", "qdrant-client>=1.13,<2"]
+agents = ["langgraph>=1.2.24,<2"]
 dev = ["pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.9,<1"]
 
 [tool.hatch.build.targets.wheel]
