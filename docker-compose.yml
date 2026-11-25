@@ -5,8 +5,9 @@ services:
       POSTGRES_DB: mutual_fund_agent
       POSTGRES_USER: mfa
       POSTGRES_PASSWORD: mfa_dev_password
+    # Local-only host access. Containers use the internal Docker network.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,9 +30,7 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.13.2
-    ports:
-      - "6333:6333"
-      - "6334:6334"
+    # Keep the unauthenticated vector database private to the Docker network.
     volumes:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
@@ -61,8 +60,10 @@ services:
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
       REDDIT_USER_AGENT: ${REDDIT_USER_AGENT:-MutualFundResearch/1.0}
       X_BEARER_TOKEN: ${X_BEARER_TOKEN:-}
+      TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+      TWELVE_DATA_EXCHANGE_ACCESS_CONFIRMED: ${TWELVE_DATA_EXCHANGE_ACCESS_CONFIRMED:-false}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
