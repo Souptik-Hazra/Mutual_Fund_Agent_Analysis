@@ -23,8 +23,17 @@ class DataSourceResponse(BaseModel):
 
 class EntityCreateRequest(BaseModel):
     entity_type: Literal[
-        "amc", "scheme", "company", "security", "sector", "benchmark",
-        "index", "person", "event", "regulator", "other"
+        "amc",
+        "scheme",
+        "company",
+        "security",
+        "sector",
+        "benchmark",
+        "index",
+        "person",
+        "event",
+        "regulator",
+        "other",
     ]
     canonical_name: str = Field(min_length=1, max_length=300)
     description: str | None = Field(default=None, max_length=4000)
