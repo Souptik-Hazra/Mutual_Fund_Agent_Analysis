@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @router.get("/capabilities")
 def assistant_capabilities() -> dict[str, Any]:
     return {
-        "orchestration": "LangGraph StateGraph",
+        "orchestration": "LangGraph",
         "langgraph_runtime": "1.x; step updates via Server-Sent Events",
         "langchain_model_api": "init_chat_model",
         "agents": [
@@ -39,8 +39,7 @@ def assistant_capabilities() -> dict[str, Any]:
 
 def _sse(event: str, payload: dict[str, Any]) -> str:
     encoded = json.dumps(jsonable_encoder(payload), ensure_ascii=False, default=str)
-    return f"event: {event}\\ndata: {encoded}\\n\\n"
-
+    return f"event: {event}\ndata: {encoded}\n\n"
 
 @router.post("/research/stream")
 def stream_research(
