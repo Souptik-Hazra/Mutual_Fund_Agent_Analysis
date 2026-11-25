@@ -85,8 +85,12 @@ deliberately rather than bypassing the database-name check.
   Store secrets separately and back up user-owned files separately where needed.
 - Qdrant collection snapshots contain the collection configuration, points, and payloads;
   collection aliases are not included. The app currently configures one research collection.
-- Qdrant snapshots can only be restored to the same minor version or the next minor version.
-  Keep the Compose Qdrant image pinned until the recovery is complete.
+- Qdrant snapshots can only be restored to a compatible release: the same minor version at
+  the same or a newer patch, or the next minor version. Keep the Compose Qdrant image pinned
+  until recovery is complete.
+- Archives contain personal financial transaction data. The scripts create new files with
+  owner-only permissions, but they do not encrypt archives; store them on a protected disk and
+  encrypt them before copying to external or cloud storage.
 - PostgreSQL and Qdrant snapshots are not an atomic cross-service transaction. Pause ingestion
   and document indexing while creating a backup for the strongest consistency.
 - A backup is not proven recoverable until a restore has been performed. Before relying on
