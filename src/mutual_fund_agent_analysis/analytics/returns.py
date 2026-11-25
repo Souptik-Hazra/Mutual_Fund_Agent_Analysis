@@ -1,10 +1,10 @@
 """Point-to-point, annualized, rolling, and calendar-year returns."""
 
 from bisect import bisect_right
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Iterable
 
 from mutual_fund_agent_analysis.analytics.series import PricePoint, normalize_prices
 
