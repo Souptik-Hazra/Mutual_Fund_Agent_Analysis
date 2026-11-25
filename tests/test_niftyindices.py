@@ -1,5 +1,4 @@
 """Contract tests for Nifty Indices TRI/NTR ingestion."""
-
 import json
 from datetime import date
 from decimal import Decimal
@@ -83,3 +82,54 @@ def test_niftyindices_rejects_out_of_range_observation() -> None:
     with NiftyIndicesClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(ValueError, match="outside the requested range"):
             client.get_history("NIFTY 50", date(2026, 11, 25), date(2026, 11, 25))
+
+
+def test_niftyindices_splits_ranges_into_max_365_day_chunks() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)["cinfo"]
+        start = body.split("'startDate':'", 1)[1].split("'", 1)[0]
+        end = body.split("'endDate':'", 1)[1].split("'", 1)[0]
+        start_date = date.fromisoformat(
+            __import__("datetime").datetime.strptime(start, "%d-%b-%Y").date().isoformat()
+        )
+        end_date = __import__("datetime").datetime.strptime(end, "%d-%b-%Y").date()
+        assert (end_date - start_date).days <= 364
+        requests.append(request)
+        row = {
+            "Index Name": "Nifty 50",
+            "Date": end,
+            "TotalReturnsIndex": "100.0",
+            "NTR_Value": "90.0",
+        }
+        return httpx.Response(200, json={"d": json.dumps([row])})
+
+    with NiftyIndicesClient(transport=httpx.MockTransport(handler)) as client:
+        result = client.get_history("NIFTY 50", date(2024, 1, 1), date(2025, 1, 1))
+
+    assert len(requests) == 2
+    assert len(result.data) == 2
+    assert result.raw_payload["request"]["chunk_count"] == 2
+
+
+def test_niftyindices_retries_transient_server_error(monkeypatch) -> None:
+    import mutual_fund_agent_analysis.data.providers.niftyindices as nifty_module
+
+    calls = 0
+    sleeps: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(503)
+        return httpx.Response(200, json=make_payload())
+
+    monkeypatch.setattr(nifty_module.time, "sleep", sleeps.append)
+    with NiftyIndicesClient(transport=httpx.MockTransport(handler)) as client:
+        result = client.get_history("NIFTY 50", date(2026, 11, 24), date(2026, 11, 25))
+
+    assert len(result.data) == 2
+    assert calls == 2
+    assert sleeps == [0.5]

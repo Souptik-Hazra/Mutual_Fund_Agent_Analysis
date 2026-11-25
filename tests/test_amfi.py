@@ -1,5 +1,4 @@
 """Contract tests for the AMFI historical NAV adapter."""
-
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -28,7 +27,7 @@ def test_amfi_history_parses_historical_eight_column_layout() -> None:
     assert response.data[0].date == date(2024, 10, 26)
     assert response.data[0].nav == Decimal("892.4560")
     assert response.raw_payload["provider"] == "amfi"
-    assert HISTORY_ROW in response.raw_payload["raw_text"]
+    assert response.raw_payload["chunks"][0]["sha256"]
 
 
 def test_amfi_history_parses_legacy_six_column_layout() -> None:
@@ -91,3 +90,45 @@ def test_amfi_chunks_long_date_ranges() -> None:
 
     assert len(requests) == 2
     assert len(response.data) == 2
+
+
+def test_amfi_default_chunk_is_seven_days() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        chunk_start = datetime.strptime(request.url.params["frmdt"], "%d-%b-%Y").date()
+        chunk_end = datetime.strptime(request.url.params["todt"], "%d-%b-%Y").date()
+        row = (
+            f"125497;HDFC Test Fund;ISIN;-;10.2500;0;0;"
+            f"{chunk_start.strftime('%d-%b-%Y')}"
+        )
+        assert (chunk_end - chunk_start).days <= 6
+        return httpx.Response(200, text=row)
+
+    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+        client.get_nav_history(125497, date(2024, 10, 1), date(2024, 10, 15))
+
+    assert len(requests) == 3
+
+
+def test_amfi_retries_http_200_stub_response(monkeypatch) -> None:
+    import mutual_fund_agent_analysis.data.providers.amfi as amfi_module
+
+    calls = 0
+    sleeps: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(200, text="<html><body>temporarily unavailable</body></html>")
+        return httpx.Response(200, text=HISTORY_ROW)
+
+    monkeypatch.setattr(amfi_module.time, "sleep", sleeps.append)
+    with AMFIClient(transport=httpx.MockTransport(handler)) as client:
+        result = client.get_nav_history(125497, date(2024, 10, 26), date(2024, 10, 26))
+
+    assert len(result.data) == 1
+    assert calls == 2
+    assert sleeps == [1.0]

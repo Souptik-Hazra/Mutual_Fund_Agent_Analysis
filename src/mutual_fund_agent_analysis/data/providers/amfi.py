@@ -1,9 +1,9 @@
 """AMFI official NAV history adapter.
 
 AMFI's public historical report is a semicolon-delimited text export, not a
-stable JSON API. Parsing is deliberately strict and covered by format fixtures.
+stable JSON API. Requests use short windows and retry transient/stub responses.
 """
-
+import hashlib
 import time
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -16,7 +16,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class AMFINavMetadata(BaseModel):
     """Scheme metadata available in AMFI historical NAV rows."""
-
     model_config = ConfigDict(extra="forbid")
     scheme_code: int = Field(gt=0)
     scheme_name: str = Field(min_length=1)
@@ -29,7 +28,6 @@ class AMFINavMetadata(BaseModel):
 
 class AMFINavPoint(BaseModel):
     """One validated AMFI NAV observation."""
-
     date: date
     nav: Decimal
 
@@ -47,7 +45,6 @@ class AMFINavPoint(BaseModel):
 
 class AMFINavResponse(BaseModel):
     """Normalized response shape shared with the repository layer."""
-
     meta: AMFINavMetadata
     data: list[AMFINavPoint]
     raw_payload: dict[str, Any] | None = None
@@ -55,7 +52,6 @@ class AMFINavResponse(BaseModel):
 
 class AMFIClient:
     """Fetch scheme NAV history from AMFI's public historical report."""
-
     source = "amfi"
     base_url = "https://portal.amfiindia.com"
 
@@ -63,11 +59,15 @@ class AMFIClient:
         self,
         timeout_seconds: float = 60.0,
         transport: httpx.BaseTransport | None = None,
-        chunk_days: int = 31,
+        chunk_days: int = 7,
+        max_attempts: int = 3,
     ) -> None:
-        if not 1 <= chunk_days <= 31:
-            raise ValueError("chunk_days must be between 1 and 31.")
+        if not 1 <= chunk_days <= 7:
+            raise ValueError("chunk_days must be between 1 and 7.")
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1.")
         self.chunk_days = chunk_days
+        self.max_attempts = max_attempts
         self._client = httpx.Client(
             base_url=self.base_url,
             timeout=httpx.Timeout(timeout_seconds, connect=10.0),
@@ -85,42 +85,60 @@ class AMFIClient:
     def __exit__(self, *_: object) -> None:
         self.close()
 
+    @staticmethod
+    def _is_error_or_stub(report: str) -> bool:
+        normalized = report.lstrip("\ufeff \t\r\n").lower()
+        markers = (
+            "<!doctype html", "<html", "<head", "<body",
+            "no data found", "no records found", "temporarily unavailable",
+            "service unavailable", "request could not be processed",
+            "application error",
+        )
+        return not normalized or any(marker in normalized[:2000] for marker in markers)
+
+    @staticmethod
+    def _retry_delay(attempt: int, retry_after: str | None = None) -> float:
+        if retry_after:
+            try:
+                return min(max(float(retry_after), 0.0), 30.0)
+            except ValueError:
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    return min(max((retry_at - datetime.now(retry_at.tzinfo)).total_seconds(), 0.0), 30.0)
+                except (TypeError, ValueError, OverflowError):
+                    pass
+        return min(1.0 * (2**attempt), 15.0)
+
     def _get_text(self, start_date: date, end_date: date) -> str:
         params = {
             "tp": "1",
             "frmdt": start_date.strftime("%d-%b-%Y"),
             "todt": end_date.strftime("%d-%b-%Y"),
         }
-        for attempt in range(3):
+        last_error: Exception | None = None
+        for attempt in range(self.max_attempts):
             try:
                 response = self._client.get("/DownloadNAVHistoryReport_Po.aspx", params=params)
                 response.raise_for_status()
                 report = response.text.lstrip("\ufeff")
-                if not report.strip():
-                    raise ValueError("AMFI returned an empty NAV history report.")
+                if self._is_error_or_stub(report):
+                    raise ValueError("AMFI returned an error/stub body with HTTP success.")
                 return report
-            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError, ValueError) as exc:
+                last_error = exc
                 retryable = not isinstance(exc, httpx.HTTPStatusError) or (
                     exc.response.status_code == 429 or exc.response.status_code >= 500
                 )
-                if not retryable or attempt == 2:
+                if not retryable or attempt + 1 == self.max_attempts:
                     raise
-                delay = 0.5 * (2**attempt)
-                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
-                    retry_after = exc.response.headers.get("Retry-After")
-                    if retry_after:
-                        try:
-                            delay = float(retry_after)
-                        except ValueError:
-                            try:
-                                retry_at = parsedate_to_datetime(retry_after)
-                                delay = max(
-                                    0.0,
-                                    (retry_at - datetime.now(retry_at.tzinfo)).total_seconds(),
-                                )
-                            except (TypeError, ValueError, OverflowError):
-                                pass
-                time.sleep(min(max(delay, 0.0), 30.0))
+                retry_after = (
+                    exc.response.headers.get("Retry-After")
+                    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429
+                    else None
+                )
+                time.sleep(self._retry_delay(attempt, retry_after))
+        if last_error:
+            raise last_error
         raise RuntimeError("AMFI request failed without an exception.")
 
     @staticmethod
@@ -143,10 +161,8 @@ class AMFIClient:
                 continue
             try:
                 if len(fields) >= 8:
-                    # Historical report: code;name;ISIN1;ISIN2;NAV;repurchase;sale;date
                     name, nav_value, date_value = fields[1], fields[4], fields[7]
                 else:
-                    # Legacy six-column row: code;ISIN1;ISIN2;name;NAV;date
                     name, nav_value, date_value = fields[3], fields[4], fields[5]
                 if not date_value:
                     continue
@@ -158,7 +174,6 @@ class AMFIClient:
                 ) from exc
 
             if not nav_value_decimal.is_finite() or nav_value_decimal <= 0:
-                # Zero-valued liquidation rows are not usable prices for return calculations.
                 continue
             if nav_date in seen_dates:
                 raise ValueError(
@@ -185,14 +200,13 @@ class AMFIClient:
         if start > end:
             raise ValueError("start_date cannot be later than end_date.")
 
-        chunks: list[str] = []
         points_by_date: dict[date, AMFINavPoint] = {}
         scheme_name: str | None = None
+        chunk_audit: list[dict[str, Any]] = []
         cursor = start
         while cursor <= end:
             chunk_end = min(cursor + timedelta(days=self.chunk_days - 1), end)
             report = self._get_text(cursor, chunk_end)
-            chunks.append(report)
             parsed_name, points = self._parse_report(report, scheme_code)
             if parsed_name:
                 scheme_name = parsed_name
@@ -204,6 +218,14 @@ class AMFIClient:
                         f"AMFI returned duplicate NAV date {point.date} across report windows."
                     )
                 points_by_date[point.date] = point
+            encoded = report.encode("utf-8")
+            chunk_audit.append({
+                "start_date": cursor.isoformat(),
+                "end_date": chunk_end.isoformat(),
+                "response_bytes": len(encoded),
+                "sha256": hashlib.sha256(encoded).hexdigest(),
+                "scheme_observation_count": len(points),
+            })
             cursor = chunk_end + timedelta(days=1)
 
         if not points_by_date or not scheme_name:
@@ -221,7 +243,6 @@ class AMFIClient:
                 "start_date": start.isoformat(),
                 "end_date": end.isoformat(),
                 "format": "semicolon-delimited AMFI historical report",
-                "chunks": len(chunks),
-                "raw_text": "\n".join(chunks),
+                "chunks": chunk_audit,
             },
         )
