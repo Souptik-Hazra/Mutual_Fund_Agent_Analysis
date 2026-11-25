@@ -619,3 +619,61 @@ The \`benchmark_indices\` table stores the benchmark master;
 date, and source; \`benchmark_sync_runs\` stores the original response and ingestion audit
 metadata. Re-running a date range is idempotent. No TRI is synthesized from price-index
 values or fund NAVs, and missing benchmark dates are not forward-filled.
+
+
+## Deterministic financial analytics (Phase 2)
+
+The `mutual_fund_agent_analysis.analytics` package is a pure-Python calculation layer.
+It accepts dated `Decimal` observations and does not make database, network, or LLM calls.
+The current API exposes:
+
+- Absolute point-to-point return and date-aware CAGR (365.25-day year).
+- Consecutive-observation returns, 1Y/3Y/5Y rolling returns, trailing returns, and calendar-year returns.
+- Annualized sample volatility, downside deviation, Sharpe, and Sortino ratios.
+- Exact-date fund/benchmark return alignment, beta, arithmetic annualized Jensen alpha, and excess return.
+- Maximum drawdown, peak/trough dates, recovery date, and underwater duration.
+
+Example:
+
+```python
+from datetime import date
+from decimal import Decimal
+
+from mutual_fund_agent_analysis.analytics import (
+    PricePoint,
+    absolute_return,
+    cagr,
+    calculate_drawdown,
+    period_returns,
+    calculate_risk_metrics,
+)
+
+navs = [
+    PricePoint(date(2023, 1, 2), Decimal("100")),
+    PricePoint(date(2024, 1, 2), Decimal("112")),
+]
+print(absolute_return(navs))
+print(cagr(navs))
+daily_returns = period_returns(navs)
+print(calculate_risk_metrics(daily_returns, periods_per_year=252))
+print(calculate_drawdown(navs))
+```
+
+### Calculation conventions and limitations
+
+- Inputs must be positive, finite prices with unique dates. They are sorted chronologically; duplicate dates are rejected.
+- Returns are calculated between consecutive available observations. The package does not invent missing trading-day values or forward-fill NAV/benchmark series.
+- Rolling/trailing windows use calendar-year day counts (365.25 days per year) and the closest observed value on or before the anchor date.
+- Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 12 for monthly observations).
+- The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers.
+- Sharpe and Sortino are undefined when their respective denominators are zero; these return `None`, not infinity.
+- Beta and alpha use only exact common return dates. No date interpolation or forward-fill is performed. Beta/alpha are undefined with fewer than two aligned observations or zero benchmark variance.
+- Jensen alpha is arithmetic and annualized by multiplying the mean periodic CAPM intercept by the periods per year; it is not CAGR alpha.
+- NAV price returns do not include cash distributions. Growth-option NAVs are the intended input for total-return comparisons; IDCW cash flows require a distribution-aware total-return series or cash-flow methodology.
+- The analytics package currently provides deterministic calculation primitives, not a database query/API endpoint. A repository-backed service and API integration are subsequent work.
+
+Run the analytics tests with:
+
+```bash
+pytest tests/test_analytics.py
+```
