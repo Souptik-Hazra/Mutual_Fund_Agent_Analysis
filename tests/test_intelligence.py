@@ -11,6 +11,7 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_alias,
     add_entity_identifier,
     create_entity,
+    create_entity_relationship,
     link_entity_evidence,
     normalize_identifier,
     normalize_name,
@@ -28,7 +29,7 @@ def session():
         engine,
         tables=[Base.metadata.tables[name] for name in (
             "data_sources", "research_entities", "entity_aliases", "entity_identifiers",
-            "evidence_records", "entity_evidence_links",
+            "evidence_records", "entity_evidence_links", "entity_relationships",
         )],
     )
     with Session(engine) as db:
@@ -131,6 +132,51 @@ def test_evidence_is_idempotent_and_linked(session):
     )
     assert link.entity_id == entity.entity_id
     assert link.evidence_id == evidence.evidence_id
+
+
+def test_entity_relationship_is_validated_and_idempotent(session):
+    scheme = create_entity(session, "scheme", "Example Equity Fund")
+    amc = create_entity(session, "amc", "Example Asset Management")
+    evidence = record_evidence(
+        session, "amfi", external_id="amc-relationship-source",
+        title="Scheme information", verification_status="verified",
+    )
+    relationship = create_entity_relationship(
+        session,
+        scheme.entity_id,
+        amc.entity_id,
+        "managed_by",
+        evidence_id=evidence.evidence_id,
+        confidence=Decimal("0.99"),
+        verification_status="verified",
+    )
+    repeated = create_entity_relationship(
+        session,
+        scheme.entity_id,
+        amc.entity_id,
+        "managed_by",
+        evidence_id=evidence.evidence_id,
+        confidence=Decimal("0.99"),
+        verification_status="verified",
+    )
+    assert relationship.relationship_id == repeated.relationship_id
+    assert repeated.source_key == "amfi"
+
+
+def test_entity_relationship_rejects_self_links_and_invalid_dates(session):
+    entity = create_entity(session, "company", "Example Limited")
+    with pytest.raises(ValueError, match="itself"):
+        create_entity_relationship(session, entity.entity_id, entity.entity_id, "subsidiary_of")
+    other = create_entity(session, "company", "Other Limited")
+    with pytest.raises(ValueError, match="valid_to"):
+        create_entity_relationship(
+            session,
+            entity.entity_id,
+            other.entity_id,
+            "subsidiary_of",
+            valid_from=date(2025, 1, 1),
+            valid_to=date(2024, 1, 1),
+        )
 
 
 def test_invalid_evidence_url_and_confidence_rejected(session):
