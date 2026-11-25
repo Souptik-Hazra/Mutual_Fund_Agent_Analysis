@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from mutual_fund_agent_analysis.analytics.service import analyze_fund, compare_funds
 from mutual_fund_agent_analysis.api.schemas.assistant import ResearchAssistantRequest
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
-    compare_portfolios,\n    events_for_fund_exposure,
+    compare_portfolios,
+    events_for_fund_exposure,
     fund_social_sentiment,
     latest_snapshot,
     portfolio_payload,
@@ -120,7 +121,10 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                                       "effective_date": snapshot.effective_date,
                                       "content_hash": snapshot.content_hash,
                                       "document_url": snapshot.document_url})
-                results[intent] = {\n                    "snapshots": snapshots,\n                    "comparison": _jsonable(compare_portfolios(session, codes)) if len(codes) > 1 else None,\n                }
+                results[intent] = {
+                    "snapshots": snapshots,
+                    "comparison": _jsonable(compare_portfolios(session, codes)) if len(codes) > 1 else None,
+                }
             elif intent == "events":
                 if codes:
                     event_results = [events_for_fund_exposure(
