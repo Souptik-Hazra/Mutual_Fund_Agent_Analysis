@@ -196,10 +196,14 @@ def fund_research_profile(
     result["sections"]["market_events"] = {
         "status": "available" if events.get("events") else "unavailable",
         "data": events,
-        "limitation": "Only locally stored fund-linked events are included; no live news fetch is implied.",
+        "limitation": (
+            "Only locally stored fund-linked events are included; "
+            "no live news fetch is implied."
+        ),
     }
     result["limitations"] = [
-        "NAV-only return metrics exclude IDCW distributions unless distribution-aware series are available.",
+        "NAV-only return metrics exclude IDCW distributions unless "
+            "distribution-aware series are available.",
         "Portfolio holdings are dated AMC disclosures, not real-time positions.",
         "Missing sources or incomplete records are reported as unavailable rather than estimated.",
     ]
