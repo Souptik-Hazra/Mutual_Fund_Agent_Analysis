@@ -723,7 +723,7 @@ def extract_pdf_text(content: bytes) -> tuple[str, int]:
                     extracted = pytesseract.image_to_string(image).strip()
                     if extracted:
                         ocr_pages += 1
-                except (ImportError, OSError) as exc:
+                except Exception as exc:
                     raise ValueError(
                         "OCR is enabled but pytesseract, Pillow, or the Tesseract binary is unavailable."
                     ) from exc
@@ -871,8 +871,8 @@ def search_documents(session: Session, query: str, scheme_code: int | None, limi
         })
     lexical.sort(key=lambda item: (item["score"], item["document_id"], item["chunk_index"]), reverse=True)
 
-    from mutual_fund_agent_analysis.data.services.document_vectors import search_chunks
     from mutual_fund_agent_analysis.analytics.hybrid_retrieval import reciprocal_rank_fusion
+    from mutual_fund_agent_analysis.data.services.document_vectors import search_chunks
 
     semantic = search_chunks(query, bounded_limit, scheme_code) or []
     results = reciprocal_rank_fusion(lexical, semantic, limit=bounded_limit)
