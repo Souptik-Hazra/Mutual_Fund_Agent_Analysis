@@ -381,20 +381,31 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             )
             session.add(evidence)
             session.flush()
+        evidence_changed = False
+        if evidence is None:
+            evidence = EvidenceRecord(
+                source_key=source_key, external_id=external_id, canonical_url=item["url"],
+                title=item["title"], published_at=item["published_at"],
+                content_hash=digest, verification_status="unverified",
+                metadata_json={"ingestion": "rss_atom", "feed_url": feed_url},
+            )
+            session.add(evidence)
+            session.flush()
+            evidence_changed = True
         else:
+            evidence_changed = any((
+                evidence.content_hash != digest,
+                evidence.title != item["title"],
+                evidence.canonical_url != item["url"],
+                evidence.published_at != item["published_at"],
+            ))
+            if evidence_changed:
+                evidence.verification_status = "unverified"
             evidence.title = item["title"]
             evidence.canonical_url = item["url"]
             evidence.published_at = item["published_at"]
-            if (
-                evidence.content_hash != digest
-                or evidence.title != item["title"]
-                or evidence.canonical_url != item["url"]
-                or evidence.published_at != item["published_at"]
-            ):
-                evidence.verification_status = "unverified"
             evidence.content_hash = digest
             evidence.retrieved_at = datetime.now(timezone.utc)
-            evidence.verification_status = "unverified"
         event_type = "other"
         title_lower = item["title"].lower()
         for term, category in (
@@ -434,7 +445,13 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             session.add(MarketEvent(source_key=source_key, external_id=external_id, **values))
             created += 1
         else:
-            changed = any(getattr(event, key) != value for key, value in values.items())
+            source_fields = (
+                "title", "summary", "event_type", "event_date",
+                "published_at", "canonical_url", "related_entity_id",
+            )
+            changed = evidence_changed or any(
+                getattr(event, key) != values[key] for key in source_fields
+            )
             if changed:
                 archive_market_event_revision(
                     session,
@@ -444,6 +461,7 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
                 )
                 for key, value in values.items():
                     setattr(event, key, value)
+            # Unchanged RSS refreshes never downgrade a manually verified event status.
             updated += 1
     session.commit()
     return {"source_key": source_key, "feed_url": feed_url, "fetched": len(items),
