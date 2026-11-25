@@ -338,7 +338,7 @@ def collect_social_posts(
                 content_hash=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
                 published_at=item.get("published_at"),
                 engagement_count=item.get("engagement_count", 0),
-                expires_at=datetime.now(UTC)\n                + timedelta(days=get_settings().social_retention_days),
+                expires_at=datetime.now(UTC) + timedelta(days=get_settings().social_retention_days),
                 metadata=item.get("metadata", {}),
             )
             create_social_post(session, payload)
