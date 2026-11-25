@@ -58,3 +58,5 @@ def test_evidence_pagination_is_bounded():
         params={"limit": 101},
     )
     assert response.status_code == 422
+    entity_response = client.get("/api/v1/intelligence/entities", params={"limit": 101})
+    assert entity_response.status_code == 422
