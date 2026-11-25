@@ -184,6 +184,7 @@ def _market_payload(row: SecurityMarketObservation | None) -> dict:
             "source_key": row.source_key,
             "source_url": row.source_url,
             "observed_at": row.observed_at,
+            "retrieved_at": row.retrieved_at,
             "fundamentals_as_of": row.fundamentals_as_of,
             "last_price": row.last_price,
             "change_pct": row.change_pct,
