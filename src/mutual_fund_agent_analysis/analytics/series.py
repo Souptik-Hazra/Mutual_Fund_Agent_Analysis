@@ -16,6 +16,7 @@ class PricePoint:
 class ReturnPoint:
     date: date
     value: Decimal
+    start_date: date | None = None
 
 
 def normalize_prices(points: Iterable[PricePoint]) -> list[PricePoint]:
@@ -35,6 +36,6 @@ def period_returns(points: Iterable[PricePoint]) -> list[ReturnPoint]:
     """Calculate close-to-close returns between consecutive observed dates."""
     prices = normalize_prices(points)
     return [
-        ReturnPoint(current.date, current.value / previous.value - Decimal("1"))
+        ReturnPoint(\n            current.date,\n            current.value / previous.value - Decimal("1"),\n            previous.date,\n        )
         for previous, current in zip(prices, prices[1:])
     ]
