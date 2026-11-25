@@ -19,14 +19,12 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
 )
 from mutual_fund_agent_analysis.models import DataSource
 
-
 def test_document_split_preserves_page_markers_and_overlap():
     text = "[Page 1]\n" + ("alpha " * 350) + "\n[Page 2]\n" + ("beta " * 350)
     chunks = split_document(text, chunk_size=500, overlap=80)
     assert len(chunks) > 2
     assert any("[Page 1]" in chunk for chunk in chunks)
     assert any("[Page 2]" in chunk for chunk in chunks)
-
 
 def test_portfolio_import_rejects_duplicate_security_asset_class():
     holding = HoldingInput(
@@ -45,7 +43,6 @@ def test_portfolio_import_rejects_duplicate_security_asset_class():
             holdings=[holding, holding],
         )
 
-
 def test_portfolio_import_requires_effective_date_and_content_hash():
     with pytest.raises(ValidationError):
         PortfolioImportRequest(
@@ -61,7 +58,6 @@ def test_portfolio_import_requires_effective_date_and_content_hash():
             ],
         )
 
-
 def test_social_post_requires_retention_expiry():
     with pytest.raises(ValidationError):
         SocialPostInput(
@@ -69,7 +65,6 @@ def test_social_post_requires_retention_expiry():
             external_id="abc123",
             content_hash="a" * 64,
         )
-
 
 def test_event_status_is_explicit_and_validated():
     event = EventInput(
@@ -83,11 +78,9 @@ def test_event_status_is_explicit_and_validated():
     with pytest.raises(ValidationError):
         EventInput(source_key="nse", title="Test event", status="confirmed-ish")
 
-
 def test_rss_adapter_rejects_non_allowlisted_host_before_network_call():
     with pytest.raises(ValueError, match="registered source host"):
         fetch_feed("https://example.com/feed.xml", "www.nseindia.com")
-
 
 def test_social_retention_uses_source_override_and_global_fallback():
     source = DataSource(
@@ -129,7 +122,6 @@ def test_social_retention_rejects_invalid_source_override(value):
     with pytest.raises(ValueError, match="retention_days"):
         source_social_retention_days(source, 30)
 
-
 def test_social_retention_rejects_invalid_global_fallback():
     source = DataSource(
         source_key="reddit",
@@ -142,7 +134,6 @@ def test_social_retention_rejects_invalid_global_fallback():
     )
     with pytest.raises(ValueError, match="Default social retention"):
         source_social_retention_days(source, 0)
-
 
 def test_social_collection_applies_source_specific_expiry(monkeypatch):
     from datetime import timedelta
@@ -200,7 +191,6 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
     assert result["persisted"] == 1
     assert timedelta(days=12) - timedelta(seconds=2) < remaining <= timedelta(days=12)
 
-
 def test_standard_portfolio_disclosure_headers_are_normalized_without_guessing_asset_class():
     from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
 
@@ -221,12 +211,10 @@ def test_standard_portfolio_disclosure_headers_are_normalized_without_guessing_a
     assert row["market_value"] == Decimal("1275000.00")
     assert "asset_class" not in row
 
-
 def test_portfolio_kind_column_is_used_only_as_an_explicit_asset_class():
     from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
 
     assert _normalize_portfolio_row({"Kind": "debt"})["asset_class"] == "debt"
-
 
 def test_pdf_extraction_rejects_malformed_and_encrypted_documents():
     import fitz
@@ -247,7 +235,6 @@ def test_pdf_extraction_rejects_malformed_and_encrypted_documents():
     document.close()
     with pytest.raises(ValueError, match="Password-protected"):
         extract_pdf_text(encrypted)
-
 
 def test_event_revision_archiver_preserves_prior_source_state():
     from types import SimpleNamespace
@@ -294,7 +281,6 @@ def test_event_revision_archiver_preserves_prior_source_state():
     assert revision.snapshot["status"] == "reported"
     assert revision.snapshot["event_date"] == "2026-10-01"
     assert session.added == [revision]
-
 
 def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
     from types import SimpleNamespace
@@ -351,8 +337,6 @@ def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
     assert incomplete["hhi_0_to_1"] is None
     assert incomplete["hhi_coverage_sufficient"] is False
 
-
-
 def test_rss_adapter_rejects_entity_declarations_and_non_https_links(monkeypatch):
     import httpx
 
@@ -390,7 +374,6 @@ def test_rss_adapter_rejects_entity_declarations_and_non_https_links(monkeypatch
     with pytest.raises(ValueError, match="entity declarations"):
         fetch_feed("https://www.nseindia.com/feed.xml", "www.nseindia.com")
 
-
 def test_social_source_requires_source_specific_evaluated_sentiment_model():
     from mutual_fund_agent_analysis.data.services.research_intelligence import create_social_post
 
@@ -402,7 +385,8 @@ def test_social_source_requires_source_specific_evaluated_sentiment_model():
         is_official=False,
         enabled=True,
         terms_url="https://www.redditinc.com/policies",
-        metadata_json={"retention_days": 30,
+        metadata_json={
+            "retention_days": 30,
             "terms_reviewed": True,
             "access_confirmed": True,
             "reviewed_at": "2026-11-25",
@@ -435,7 +419,6 @@ def test_social_source_requires_source_specific_evaluated_sentiment_model():
     )
     with pytest.raises(ValueError, match="not registered as evaluated"):
         create_social_post(StubSession(), payload)
-
 
 def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(monkeypatch):
     from types import SimpleNamespace
@@ -499,8 +482,6 @@ def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(mon
     assert row.text_excerpt is None
     assert row.metadata_json == {"subreddit": "investing"}
 
-
-
 def test_rss_entity_resolution_requires_one_unique_exact_company_alias():
     from types import SimpleNamespace
 
@@ -525,28 +506,35 @@ def test_rss_entity_resolution_requires_one_unique_exact_company_alias():
         def execute(self, _statement):
             return StubResult(self.rows)
 
-    assert _resolve_rss_entity_exact(
-        StubSession([(alias, entity)]),
-        "nse",
-        "Example Industries announces quarterly results",
-        date(2026, 11, 1),
-    ) == 42
-    assert _resolve_rss_entity_exact(
-        StubSession([(alias, entity)]),
-        "nse",
-        "Example Industries Ltd competitor results",
-        None,
-    ) is None
+    assert (
+        _resolve_rss_entity_exact(
+            StubSession([(alias, entity)]),
+            "nse",
+            "Example Industries announces quarterly results",
+            date(2026, 11, 1),
+        )
+        == 42
+    )
+    assert (
+        _resolve_rss_entity_exact(
+            StubSession([(alias, entity)]),
+            "nse",
+            "Example Industries Ltd competitor results",
+            None,
+        )
+        is None
+    )
 
     other = SimpleNamespace(entity_id=43)
-    assert _resolve_rss_entity_exact(
-        StubSession([(alias, entity), (alias, other)]),
-        "nse",
-        "Example Industries announces quarterly results",
-        date(2026, 11, 1),
-    ) is None
-
-
+    assert (
+        _resolve_rss_entity_exact(
+            StubSession([(alias, entity), (alias, other)]),
+            "nse",
+            "Example Industries announces quarterly results",
+            date(2026, 11, 1),
+        )
+        is None
+    )
 
 def test_rss_event_date_is_not_inferred_from_publication_date():
     from xml.etree import ElementTree
