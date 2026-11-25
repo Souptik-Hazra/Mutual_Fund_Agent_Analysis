@@ -1,5 +1,7 @@
 """Idempotent PostgreSQL upserts for schemes, NAVs, and reconciliation results."""
 
+import hashlib
+import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -13,6 +15,8 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_identifier,
     create_entity,
     create_entity_relationship,
+    link_entity_evidence,
+    record_evidence,
 )
 from mutual_fund_agent_analysis.data.services.nav_reconciliation import (
     NAV_RECONCILIATION_TOLERANCE,
@@ -206,14 +210,39 @@ def upsert_nav_response(
                 ],
             }
         )
-    session.add(
-        ProviderSyncRun(
-            scheme_code=metadata.scheme_code,
-            source=normalized_source,
-            fetched_at=fetched_at,
-            observation_count=processed,
-            response_payload=raw_payload,
-        )
+    sync_run = ProviderSyncRun(
+        scheme_code=metadata.scheme_code,
+        source=normalized_source,
+        fetched_at=fetched_at,
+        observation_count=processed,
+        response_payload=raw_payload,
     )
+    session.add(sync_run)
+    session.flush()
+    if source_key is not None:
+        content_hash = hashlib.sha256(
+            json.dumps(raw_payload, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        evidence = record_evidence(
+            session,
+            source_key,
+            external_id=f"provider-sync-run:{sync_run.id}",
+            title=f"NAV provider sync for scheme {metadata.scheme_code}",
+            retrieved_at=fetched_at,
+            content_hash=content_hash,
+            verification_status="unverified",
+            metadata={
+                "scheme_code": metadata.scheme_code,
+                "sync_run_id": sync_run.id,
+                "observation_count": processed,
+            },
+        )
+        link_entity_evidence(
+            session,
+            entity.entity_id,
+            evidence.evidence_id,
+            relation_type="nav_sync",
+            resolution_method="identifier",
+        )
     _reconcile_dates(session, metadata.scheme_code, affected_dates)
     return processed
