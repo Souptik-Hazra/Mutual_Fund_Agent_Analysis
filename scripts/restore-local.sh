@@ -74,8 +74,8 @@ with tarfile.open(sys.argv[1], "r:gz") as archive:
         path = PurePosixPath(member.name)
         if path.is_absolute() or ".." in path.parts or not path.parts or path.parts[0] != "backup":
             raise SystemExit(f"Unsafe path in backup archive: {member.name}")
-        if member.issym() or member.islnk():
-            raise SystemExit(f"Links are not allowed in backup archives: {member.name}")
+        if not (member.isfile() or member.isdir()):
+            raise SystemExit(f"Unsupported archive entry type: {member.name}")
 PY
 
 tar -xzf "$ARCHIVE" -C "$WORK_DIR"
@@ -175,9 +175,10 @@ docker compose exec -T db pg_restore --clean --if-exists --no-owner --no-privile
 
 if [[ "$QDRANT_INCLUDED" == "true" ]]; then
   printf 'Restoring Qdrant collection %s ...\n' "$QDRANT_COLLECTION"
+  QDRANT_SNAPSHOT_SHA256="$(sha256sum "$PAYLOAD/qdrant.snapshot" | cut -d ' ' -f 1)"
   curl -fsS -X POST "${QDRANT_HEADERS[@]}" \
     -F "snapshot=@$PAYLOAD/qdrant.snapshot" \
-    "$QDRANT_URL/collections/$QDRANT_COLLECTION/snapshots/upload?priority=snapshot&wait=true" \
+    "$QDRANT_URL/collections/$QDRANT_COLLECTION/snapshots/upload?priority=snapshot&wait=true&checksum=$QDRANT_SNAPSHOT_SHA256" \
     >/dev/null
   curl -fsS "${QDRANT_HEADERS[@]}" "$QDRANT_URL/collections/$QDRANT_COLLECTION" >/dev/null
 else
