@@ -18,7 +18,7 @@ def _client() -> TestClient:
 
 def test_intelligence_routes_are_registered():
     app = create_app()
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/v1/intelligence/sources" in paths
     assert "/api/v1/intelligence/entities" in paths
     assert "/api/v1/intelligence/resolve" in paths
