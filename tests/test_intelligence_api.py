@@ -19,18 +19,18 @@ def _client() -> TestClient:
 
 def test_intelligence_routes_are_registered():
     paths = {route.path for route in intelligence_router.routes if hasattr(route, "path")}
-    assert "/api/v1/intelligence/sources" in paths
-    assert "/api/v1/intelligence/entities" in paths
-    assert "/api/v1/intelligence/resolve" in paths
-    assert "/api/v1/intelligence/entities/{entity_id}/relationships" in paths
-    assert "/api/v1/intelligence/entities/{entity_id}/aliases" in paths
-    assert "/api/v1/intelligence/entities/{entity_id}/identifiers" in paths
+    assert "/intelligence/sources" in paths
+    assert "/intelligence/entities" in paths
+    assert "/intelligence/resolve" in paths
+    assert "/intelligence/entities/{entity_id}/relationships" in paths
+    assert "/intelligence/entities/{entity_id}/aliases" in paths
+    assert "/intelligence/entities/{entity_id}/identifiers" in paths
 
 
 def test_entity_create_request_rejects_blank_name():
     client = _client()
     response = client.post(
-        "/api/v1/intelligence/entities",
+        "/intelligence/entities",
         json={"entity_type": "company", "canonical_name": "   "},
     )
     assert response.status_code == 422
@@ -38,14 +38,14 @@ def test_entity_create_request_rejects_blank_name():
 
 def test_resolve_request_requires_lookup_key():
     client = _client()
-    response = client.post("/api/v1/intelligence/resolve", json={"entity_type": "company"})
+    response = client.post("/intelligence/resolve", json={"entity_type": "company"})
     assert response.status_code == 422
 
 
 def test_evidence_request_rejects_invalid_confidence():
     client = _client()
     response = client.post(
-        "/api/v1/intelligence/evidence",
+        "/intelligence/evidence",
         json={"source_key": "amfi", "confidence": "1.2"},
     )
     assert response.status_code == 422
@@ -54,9 +54,9 @@ def test_evidence_request_rejects_invalid_confidence():
 def test_evidence_pagination_is_bounded():
     client = _client()
     response = client.get(
-        "/api/v1/intelligence/entities/1/evidence",
+        "/intelligence/entities/1/evidence",
         params={"limit": 101},
     )
     assert response.status_code == 422
-    entity_response = client.get("/api/v1/intelligence/entities", params={"limit": 101})
+    entity_response = client.get("/intelligence/entities", params={"limit": 101})
     assert entity_response.status_code == 422
