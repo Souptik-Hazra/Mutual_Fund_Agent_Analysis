@@ -25,9 +25,7 @@ router = APIRouter(prefix="/fund-intelligence", tags=["fund-intelligence"])
 
 
 class FundCompareRequest(BaseModel):
-    scheme_codes: list[Annotated[int, Field(strict=True, gt=0)]] = Field(
-        min_length=2, max_length=5
-    )
+    scheme_codes: list[Annotated[int, Field(strict=True, gt=0)]] = Field(min_length=2, max_length=5)
 
     @field_validator("scheme_codes")
     @classmethod
@@ -125,9 +123,7 @@ def _latest_market_observation(session: Session, security_key: str, isin: str | 
         ).first()
         if exact_key_match is not None:
             return exact_key_match
-        return session.scalars(
-            query.where(SecurityMarketObservation.isin == isin).limit(1)
-        ).first()
+        return session.scalars(query.where(SecurityMarketObservation.isin == isin).limit(1)).first()
     return session.scalars(
         query.where(SecurityMarketObservation.security_key == security_key).limit(1)
     ).first()
