@@ -109,8 +109,14 @@ def add_alias_endpoint(
 ):
     try:
         record = add_entity_alias(
-            session, entity_id, request.alias, request.alias_type, request.source_key,
-            request.valid_from, request.valid_to, request.is_primary,
+            session,
+            entity_id,
+            request.alias,
+            request.alias_type,
+            request.source_key,
+            request.valid_from,
+            request.valid_to,
+            request.is_primary,
         )
         _commit(session)
         return AliasResponse.model_validate(record)
@@ -137,7 +143,8 @@ def list_entity_aliases(entity_id: int, session: Annotated[Session, Depends(get_
 
 
 @router.post(
-    "/entities/{entity_id}/identifiers", response_model=IdentifierResponse,
+    "/entities/{entity_id}/identifiers",
+    response_model=IdentifierResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def add_identifier_endpoint(
@@ -145,8 +152,14 @@ def add_identifier_endpoint(
 ):
     try:
         record = add_entity_identifier(
-            session, entity_id, request.namespace, request.identifier_value, request.source_key,
-            request.valid_from, request.valid_to, request.is_primary,
+            session,
+            entity_id,
+            request.namespace,
+            request.identifier_value,
+            request.source_key,
+            request.valid_from,
+            request.valid_to,
+            request.is_primary,
         )
         _commit(session)
         return IdentifierResponse.model_validate(record)
@@ -161,9 +174,7 @@ def add_identifier_endpoint(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get(
-    "/entities/{entity_id}/identifiers", response_model=list[IdentifierResponse]
-)
+@router.get("/entities/{entity_id}/identifiers", response_model=list[IdentifierResponse])
 def list_entity_identifiers(entity_id: int, session: Annotated[Session, Depends(get_db)]):
     _entity_or_404(session, entity_id)
     rows = session.scalars(
@@ -180,10 +191,19 @@ def create_evidence_endpoint(
 ):
     try:
         record = record_evidence(
-            session, request.source_key, request.external_id, request.canonical_url,
-            request.title, request.published_at, request.retrieved_at, request.effective_from,
-            request.effective_to, request.content_hash, request.verification_status,
-            request.confidence, request.metadata,
+            session,
+            request.source_key,
+            request.external_id,
+            request.canonical_url,
+            request.title,
+            request.published_at,
+            request.retrieved_at,
+            request.effective_from,
+            request.effective_to,
+            request.content_hash,
+            request.verification_status,
+            request.confidence,
+            request.metadata,
         )
         _commit(session)
         return EvidenceResponse.model_validate(record)
@@ -200,16 +220,24 @@ def create_evidence_endpoint(
 
 @router.post(
     "/entities/{entity_id}/evidence/{evidence_id}",
-    response_model=EntityEvidenceLinkResponse, status_code=status.HTTP_201_CREATED,
+    response_model=EntityEvidenceLinkResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 def link_evidence_endpoint(
-    entity_id: int, evidence_id: int, request: EntityEvidenceLinkRequest,
+    entity_id: int,
+    evidence_id: int,
+    request: EntityEvidenceLinkRequest,
     session: Annotated[Session, Depends(get_db)],
 ):
     try:
         record = link_entity_evidence(
-            session, entity_id, evidence_id, request.relation_type, request.confidence,
-            request.resolution_method, request.verified_at,
+            session,
+            entity_id,
+            evidence_id,
+            request.relation_type,
+            request.confidence,
+            request.resolution_method,
+            request.verified_at,
         )
         _commit(session)
         return EntityEvidenceLinkResponse.model_validate(record)
@@ -249,8 +277,13 @@ def resolve_entity_endpoint(
 ):
     try:
         result = resolve_entity(
-            session, request.entity_type, request.namespace, request.identifier_value,
-            request.alias, request.as_of, request.source_key,
+            session,
+            request.entity_type,
+            request.namespace,
+            request.identifier_value,
+            request.alias,
+            request.as_of,
+            request.source_key,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -304,9 +337,7 @@ def create_relationship_endpoint(
     "/entities/{entity_id}/relationships",
     response_model=list[EntityRelationshipResponse],
 )
-def list_entity_relationships(
-    entity_id: int, session: Annotated[Session, Depends(get_db)]
-):
+def list_entity_relationships(entity_id: int, session: Annotated[Session, Depends(get_db)]):
     _entity_or_404(session, entity_id)
     rows = session.scalars(
         select(EntityRelationship)
