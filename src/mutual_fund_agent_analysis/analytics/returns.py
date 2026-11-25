@@ -66,10 +66,7 @@ def rolling_returns(
 ) -> list[RollingReturn]:
     """Calculate rolling point-to-point returns using the last observation on/before each anchor."""
     prices = normalize_prices(points)
-    if any(
-        isinstance(year, bool) or not isinstance(year, int) or year <= 0
-        for year in windows_years
-    ):
+    if any(isinstance(year, bool) or not isinstance(year, int) or year <= 0 for year in windows_years):
         raise ValueError("Rolling windows must be positive integers.")
     if len(windows_years) != len(set(windows_years)):
         raise ValueError("Rolling windows must not contain duplicates.")
