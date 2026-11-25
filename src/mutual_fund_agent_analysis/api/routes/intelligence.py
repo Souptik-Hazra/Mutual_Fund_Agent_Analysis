@@ -99,7 +99,9 @@ def list_entities(
     session: Annotated[Session, Depends(get_db)],
     entity_type: str | None = Query(default=None, min_length=1, max_length=30),
     q: str | None = Query(default=None, min_length=1, max_length=300),
-    entity_status: str = Query(default="active", alias="status", pattern="^(active|inactive|merged|all)$"),
+    entity_status: str = Query(
+        default="active", alias="status", pattern="^(active|inactive|merged|all)$"
+    ),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
@@ -107,8 +109,17 @@ def list_entities(
     if entity_type:
         normalized_type = entity_type.strip().lower()
         if normalized_type not in {
-            "amc", "scheme", "company", "security", "sector", "benchmark",
-            "index", "person", "event", "regulator", "other",
+            "amc",
+            "scheme",
+            "company",
+            "security",
+            "sector",
+            "benchmark",
+            "index",
+            "person",
+            "event",
+            "regulator",
+            "other",
         }:
             raise HTTPException(status_code=422, detail="Unsupported entity_type.")
         statement = statement.where(ResearchEntity.entity_type == normalized_type)
@@ -116,7 +127,9 @@ def list_entities(
         statement = statement.where(ResearchEntity.status == entity_status)
     if q:
         normalized_query = " ".join(q.split()).casefold()
-        escaped_query = normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        escaped_query = (
+            normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        )
         statement = statement.where(
             ResearchEntity.normalized_name.ilike(f"%{escaped_query}%", escape="\\")
         )
