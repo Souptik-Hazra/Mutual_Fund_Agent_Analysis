@@ -37,6 +37,7 @@ from mutual_fund_agent_analysis.models import (
     NavReconciliation,
     ProviderSyncRun,
     ResearchEntity,
+    SecurityMarketObservation,
     SocialPost,
 )
 
@@ -126,6 +127,7 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "benchmark_indices" in tables
     assert "benchmark_observations" in tables
     assert "benchmark_sync_runs" in tables
+    assert "security_market_observations" in tables
     assert "data_sources" in tables
     assert "research_entities" in tables
     assert "entity_aliases" in tables
@@ -190,6 +192,63 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
         check_database_connection()
     command.upgrade(config, "head")
     check_database_connection()
+
+
+
+def test_postgres_security_market_observation_persists_source_and_json(
+    migrated_postgres: Engine,
+) -> None:
+    source_key = "integration_market_provider"
+    with Session(migrated_postgres) as session:
+        if session.get(DataSource, source_key) is None:
+            session.add(
+                DataSource(
+                    source_key=source_key,
+                    display_name="Market provider integration fixture",
+                    source_type="provider",
+                    authority_tier=3,
+                    is_official=False,
+                    enabled=True,
+                    base_url="https://market.example.test",
+                    metadata_json={},
+                )
+            )
+            session.commit()
+
+    observed_at = datetime.now(UTC) - timedelta(minutes=1)
+    with Session(migrated_postgres) as session, session.begin():
+        observation = SecurityMarketObservation(
+            security_key="INE009A01021",
+            isin="INE009A01021",
+            security_name="Example Limited",
+            symbol="EXAMPLE",
+            exchange="NSE",
+            source_key=source_key,
+            source_url="https://market.example.test/quote/EXAMPLE",
+            observed_at=observed_at,
+            fundamentals_as_of=date(2026, 11, 24),
+            last_price=Decimal("100.250000"),
+            change_pct=Decimal("1.250000"),
+            day_high=Decimal("101.000000"),
+            day_low=Decimal("99.000000"),
+            volume=1000,
+            market_status="trading",
+            fundamentals_json={"pe_ratio": 25.5, "roe_pct": 18.2},
+            corporate_events_json=[{"type": "dividend", "date": "2026-11-24"}],
+            content_hash="a" * 64,
+        )
+        session.add(observation)
+        session.flush()
+        observation_id = observation.observation_id
+
+    with Session(migrated_postgres) as session:
+        saved = session.get(SecurityMarketObservation, observation_id)
+        assert saved is not None
+        assert saved.security_key == "INE009A01021"
+        assert saved.last_price == Decimal("100.250000")
+        assert saved.fundamentals_json["pe_ratio"] == 25.5
+        assert saved.corporate_events_json[0]["type"] == "dividend"
+        assert saved.retrieved_at is not None
 
 
 def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
