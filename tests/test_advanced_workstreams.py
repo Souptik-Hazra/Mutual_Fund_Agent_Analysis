@@ -236,3 +236,16 @@ def test_unverified_security_observation_still_requires_complete_provenance():
     assert result["provenance_completeness"] == 1.0
     assert result["verified_citation_ratio"] == 0.0
     assert result["evidence_quality_passed"] is True
+
+
+def test_security_grounding_accepts_holdings_disclosure_when_market_data_is_unavailable():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_grounding_contract
+
+    result = evaluate_grounding_contract(
+        {
+            "answer": "Underlying shares were identified from the AMC disclosure; no market quote is stored.",
+            "results": {"security": {"securities": [{"availability": "no_market_observation"}]}},
+            "citations": [{"type": "portfolio_disclosure"}],
+        }
+    )
+    assert result["grounding_contract_passed"] is True
