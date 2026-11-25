@@ -5,13 +5,14 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import httpx
-
 import pytest
 from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
 
 from mutual_fund_agent_analysis.api.routes import research as research_routes
-from mutual_fund_agent_analysis.api.routes.market_data import _validate_registered_source_url
+from mutual_fund_agent_analysis.api.routes.market_data import (
+    _validate_registered_source_url,
+)
 from mutual_fund_agent_analysis.api.schemas.research import (
     EventInput,
     HoldingInput,
