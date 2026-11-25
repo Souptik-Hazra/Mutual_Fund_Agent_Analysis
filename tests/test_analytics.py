@@ -17,8 +17,8 @@ from mutual_fund_agent_analysis.analytics import (
     calculate_risk_metrics,
     calendar_year_returns,
     cagr,
-    period_returns,
     load_fund_prices,
+    period_returns,
     rolling_returns,
     trailing_return,
 )
@@ -142,7 +142,6 @@ def test_drawdown_reports_peak_trough_and_recovery() -> None:
     assert result.recovery_duration_days == 22
 
 
-
 def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
     fund = [
         ReturnPoint(date(2024, 1, 3), Decimal("0.02"), date(2024, 1, 1)),
@@ -153,7 +152,6 @@ def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
     aligned_fund, aligned_benchmark = align_returns(fund, benchmark)
     assert aligned_fund == []
     assert aligned_benchmark == []
-
 
 
 def test_database_loader_rejects_nav_reconciliation_conflicts_by_default() -> None:
