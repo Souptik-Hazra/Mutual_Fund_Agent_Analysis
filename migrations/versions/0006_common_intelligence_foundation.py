@@ -452,7 +452,7 @@ def upgrade() -> None:
             entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
         )
         SELECT e.entity_id, 'AMFI_SCHEME_CODE', s.scheme_code::text,
-               s.scheme_code::text, 'amfi', true
+               s.scheme_code::text, s.source, true
         FROM mutual_fund_schemes s
         JOIN research_entities e
           ON e.entity_type = 'scheme'
@@ -465,7 +465,7 @@ def upgrade() -> None:
         INSERT INTO entity_identifiers (
             entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
         )
-        SELECT e.entity_id, 'ISIN', i.isin, upper(btrim(i.isin)), 'amfi', false
+        SELECT e.entity_id, 'ISIN', i.isin, upper(btrim(i.isin)), s.source, false
         FROM mutual_fund_schemes s
         JOIN research_entities e
           ON e.entity_type = 'scheme'
@@ -492,7 +492,7 @@ def upgrade() -> None:
             entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
         )
         SELECT e.entity_id, 'BENCHMARK_CODE', b.benchmark_code,
-               upper(btrim(b.benchmark_code)), 'niftyindices', true
+               upper(btrim(b.benchmark_code)), b.provider, true
         FROM benchmark_indices b
         JOIN research_entities e
           ON e.entity_type = 'benchmark'
