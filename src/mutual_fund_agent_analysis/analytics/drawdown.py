@@ -63,7 +63,7 @@ def calculate_drawdown(points: Iterable[PricePoint]) -> DrawdownMetrics:
         recovery_date=worst_recovery,
         drawdown_duration_days=(worst_trough.date - worst_peak.date).days,
         recovery_duration_days=(
-            (worst_recovery - worst_peak.date).days if worst_recovery is not None else None
+            (worst_recovery - worst_trough.date).days if worst_recovery is not None else None
         ),
         maximum_underwater_duration_days=longest_underwater,
     )
