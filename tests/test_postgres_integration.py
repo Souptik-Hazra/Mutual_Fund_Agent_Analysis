@@ -25,6 +25,8 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkIndex,
     BenchmarkObservation,
     BenchmarkSyncRun,
+    EntityIdentifier,
+    ResearchEntity,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -137,6 +139,21 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         }
         assert sync_runs[0].response_payload["meta"]["scheme_code"] == 991234
         assert sync_runs[0].observation_count == 1
+        scheme_entity = session.scalar(
+            select(ResearchEntity).where(
+                ResearchEntity.entity_type == "scheme",
+                ResearchEntity.canonical_name == "Integration Test Equity Fund [991234]",
+            )
+        )
+        assert scheme_entity is not None
+        scheme_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+                EntityIdentifier.normalized_value == "991234",
+            )
+        )
+        assert scheme_identifier is not None
+        assert scheme_identifier.entity_id == scheme_entity.entity_id
 
 
 def test_postgres_upsert_does_not_erase_optional_scheme_metadata(
@@ -251,3 +268,13 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         ).all()
         assert len(runs) == 2
         assert runs[0].response_payload["fixture"] is True
+        benchmark_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "BENCHMARK_CODE",
+                EntityIdentifier.normalized_value == "NIFTY 50",
+            )
+        )
+        assert benchmark_identifier is not None
+        benchmark_entity = session.get(ResearchEntity, benchmark_identifier.entity_id)
+        assert benchmark_entity is not None
+        assert benchmark_entity.entity_type == "benchmark"
