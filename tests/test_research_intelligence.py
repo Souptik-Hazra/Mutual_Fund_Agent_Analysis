@@ -150,7 +150,8 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
         authority_tier=5,
         is_official=False,
         enabled=True,
-        metadata_json={"retention_days": 12},
+        terms_url="https://terms.example/reddit",
+        metadata_json={"retention_days": 12, "terms_reviewed": True, "access_confirmed": True, "reviewed_at": "2026-11-25"},
     )
 
     class StubSession:
