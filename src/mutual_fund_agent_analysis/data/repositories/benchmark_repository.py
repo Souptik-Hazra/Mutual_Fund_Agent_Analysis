@@ -1,5 +1,7 @@
 """Idempotent persistence for benchmark TRI/NTR observations."""
 
+import hashlib
+import json
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -11,6 +13,8 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_alias,
     add_entity_identifier,
     create_entity,
+    link_entity_evidence,
+    record_evidence,
 )
 from mutual_fund_agent_analysis.models.intelligence import (
     DataSource,
@@ -109,25 +113,51 @@ def upsert_benchmark_response(
         session.execute(statement)
         processed += len(batch)
 
-    session.add(
-        BenchmarkSyncRun(
-            benchmark_code=response.benchmark_code,
-            source=normalized_source,
-            fetched_at=fetched_at,
-            observation_count=processed,
-            response_payload=response.raw_payload or {
-                "provider": normalized_source,
+    raw_payload = response.raw_payload or {
+        "provider": normalized_source,
+        "benchmark_code": response.benchmark_code,
+        "benchmark_name": response.benchmark_name,
+        "observations": [
+            {
+                "date": point.date.isoformat(),
+                "tri": str(point.tri),
+                "ntr": str(point.ntr) if point.ntr is not None else None,
+            }
+            for point in response.data
+        ],
+    }
+    sync_run = BenchmarkSyncRun(
+        benchmark_code=response.benchmark_code,
+        source=normalized_source,
+        fetched_at=fetched_at,
+        observation_count=processed,
+        response_payload=raw_payload,
+    )
+    session.add(sync_run)
+    session.flush()
+    if source_key is not None:
+        content_hash = hashlib.sha256(
+            json.dumps(raw_payload, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        evidence = record_evidence(
+            session,
+            source_key,
+            external_id=f"benchmark-sync-run:{sync_run.id}",
+            title=f"Benchmark provider sync for {response.benchmark_code}",
+            retrieved_at=fetched_at,
+            content_hash=content_hash,
+            verification_status="unverified",
+            metadata={
                 "benchmark_code": response.benchmark_code,
-                "benchmark_name": response.benchmark_name,
-                "observations": [
-                    {
-                        "date": point.date.isoformat(),
-                        "tri": str(point.tri),
-                        "ntr": str(point.ntr) if point.ntr is not None else None,
-                    }
-                    for point in response.data
-                ],
+                "sync_run_id": sync_run.id,
+                "observation_count": processed,
             },
         )
-    )
+        link_entity_evidence(
+            session,
+            entity.entity_id,
+            evidence.evidence_id,
+            relation_type="benchmark_sync",
+            resolution_method="identifier",
+        )
     return processed
