@@ -143,7 +143,7 @@ def upsert_nav_response(
         )
     add_entity_alias(
         session, entity.entity_id, metadata.scheme_name,
-        alias_type="provider_name", is_primary=True,
+        alias_type="provider_name", source_key=source_key, is_primary=True,
     )
     for isin in (metadata.isin_growth, metadata.isin_div_reinvestment):
         if isin:
