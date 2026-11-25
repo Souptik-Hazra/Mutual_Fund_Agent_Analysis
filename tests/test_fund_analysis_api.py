@@ -94,21 +94,21 @@ def test_scheme_detail_returns_404_when_not_ingested() -> None:
 
 
 def test_comparison_request_rejects_duplicate_scheme_codes() -> None:
-    response = TestClient(create_app()).post(
+    response = TestClient(_override_db(Mock())).post(
         "/api/v1/schemes/compare", json={"scheme_codes": [100, 100]}
     )
     assert response.status_code == 422
 
 
 def test_comparison_request_rejects_more_than_five_schemes() -> None:
-    response = TestClient(create_app()).post(
+    response = TestClient(_override_db(Mock())).post(
         "/api/v1/schemes/compare", json={"scheme_codes": [1, 2, 3, 4, 5, 6]}
     )
     assert response.status_code == 422
 
 
 def test_comparison_request_rejects_reversed_date_range() -> None:
-    response = TestClient(create_app()).post(
+    response = TestClient(_override_db(Mock())).post(
         "/api/v1/schemes/compare",
         json={
             "scheme_codes": [100, 200],
@@ -194,7 +194,7 @@ def test_single_fund_endpoint_serializes_analytics_report(monkeypatch) -> None:
         calendar_year_as_of_date=None,
     )
     monkeypatch.setattr(funds, "analyze_fund", lambda *args, **kwargs: report)
-    response = TestClient(create_app()).get("/api/v1/schemes/100/analytics")
+    response = TestClient(_override_db(Mock())).get("/api/v1/schemes/100/analytics")
     assert response.status_code == 200
     assert response.json()["absolute_return"] == "0.1"
     assert response.json()["observation_count"] == 2
