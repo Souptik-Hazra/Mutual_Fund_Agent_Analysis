@@ -74,7 +74,8 @@ def sync_twelvedata_quote(
     except (httpx.HTTPError, ValueError) as exc:
         # Provider exceptions may contain request URLs or credentials; never expose them.
         raise HTTPException(
-            status_code=502, detail="Twelve Data quote request failed; provider details were withheld."
+            status_code=502,
+            detail="Twelve Data quote request failed; provider details were withheld.",
         ) from exc
     finally:
         client.close()
