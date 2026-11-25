@@ -4,7 +4,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "0007_research_intelligence"
-down_revision = "0006_common_intelligence_foundation"
+down_revision = "0006_common_intel"
 branch_labels = None
 depends_on = None
 
