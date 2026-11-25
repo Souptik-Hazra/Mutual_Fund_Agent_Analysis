@@ -234,6 +234,87 @@ def add_scheme_metadata_observation(
     return SchemeMetadataObservationResponse.model_validate(record)
 
 
+@router.get("/schemes/{scheme_code}/metadata-quality")
+def get_scheme_metadata_quality(
+    scheme_code: int,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict[str, Any]:
+    """Report scheme-master completeness and provenance freshness."""
+    scheme = _scheme_or_404(session, scheme_code)
+    fields = {
+        "fund_house": scheme.fund_house,
+        "scheme_type": scheme.scheme_type,
+        "scheme_category": scheme.scheme_category,
+        "isin_growth": scheme.isin_growth,
+        "isin_div_reinvestment": scheme.isin_div_reinvestment,
+        "lifecycle_type": scheme.lifecycle_type,
+        "plan_type": scheme.plan_type,
+        "option_type": scheme.option_type,
+        "launch_date": scheme.launch_date,
+        "closure_date": scheme.closure_date,
+        "expense_ratio": scheme.effective_expense_ratio,
+        "expense_ratio_effective_date": scheme.expense_ratio_effective_date,
+    }
+    present = [key for key, value in fields.items() if value is not None]
+    missing = [key for key, value in fields.items() if value is None]
+    latest = session.scalars(
+        select(SchemeMetadataObservation)
+        .where(SchemeMetadataObservation.scheme_code == scheme_code)
+        .order_by(
+            SchemeMetadataObservation.observed_at.desc(),
+            SchemeMetadataObservation.metadata_id.desc(),
+        )
+        .limit(1)
+    ).first()
+    latest_verified = session.scalars(
+        select(SchemeMetadataObservation)
+        .where(
+            SchemeMetadataObservation.scheme_code == scheme_code,
+            SchemeMetadataObservation.verification_status == "verified",
+        )
+        .order_by(
+            SchemeMetadataObservation.observed_at.desc(),
+            SchemeMetadataObservation.metadata_id.desc(),
+        )
+        .limit(1)
+    ).first()
+    today = datetime.now(UTC).date()
+    observed_at = latest.observed_at if latest is not None else None
+    age_days = max(0, (today - observed_at.date()).days) if observed_at else None
+    freshness = (
+        "missing"
+        if age_days is None
+        else "fresh"
+        if age_days <= 90
+        else "ageing"
+        if age_days <= 180
+        else "stale"
+    )
+    return {
+        "scheme_code": scheme_code,
+        "catalogue_completeness_pct": Decimal(len(present)) / Decimal(len(fields)) * Decimal("100"),
+        "present_fields": present,
+        "missing_fields": missing,
+        "field_count": len(fields),
+        "latest_observation": {
+            "metadata_id": latest.metadata_id,
+            "source_key": latest.source_key,
+            "observed_at": latest.observed_at,
+            "verification_status": latest.verification_status,
+            "valid_from": latest.valid_from,
+            "valid_to": latest.valid_to,
+        } if latest else None,
+        "latest_verified_observation": {
+            "metadata_id": latest_verified.metadata_id,
+            "source_key": latest_verified.source_key,
+            "observed_at": latest_verified.observed_at,
+        } if latest_verified else None,
+        "metadata_age_days": age_days,
+        "freshness": freshness,
+        "freshness_policy_days": {"fresh_max": 90, "ageing_max": 180},
+    }
+
+
 @router.get(
     "/schemes/{scheme_code}/metadata-observations",
     response_model=list[SchemeMetadataObservationResponse],

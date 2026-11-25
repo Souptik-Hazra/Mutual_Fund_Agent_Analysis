@@ -67,6 +67,47 @@ def ingest_portfolio(
         raise _domain_error(exc) from exc
 
 
+def _normalize_portfolio_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize common AMC/SEBI column labels without inferring asset classes."""
+    normalized = {
+        str(key).strip().lower().replace(" ", "_"): value
+        for key, value in row.items()
+        if key is not None
+    }
+    aliases = {
+        "name_of_instrument": "security_name",
+        "instrument_name": "security_name",
+        "name_of_security": "security_name",
+        "isin_code": "isin",
+        "isin_no": "isin",
+        "security_isin": "isin",
+        "industry": "sector",
+        "percentage_to_nav": "weight_pct",
+        "percent_to_nav": "weight_pct",
+        "%_to_nav": "weight_pct",
+        "%_of_nav": "weight_pct",
+        "kind": "asset_class",
+    }
+    for alias, canonical in aliases.items():
+        if canonical not in normalized and alias in normalized:
+            normalized[canonical] = normalized[alias]
+    if "market_value" not in normalized:
+        for key in (
+            "market_value_rs_in_lakhs",
+            "market_value_in_lakhs",
+            "market_value_lakhs",
+            "mkt_value_(rs_in_lakhs)",
+            "mkt_value_rs_in_lakhs",
+        ):
+            value = normalized.get(key)
+            if value not in (None, ""):
+                parsed = Decimal(str(value).replace(",", "").strip())
+                normalized["market_value"] = parsed * Decimal("100000")
+                normalized["market_value_source_unit"] = "INR lakhs"
+                break
+    return normalized
+
+
 @router.post("/portfolios/import-file", status_code=status.HTTP_201_CREATED)
 async def import_portfolio_file(
     session: Annotated[Session, Depends(get_db)],
@@ -105,9 +146,7 @@ async def import_portfolio_file(
             raise ValueError("No holding rows were found.")
         holdings = []
         for index, row in enumerate(rows, start=2):
-            normalized = {
-                str(k).strip().lower().replace(" ", "_"): v for k, v in row.items() if k is not None
-            }
+            normalized = _normalize_portfolio_row(row)
             isin = normalized.get("isin") or normalized.get("isin_code")
             security_key = normalized.get("security_key") or isin
             name = (

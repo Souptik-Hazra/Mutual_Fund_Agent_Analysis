@@ -186,3 +186,30 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
     remaining = captured[0].expires_at - datetime.now(UTC)
     assert result["persisted"] == 1
     assert timedelta(days=12) - timedelta(seconds=2) < remaining <= timedelta(days=12)
+
+
+def test_standard_portfolio_disclosure_headers_are_normalized_without_guessing_asset_class():
+    from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
+
+    row = _normalize_portfolio_row(
+        {
+            "ISIN": "INE123A01016",
+            "Name of Instrument": "Example Ltd",
+            "Industry": "Banks",
+            "% to NAV": "2.50",
+            "Mkt Value (Rs in Lakhs)": "12.75",
+        }
+    )
+    assert row["isin"] == "INE123A01016"
+    assert row["security_name"] == "Example Ltd"
+    assert row["sector"] == "Banks"
+    assert row["%_to_nav"] == "2.50"
+    assert row["market_value_source_unit"] == "INR lakhs"
+    assert row["market_value"] == Decimal("1275000.00")
+    assert "asset_class" not in row
+
+
+def test_portfolio_kind_column_is_used_only_as_an_explicit_asset_class():
+    from mutual_fund_agent_analysis.api.routes.research import _normalize_portfolio_row
+
+    assert _normalize_portfolio_row({"Kind": "debt"})["asset_class"] == "debt"
