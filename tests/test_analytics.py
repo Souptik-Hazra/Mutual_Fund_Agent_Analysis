@@ -40,8 +40,8 @@ def test_absolute_return_and_cagr() -> None:
 
 def test_period_returns_sort_observations_and_preserve_actual_dates() -> None:
     result = period_returns(prices(("2024-01-03", "121"), ("2024-01-01", "100")))
-    assert [(point.date.isoformat(), point.value) for point in result] == [
-        ("2024-01-03", Decimal("0.21"))
+    assert [(point.date.isoformat(), point.value, point.start_date) for point in result] == [
+        ("2024-01-03", Decimal("0.21"), date(2024, 1, 1))
     ]
 
 
