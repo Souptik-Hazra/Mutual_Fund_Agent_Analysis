@@ -21,7 +21,9 @@ export default function App() {
   const [documentQuery, setDocumentQuery] = useState("expense ratio risk portfolio strategy");
   const [dateFrom, setDateFrom] = useState("2024-01-01");
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
-  const [selectedFile, setSelectedFile] = useState(null);\n  const [selectedDocument, setSelectedDocument] = useState(null);\n  const [documentTitle, setDocumentTitle] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documentTitle, setDocumentTitle] = useState("");
   const schemeCodes = useMemo(() => codes.split(",").map((x) => Number(x.trim())).filter((x) => Number.isInteger(x) && x > 0), [codes]);
 
   useEffect(() => { fetch("/health/live").then((r) => r.ok ? r.json() : Promise.reject()).then(() => setHealth("API connected")).catch(() => setHealth("API offline")); }, []);
@@ -34,9 +36,22 @@ export default function App() {
   const runEvents = () => run(() => request(`/events/fund-exposure/${schemeCodes[0]}?start_date=${dateFrom}&end_date=${dateTo}`));
   const runDocuments = () => run(() => request(`/documents/search?q=${encodeURIComponent(documentQuery)}&scheme_code=${schemeCodes[0] || ""}&limit=8`));
   const runAssistant = () => run(() => request("/assistant/research", json("POST", { question, scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo })));
+  async function importDocument() {
+    if (!selectedDocument) return setError("Choose a PDF first.");
+    const form = new FormData();
+    form.append("file", selectedDocument);
+    form.append("source_key", "amc_disclosures");
+    form.append("title", documentTitle || selectedDocument.name);
+    if (schemeCodes[0]) form.append("scheme_code", String(schemeCodes[0]));
+    await run(() => request("/documents/upload", { method: "POST", body: form }));
+  }
   async function importPortfolio() {
+    if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     if (!selectedFile) return setError("Choose a normalized AMC CSV or XLSX file first.");
-    const form = new FormData(); form.append("file", selectedFile); form.append("scheme_code", String(schemeCodes[0])); form.append("effective_date", dateTo);
+    const form = new FormData();
+    form.append("file", selectedFile);
+    form.append("scheme_code", String(schemeCodes[0]));
+    form.append("effective_date", dateTo);
     await run(() => request("/portfolios/import-file", { method: "POST", body: form }));
   }
 
