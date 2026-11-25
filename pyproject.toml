@@ -24,6 +24,7 @@ dependencies = [
 [project.scripts]
 mfa-sync-nav = "mutual_fund_agent_analysis.cli.sync_nav:main"
 mfa-sync-benchmark = "mutual_fund_agent_analysis.cli.sync_benchmark:main"
+mfa-sync-benchmark = "mutual_fund_agent_analysis.cli.sync_benchmark:main"
 
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.3,<2"]
