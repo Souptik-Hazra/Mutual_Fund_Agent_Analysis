@@ -25,6 +25,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     search_documents,
     social_analytics,
 )
+from mutual_fund_agent_analysis.analytics.security_intelligence import securities_for_funds
 from mutual_fund_agent_analysis.llm.providers import create_chat_model
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,11 @@ KEYWORDS = {
         "allocation",
         "overlap",
         "concentration",
+    ),
+    "security": (
+        "stock", "stocks", "share", "shares", "fundamentals", "market cap",
+        "valuation", "p/e", "pe ratio", "p/b", "pb ratio", "return on equity",
+        "debt to equity", "dividend yield", "eps", "underlying companies",
     ),
     "events": (
         "news",
@@ -209,6 +215,25 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     if len(codes) > 1 and len(snapshots) == len(codes)
                     else None,
                 }
+            elif intent == "security":
+                if not codes:
+                    raise ValueError("Underlying security intelligence requires scheme_codes.")
+                security_data = securities_for_funds(
+                    session, codes, as_of=request.end_date, limit=min(request.top_k * 5, 50)
+                )
+                results[intent] = _jsonable(security_data)
+                for security in security_data.get("securities", []):
+                    market = security.get("market") or {}
+                    fundamentals = security.get("fundamentals") or {}
+                    if market.get("source_key") or fundamentals.get("source_key"):
+                        citations.append({
+                            "type": "security_market_observation",
+                            "security_key": security.get("security_key"),
+                            "source_key": market.get("source_key") or fundamentals.get("source_key"),
+                            "observed_at": market.get("observed_at"),
+                            "fundamentals_as_of": fundamentals.get("as_of"),
+                            "source_url": market.get("source_url") or fundamentals.get("source_url"),
+                        })
             elif intent == "events":
                 if codes:
                     event_results = [
