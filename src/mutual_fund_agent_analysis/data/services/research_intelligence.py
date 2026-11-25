@@ -169,6 +169,75 @@ def security_fund_exposure(session: Session, security_key: str) -> dict[str, Any
     return {"security_key": key, "funds": funds, "total_fund_count": len(funds)}
 
 
+def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict[str, Any]:
+    """Ingest RSS/Atom items as reported (never confirmed) events with evidence records."""
+    from urllib.parse import urlparse
+    from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
+
+    source = session.get(DataSource, source_key)
+    if source is None or not source.enabled or not source.base_url:
+        raise ValueError("Source must be registered, enabled, and have an official base_url.")
+    allowed_host = urlparse(source.base_url).hostname
+    if not allowed_host:
+        raise ValueError("Registered source base_url is invalid.")
+    items = fetch_feed(feed_url, allowed_host)
+    created = updated = 0
+    for item in items:
+        external_id = "rss:" + item["external_id"]
+        evidence = session.scalar(select(EvidenceRecord).where(
+            EvidenceRecord.source_key == source_key, EvidenceRecord.external_id == external_id
+        ))
+        digest = hashlib.sha256((item["title"] + item["summary"]).encode("utf-8")).hexdigest()
+        if evidence is None:
+            evidence = EvidenceRecord(
+                source_key=source_key, external_id=external_id, canonical_url=item["url"],
+                title=item["title"], published_at=item["published_at"],
+                content_hash=digest, verification_status="unverified",
+                metadata_json={"ingestion": "rss_atom", "feed_url": feed_url},
+            )
+            session.add(evidence)
+            session.flush()
+        else:
+            evidence.title = item["title"]
+            evidence.canonical_url = item["url"]
+            evidence.published_at = item["published_at"]
+            evidence.content_hash = digest
+        event = session.scalar(select(MarketEvent).where(
+            MarketEvent.source_key == source_key, MarketEvent.external_id == external_id
+        ))
+        event_type = "other"
+        title_lower = item["title"].lower()
+        for term, category in (
+            ("board meeting", "board_meeting"), ("financial results", "results"),
+            ("quarterly results", "results"), ("dividend", "dividend"),
+            ("record date", "record_date"), ("stock split", "split"),
+            ("bonus issue", "bonus"), ("merger", "merger"),
+            ("acquisition", "acquisition"), ("fund raising", "fundraising"),
+            ("management", "management"), ("circular", "regulatory"),
+        ):
+            if term in title_lower:
+                event_type = category
+                break
+        values = {
+            "evidence_id": evidence.evidence_id, "title": item["title"],
+            "summary": item["summary"], "event_type": event_type, "status": "reported",
+            "event_date": item["published_at"].date() if item["published_at"] else None,
+            "published_at": item["published_at"], "canonical_url": item["url"],
+            "metadata_json": {"ingestion": "rss_atom", "feed_url": feed_url},
+        }
+        if event is None:
+            session.add(MarketEvent(source_key=source_key, external_id=external_id, **values))
+            created += 1
+        else:
+            for key, value in values.items():
+                setattr(event, key, value)
+            updated += 1
+    session.commit()
+    return {"source_key": source_key, "feed_url": feed_url, "fetched": len(items),
+            "created": created, "updated": updated,
+            "status_policy": "RSS items are stored as reported, never automatically confirmed."}
+
+
 def create_market_event(session: Session, payload: Any) -> MarketEvent:
     if session.get(DataSource, payload.source_key) is None:
         raise ValueError("Unknown source_key.")
