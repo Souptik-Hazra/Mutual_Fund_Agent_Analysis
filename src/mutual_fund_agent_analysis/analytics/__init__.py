@@ -1,13 +1,13 @@
 """Deterministic mutual-fund performance and risk analytics."""
 
+from mutual_fund_agent_analysis.analytics.active_risk import (
+    ActiveRiskMetrics,
+    calculate_active_risk_metrics,
+)
 from mutual_fund_agent_analysis.analytics.benchmark import (
     BenchmarkMetrics,
     align_returns,
     calculate_benchmark_metrics,
-)
-from mutual_fund_agent_analysis.analytics.active_risk import (
-    ActiveRiskMetrics,
-    calculate_active_risk_metrics,
 )
 from mutual_fund_agent_analysis.analytics.investor import (
     InvestorReturnReport,
