@@ -87,9 +87,7 @@ def test_risk_metrics_use_sample_volatility_and_explicit_frequency() -> None:
 
 
 def test_zero_volatility_has_undefined_sharpe() -> None:
-    result = calculate_risk_metrics(
-        returns(("2024-01-02", "0.01"), ("2024-01-03", "0.01"))
-    )
+    result = calculate_risk_metrics(returns(("2024-01-02", "0.01"), ("2024-01-03", "0.01")))
     assert result.annualized_volatility == 0
     assert result.sharpe_ratio is None
 
