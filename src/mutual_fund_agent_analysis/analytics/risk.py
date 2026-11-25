@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Iterable
+from collections.abc import Iterable
 
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint
 
