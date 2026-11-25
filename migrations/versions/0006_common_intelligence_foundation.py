@@ -409,6 +409,60 @@ def upgrade() -> None:
         ON CONFLICT (namespace, normalized_value) DO NOTHING
     """)
 
+    # Backfill AMC identities and scheme-to-AMC relationships from existing provider metadata.
+    op.execute("""
+        INSERT INTO research_entities (
+            entity_type, canonical_name, normalized_name, status
+        )
+        SELECT DISTINCT
+            'amc',
+            btrim(fund_house),
+            lower(regexp_replace(btrim(fund_house), '\\s+', ' ', 'g')),
+            'active'
+        FROM mutual_fund_schemes
+        WHERE fund_house IS NOT NULL AND btrim(fund_house) <> ''
+        ON CONFLICT (entity_type, normalized_name) DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO entity_aliases (
+            entity_id, alias, normalized_alias, alias_type, source_key, is_primary
+        )
+        SELECT DISTINCT e.entity_id, btrim(s.fund_house),
+               lower(regexp_replace(btrim(s.fund_house), '\\s+', ' ', 'g')),
+               'provider_name', s.source, true
+        FROM mutual_fund_schemes s
+        JOIN research_entities e
+          ON e.entity_type = 'amc'
+         AND e.normalized_name = lower(regexp_replace(
+             btrim(s.fund_house), '\\s+', ' ', 'g'
+         ))
+        WHERE s.fund_house IS NOT NULL AND btrim(s.fund_house) <> ''
+        ON CONFLICT DO NOTHING
+    """)
+    op.execute("""
+        INSERT INTO entity_relationships (
+            from_entity_id, to_entity_id, relation_type, source_key,
+            verification_status, metadata
+        )
+        SELECT DISTINCT scheme_entity.entity_id, amc_entity.entity_id,
+               'managed_by', s.source, 'unverified',
+               jsonb_build_object('provider_scheme_code', s.scheme_code)
+        FROM mutual_fund_schemes s
+        JOIN research_entities scheme_entity
+          ON scheme_entity.entity_type = 'scheme'
+         AND scheme_entity.normalized_name = lower(regexp_replace(
+             btrim(s.scheme_name || ' [' || s.scheme_code::text || ']'),
+             '\\s+', ' ', 'g'
+         ))
+        JOIN research_entities amc_entity
+          ON amc_entity.entity_type = 'amc'
+         AND amc_entity.normalized_name = lower(regexp_replace(
+             btrim(s.fund_house), '\\s+', ' ', 'g'
+         ))
+        WHERE s.fund_house IS NOT NULL AND btrim(s.fund_house) <> ''
+        ON CONFLICT DO NOTHING
+    """)
+
 
 def downgrade() -> None:
     op.drop_index("ix_entity_relationships_to", table_name="entity_relationships")
