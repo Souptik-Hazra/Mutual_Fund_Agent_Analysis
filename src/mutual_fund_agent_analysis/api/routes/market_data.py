@@ -146,7 +146,6 @@ def sync_twelvedata_quote(
     }
 
 
-
 class SecurityCorporateEvent(BaseModel):
     title: str = Field(min_length=3, max_length=500)
     event_type: Literal[
