@@ -79,6 +79,7 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
     expected_types = {
         "fund": "financial_data",
         "portfolio": "portfolio_disclosure",
+        "security": "security_market_observation",
         "events": "market_event",
         "social": "social_aggregation",
         "documents": "document_chunk",
