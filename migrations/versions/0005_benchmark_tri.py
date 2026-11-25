@@ -11,6 +11,9 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    BigInteger,
+    Identity,
+    Integer,
     ForeignKeyConstraint,
     Numeric,
     PrimaryKeyConstraint,
@@ -62,11 +65,11 @@ def upgrade() -> None:
     )
     op.create_table(
         "benchmark_sync_runs",
-        Column("id", __import__("sqlalchemy").BigInteger(), __import__("sqlalchemy").Identity(), nullable=False),
+        Column("id", BigInteger(), Identity(), nullable=False),
         Column("benchmark_code", String(length=80), nullable=False),
         Column("source", String(length=40), nullable=False),
         Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-        Column("observation_count", __import__("sqlalchemy").Integer(), nullable=False),
+        Column("observation_count", Integer(), nullable=False),
         Column("response_payload", JSONB(), nullable=False),
         ForeignKeyConstraint(
             ["benchmark_code"],
