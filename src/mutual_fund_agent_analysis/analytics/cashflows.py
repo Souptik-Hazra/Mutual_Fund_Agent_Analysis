@@ -31,6 +31,8 @@ def normalize_cash_flows(flows: Iterable[CashFlow]) -> list[CashFlow]:
     items = list(flows)
     if not items:
         raise ValueError("At least two dated cash flows are required.")
+    if any(not isinstance(item, CashFlow) for item in items):
+        raise TypeError("Every item must be a CashFlow.")
     if any(type(item.date) is not date for item in items):
         raise ValueError("Cash-flow dates must be datetime.date values.")
     if any(not isinstance(item.amount, Decimal) for item in items):
@@ -39,15 +41,25 @@ def normalize_cash_flows(flows: Iterable[CashFlow]) -> list[CashFlow]:
         raise ValueError("Cash-flow amounts must be finite.")
 
     totals: dict[date, Decimal] = defaultdict(Decimal)
-    for item in items:
-        totals[item.date] += item.amount
+    with localcontext() as context:
+        context.prec = max(
+            50,
+            max(len(item.amount.as_tuple().digits) for item in items)
+            + len(str(len(items)))
+            + 4,
+        )
+        for item in items:
+            totals[item.date] += item.amount
+
     result = [CashFlow(day, amount) for day, amount in sorted(totals.items()) if amount != 0]
     if len(result) < 2:
         raise ValueError("At least two non-zero cash-flow dates are required.")
     if not any(item.amount < 0 for item in result) or not any(
         item.amount > 0 for item in result
     ):
-        raise ValueError("Cash flows must contain at least one contribution and one proceeds flow.")
+        raise ValueError(
+            "Cash flows must contain at least one contribution and one proceeds flow."
+        )
     return result
 
 
@@ -65,8 +77,13 @@ def xnpv(rate: Decimal, flows: Iterable[CashFlow]) -> Decimal:
         return sum(
             (
                 flow.amount
-                * (-(Decimal((flow.date - origin).days) / DAYS_PER_XIRR_YEAR)
-                   * log_gross_rate).exp()
+                * (
+                    -(
+                        Decimal((flow.date - origin).days)
+                        / DAYS_PER_XIRR_YEAR
+                    )
+                    * log_gross_rate
+                ).exp()
                 for flow in normalized
             ),
             Decimal("0"),
@@ -74,11 +91,12 @@ def xnpv(rate: Decimal, flows: Iterable[CashFlow]) -> Decimal:
 
 
 def xirr(flows: Iterable[CashFlow]) -> Decimal:
-    """Calculate the unique XIRR in the bounded gross-rate domain [1e-6, 1e6].
+    """Calculate XIRR in the bounded gross-rate domain [1e-6, 1e6].
 
     The solver scans log(1 + rate) for sign-changing brackets and bisects each
-    bracket. It rejects no-root and multiple-root cases. As with any numerical
-    XIRR solver, roots outside the documented domain are not searched.
+    bracket. Multiple sign-changing roots found at the scan resolution are
+    rejected. Tangential roots and roots outside the documented domain are not
+    guaranteed to be detected.
     """
     normalized = normalize_cash_flows(flows)
     origin = normalized[0].date
@@ -112,7 +130,6 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
                 brackets.append((left, right))
             left, left_value = right, right_value
 
-        # De-duplicate a root that lies exactly on a scan boundary.
         unique_brackets: list[tuple[Decimal, Decimal]] = []
         for bracket in brackets:
             if not unique_brackets or bracket != unique_brackets[-1]:
@@ -121,7 +138,9 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
         if not unique_brackets:
             raise ValueError("XIRR has no root in the supported rate domain.")
         if len(unique_brackets) > 1:
-            raise ValueError("XIRR is ambiguous: multiple roots exist in the supported rate domain.")
+            raise ValueError(
+                "XIRR is ambiguous: multiple roots exist in the supported rate domain."
+            )
 
         low, high = unique_brackets[0]
         if low == high:
@@ -131,7 +150,10 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
             for _ in range(_MAX_ITERATIONS):
                 middle = (low + high) / Decimal("2")
                 middle_value = value_at(middle)
-                if abs(middle_value) <= _ROOT_TOLERANCE or abs(high - low) <= _ROOT_TOLERANCE:
+                if (
+                    abs(middle_value) <= _ROOT_TOLERANCE
+                    or abs(high - low) <= _ROOT_TOLERANCE
+                ):
                     low = high = middle
                     break
                 if (low_value < 0) != (middle_value < 0):
