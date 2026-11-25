@@ -94,7 +94,15 @@ class AMFIClient:
             "service unavailable", "request could not be processed",
             "application error",
         )
-        return not normalized or any(marker in normalized[:2000] for marker in markers)
+        if not normalized or any(marker in normalized[:2000] for marker in markers):
+            return True
+        has_data_row = any(
+            len(line.strip().split(";")) >= 6
+            and line.strip().split(";", 1)[0].isdigit()
+            for line in report.splitlines()
+        )
+        explicit_empty = "no data" in normalized or "no records" in normalized
+        return not has_data_row and not explicit_empty
 
     @staticmethod
     def _retry_delay(attempt: int, retry_after: str | None = None) -> float:
