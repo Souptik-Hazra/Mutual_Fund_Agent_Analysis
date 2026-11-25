@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import asdict, is_dataclass
 from datetime import date
@@ -25,10 +26,12 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
 )
 from mutual_fund_agent_analysis.llm.providers import create_chat_model
 
+logger = logging.getLogger(__name__)
+
 KEYWORDS = {
-    "fund": ("return", "cagr", "performance", "risk", "drawdown", "sharpe", "benchmark", "volatility"),
+    "fund": ("return", "returns", "cagr", "performance", "risk", "risks", "drawdown", "sharpe", "benchmark", "volatility"),
     "portfolio": ("holding", "holdings", "portfolio", "sector", "exposure", "allocation", "overlap", "concentration"),
-    "events": ("news", "event", "announcement", "filing", "results", "dividend", "board meeting", "regulatory"),
+    "events": ("news", "event", "events", "announcement", "announcements", "filing", "filings", "results", "dividend", "dividends", "board meeting", "regulatory"),
     "social": ("sentiment", "reddit", "social", "discussion", "bullish", "bearish", "community"),
     "documents": ("document", "factsheet", "sid", "pdf", "scheme information", "expense ratio", "prospectus", "disclosure"),
 }
@@ -182,7 +185,7 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             from langchain_core.messages import HumanMessage, SystemMessage
 
             evidence = json.dumps(_jsonable(results), ensure_ascii=False, default=str)[:18000]
-            response = model.invoke([
+            response = model.with_retry(stop_after_attempt=2).invoke([
                 SystemMessage(content=(
                     "You are a careful Indian mutual-fund research analyst. Use only the supplied "
                     "retrieved data. Never invent NAVs, returns, holdings, event status, or sources. "
@@ -199,7 +202,7 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             answer = str(response.content)
             model_used = type(model).__name__
         except Exception:
-            pass
+            logger.exception("Optional LLM synthesis failed; returning deterministic research output.")
     if errors:
         answer += "\n\nLimitations: " + "; ".join(errors)
     return {"answer": answer, "model_used": model_used}
