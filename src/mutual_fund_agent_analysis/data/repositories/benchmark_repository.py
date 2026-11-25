@@ -12,7 +12,11 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_identifier,
     create_entity,
 )
-from mutual_fund_agent_analysis.models.intelligence import DataSource, EntityIdentifier, ResearchEntity
+from mutual_fund_agent_analysis.models.intelligence import (
+    DataSource,
+    EntityIdentifier,
+    ResearchEntity,
+)
 from mutual_fund_agent_analysis.models.benchmark import (
     BenchmarkIndex,
     BenchmarkObservation,
