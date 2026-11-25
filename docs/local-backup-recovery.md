@@ -38,7 +38,8 @@ The default output is `backups/mfa-backup-<UTC timestamp>.tar.gz`, plus an adjac
 - A `SHA256SUMS` file covering every payload in the archive.
 
 The script downloads and then removes its temporary Qdrant-side snapshot. The default
-retention is the newest seven archives. Configure it with:
+retention is the newest seven archives. Set `BACKUP_KEEP=0` to disable automatic pruning,
+or configure a different retention count with:
 
 ```bash
 BACKUP_DIR="$HOME/mfa-backups" BACKUP_KEEP=14 ./scripts/backup-local.sh
@@ -56,10 +57,11 @@ overwrites the configured Qdrant collection. The script:
 
 1. Verifies the archive's adjacent checksum (when present), validates archive paths, and
    verifies each payload checksum.
-2. Checks that the target Compose database name matches the database recorded in the manifest.
-3. Checks Qdrant snapshot compatibility before changing database contents.
-4. Requires the exact interactive confirmation word `RESTORE`.
-5. Restores PostgreSQL, restores or clears the Qdrant collection to match the backup, and
+2. Checks the archive paths and entry types before extraction.
+3. Checks that the target Compose database name matches the database recorded in the manifest.
+4. Checks Qdrant snapshot compatibility and SHA-256 before changing database contents.
+5. Requires the exact interactive confirmation word `RESTORE`.
+6. Restores PostgreSQL, restores or clears the Qdrant collection to match the backup, and
    applies any newer Alembic migrations.
 
 Run:
