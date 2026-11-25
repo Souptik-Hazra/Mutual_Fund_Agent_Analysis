@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "chore/**", "feature/**"]
+    branches: [main, "chore/**", "feature/**", "feat/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "feat/phases-5-8-intelligence"]
 
 permissions:
   contents: read
@@ -43,7 +43,7 @@ jobs:
       - name: Install project and development dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,agents]"
       - name: Ruff lint
         run: ruff check .
       - name: Ruff format check
@@ -54,3 +54,20 @@ jobs:
         run: docker build --tag mutual-fund-agent-analysis:ci .
       - name: Run tests
         run: pytest --cov=mutual_fund_agent_analysis --cov-report=term-missing
+      - name: Run offline agent evaluation
+        run: mfa-evaluate-agent
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package.json
+      - run: npm install
+      - run: npm run build
