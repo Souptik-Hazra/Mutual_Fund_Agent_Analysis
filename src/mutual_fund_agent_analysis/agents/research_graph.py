@@ -26,7 +26,7 @@ from mutual_fund_agent_analysis.llm.providers import create_chat_model
 
 INTENTS = ("fund", "portfolio", "events", "social", "documents")
 KEYWORDS = {
-    "fund": ("return", "cagr", "performance", "risk", "drawdown", "sharpe", "benchmark", "volatility", "compare"),
+    "fund": ("return", "cagr", "performance", "risk", "drawdown", "sharpe", "benchmark", "volatility"),
     "portfolio": ("holding", "holdings", "portfolio", "sector", "exposure", "allocation", "overlap", "concentration"),
     "events": ("news", "event", "announcement", "filing", "results", "dividend", "board meeting", "regulatory"),
     "social": ("sentiment", "reddit", "social", "discussion", "bullish", "bearish", "community"),
@@ -195,7 +195,7 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             ])
             answer = str(response.content)
             model_used = type(model).__name__
-        except (ValueError, ImportError, RuntimeError):
+        except Exception:
             pass
     if errors:
         answer += "\\n\\nLimitations: " + "; ".join(errors)
