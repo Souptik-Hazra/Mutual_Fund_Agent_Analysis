@@ -342,7 +342,6 @@ def resolve_entity_endpoint(
     )
 
 
-
 @router.post(
     "/entities/{entity_id}/relationships",
     response_model=EntityRelationshipResponse,
