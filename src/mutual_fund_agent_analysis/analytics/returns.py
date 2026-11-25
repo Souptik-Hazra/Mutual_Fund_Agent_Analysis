@@ -45,7 +45,7 @@ def cagr(points: Iterable[PricePoint]) -> Decimal:
 
 def trailing_return(points: Iterable[PricePoint], years: int) -> Decimal:
     """Calculate return to the latest date from the closest available prior observation."""
-    if years <= 0:
+    if isinstance(years, bool) or not isinstance(years, int) or years <= 0:
         raise ValueError("years must be a positive integer.")
     prices = normalize_prices(points)
     target = _subtract_years(prices[-1].date, years)
@@ -61,7 +61,10 @@ def rolling_returns(
 ) -> list[RollingReturn]:
     """Calculate rolling point-to-point returns using the last observation on/before each anchor."""
     prices = normalize_prices(points)
-    if any(year <= 0 for year in windows_years):
+    if any(
+        isinstance(year, bool) or not isinstance(year, int) or year <= 0
+        for year in windows_years
+    ):
         raise ValueError("Rolling windows must be positive integers.")
     dates = [point.date for point in prices]
     results: list[RollingReturn] = []
