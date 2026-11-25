@@ -103,9 +103,9 @@ def test_sip_rejects_duplicate_and_invalid_nav_observations() -> None:
 def test_sip_requires_at_least_one_scheduled_due_date() -> None:
     with pytest.raises(ValueError, match="No SIP installments"):
         simulate_monthly_sip(
-            [PricePoint(date(2024, 1, 1), Decimal("10"))],
-            date(2024, 2, 1),
-            date(2024, 2, 1),
+            [PricePoint(date(2024, 3, 1), Decimal("10"))],
+            date(2024, 2, 2),
+            date(2024, 2, 28),
             Decimal("100"),
-            date(2024, 2, 1),
+            date(2024, 3, 1),
         )
