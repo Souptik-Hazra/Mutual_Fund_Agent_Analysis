@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models import (
-    DataSource, DocumentChunk, EvidenceRecord, MarketEvent, MarketEventRevision, MutualFundScheme,
+    DataSource, DocumentChunk, EntityAlias, EntityEvidenceLink, EvidenceRecord, MarketEvent, MarketEventRevision, MutualFundScheme,
     PortfolioHolding, PortfolioSnapshot, ResearchDocument, ResearchEntity, SocialPost,
 )
 
@@ -287,6 +287,35 @@ def archive_market_event_revision(
     return revision
 
 
+def _resolve_rss_entity_exact(
+    session: Session, source_key: str, title: str, as_of: date | None
+) -> int | None:
+    """Link a headline only when exactly one active company alias matches."""
+    if as_of is None:
+        return None
+    aliases = session.execute(
+        select(EntityAlias, ResearchEntity)
+        .join(ResearchEntity, ResearchEntity.entity_id == EntityAlias.entity_id)
+        .where(ResearchEntity.entity_type == "company")
+        .where(ResearchEntity.status == "active")
+        .where((EntityAlias.source_key == source_key) | EntityAlias.source_key.is_(None))
+        .where((EntityAlias.valid_from.is_(None)) | (EntityAlias.valid_from <= as_of))
+        .where((EntityAlias.valid_to.is_(None)) | (EntityAlias.valid_to >= as_of))
+    ).all()
+    normalized_title = " ".join(title.casefold().split())
+    matches: dict[int, int] = {}
+    for alias, entity in aliases:
+        normalized_alias = " ".join(alias.normalized_alias.casefold().split())
+        if normalized_alias and re.search(
+            rf"(?<![\\w]){re.escape(normalized_alias)}(?![\\w])",
+            normalized_title,
+        ):
+            matches[entity.entity_id] = max(matches.get(entity.entity_id, 0), len(normalized_alias))
+    if len(matches) != 1:
+        return None
+    return next(iter(matches))
+
+
 def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict[str, Any]:
     """Ingest RSS/Atom items as reported (never confirmed) events with evidence records."""
     from urllib.parse import urlparse
@@ -300,6 +329,9 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
         or source.source_type != "official"
         or not source.base_url
         or urlparse(source.base_url).scheme != "https"
+        or not isinstance(source.metadata_json, dict)
+        or source.metadata_json.get("terms_reviewed") is not True
+        or source.metadata_json.get("access_confirmed") is not True
     ):
         raise ValueError("Event feed source must be enabled, official, and registered with an HTTPS base_url.")
     allowed_host = urlparse(source.base_url).hostname
@@ -374,8 +406,20 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             if term in title_lower:
                 event_type = category
                 break
+        resolved_entity_id = _resolve_rss_entity_exact(
+            session, source_key, item["title"], item.get("event_date") or (item["published_at"].date() if item["published_at"] else None)
+        )
+        if resolved_entity_id is not None:
+            existing_link = session.get(EntityEvidenceLink, (resolved_entity_id, evidence.evidence_id))
+            if existing_link is None:
+                session.add(EntityEvidenceLink(
+                    entity_id=resolved_entity_id,
+                    evidence_id=evidence.evidence_id,
+                    relation_type="mentions",
+                    resolution_method="exact_alias",
+                ))
         values = {
-            "evidence_id": evidence.evidence_id, "title": item["title"],
+            "evidence_id": evidence.evidence_id, "related_entity_id": resolved_entity_id, "title": item["title"],
             "summary": item["summary"], "event_type": event_type, "status": "reported",
             "event_date": item.get("event_date"),
             "published_at": item["published_at"], "canonical_url": item["url"],
