@@ -120,9 +120,18 @@ def security_profile(
         else []
     )
 
-    now = datetime.now(UTC)
+    freshness_reference_date = as_of or date.today()
+    freshness_reference_time = (
+        datetime.combine(freshness_reference_date, time.max, tzinfo=UTC)
+        if as_of
+        else datetime.now(UTC)
+    )
     quote_age_hours = (
-        max(0.0, (now - latest.observed_at.astimezone(UTC)).total_seconds() / 3600)
+        max(
+            0.0,
+            (freshness_reference_time - latest.observed_at.astimezone(UTC)).total_seconds()
+            / 3600,
+        )
         if latest
         else None
     )
@@ -137,7 +146,9 @@ def security_profile(
     fundamentals_as_of = (
         fundamentals_observation.fundamentals_as_of if fundamentals_observation else None
     )
-    fundamentals_age_days = (date.today() - fundamentals_as_of).days if fundamentals_as_of else None
+    fundamentals_age_days = (
+        (freshness_reference_date - fundamentals_as_of).days if fundamentals_as_of else None
+    )
     fundamentals_freshness = (
         "unavailable"
         if fundamentals_observation is None
@@ -215,7 +226,12 @@ def security_profile(
         "freshness_policy": {
             "quote_fresh_hours": 24,
             "fundamentals_fresh_days": 180,
-            "note": "Application freshness heuristics, not exchange or regulatory standards.",
+            "reference_date": freshness_reference_date,
+            "note": (
+                "Historical requests evaluate freshness relative to as_of; current requests "
+                "use the current date. These are application heuristics, not exchange or "
+                "regulatory standards."
+            ),
         },
         "limitations": [
             (
