@@ -190,16 +190,19 @@ def compare_portfolios(session: Session, scheme_codes: list[int]) -> dict[str, A
 
 def security_fund_exposure(session: Session, security_key: str) -> dict[str, Any]:
     key = security_key.strip().upper()
-    latest_ids = select(
-        PortfolioSnapshot.scheme_code,
-        func.max(PortfolioSnapshot.effective_date).label("latest_date"),
-    ).group_by(PortfolioSnapshot.scheme_code).subquery()
+    ranked_snapshots = select(
+        PortfolioSnapshot.snapshot_id,
+        func.row_number().over(
+            partition_by=PortfolioSnapshot.scheme_code,
+            order_by=(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc()),
+        ).label("snapshot_rank"),
+    ).subquery()
     stmt = (
         select(PortfolioHolding, PortfolioSnapshot, MutualFundScheme)
         .join(PortfolioSnapshot, PortfolioSnapshot.snapshot_id == PortfolioHolding.snapshot_id)
         .join(MutualFundScheme, MutualFundScheme.scheme_code == PortfolioSnapshot.scheme_code)
-        .join(latest_ids, (latest_ids.c.scheme_code == PortfolioSnapshot.scheme_code) &
-              (latest_ids.c.latest_date == PortfolioSnapshot.effective_date))
+        .join(ranked_snapshots, ranked_snapshots.c.snapshot_id == PortfolioSnapshot.snapshot_id)
+        .where(ranked_snapshots.c.snapshot_rank == 1)
         .where(PortfolioHolding.security_key == key)
         .order_by(PortfolioHolding.weight_pct.desc().nullslast())
     )
