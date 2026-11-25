@@ -44,9 +44,7 @@ def normalize_cash_flows(flows: Iterable[CashFlow]) -> list[CashFlow]:
     with localcontext() as context:
         context.prec = max(
             50,
-            max(len(item.amount.as_tuple().digits) for item in items)
-            + len(str(len(items)))
-            + 4,
+            max(len(item.amount.as_tuple().digits) for item in items) + len(str(len(items))) + 4,
         )
         for item in items:
             totals[item.date] += item.amount
@@ -54,12 +52,8 @@ def normalize_cash_flows(flows: Iterable[CashFlow]) -> list[CashFlow]:
     result = [CashFlow(day, amount) for day, amount in sorted(totals.items()) if amount != 0]
     if len(result) < 2:
         raise ValueError("At least two non-zero cash-flow dates are required.")
-    if not any(item.amount < 0 for item in result) or not any(
-        item.amount > 0 for item in result
-    ):
-        raise ValueError(
-            "Cash flows must contain at least one contribution and one proceeds flow."
-        )
+    if not any(item.amount < 0 for item in result) or not any(item.amount > 0 for item in result):
+        raise ValueError("Cash flows must contain at least one contribution and one proceeds flow.")
     return result
 
 
@@ -78,11 +72,7 @@ def xnpv(rate: Decimal, flows: Iterable[CashFlow]) -> Decimal:
             (
                 flow.amount
                 * (
-                    -(
-                        Decimal((flow.date - origin).days)
-                        / DAYS_PER_XIRR_YEAR
-                    )
-                    * log_gross_rate
+                    -(Decimal((flow.date - origin).days) / DAYS_PER_XIRR_YEAR) * log_gross_rate
                 ).exp()
                 for flow in normalized
             ),
