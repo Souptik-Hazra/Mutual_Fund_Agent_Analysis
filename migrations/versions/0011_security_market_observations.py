@@ -1,6 +1,6 @@
 """Persist versioned security market observations.
 
-Revision ID: 0011_security_market_observations
+Revision ID: 0011_security_market_obs
 Revises: 0010_market_event_revisions
 """
 
@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0011_security_market_observations"
+revision = "0011_security_market_obs"
 down_revision = "0010_market_event_revisions"
 branch_labels = None
 depends_on = None
