@@ -215,3 +215,24 @@ def test_quote_only_observation_does_not_erase_older_fundamentals_or_events():
     assert result["fundamentals"]["metrics"]["pe_ratio"] == "22.5"
     assert result["fundamentals"]["source_key"] == "fundamentals_provider"
     assert result["corporate_events"][0]["title"] == "Board meeting"
+
+
+def test_unverified_security_observation_still_requires_complete_provenance():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
+
+    result = evaluate_evidence_quality(
+        {
+            "results": {"security": {"securities": []}},
+            "citations": [
+                {
+                    "source_key": "manual_provider",
+                    "canonical_url": "https://example.com/fundamentals",
+                    "retrieved_at": "2026-11-25T10:00:00+00:00",
+                    "verification_status": "unverified",
+                }
+            ],
+        }
+    )
+    assert result["provenance_completeness"] == 1.0
+    assert result["verified_citation_ratio"] == 0.0
+    assert result["evidence_quality_passed"] is True
