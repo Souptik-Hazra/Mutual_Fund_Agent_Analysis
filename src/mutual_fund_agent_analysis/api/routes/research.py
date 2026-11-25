@@ -44,7 +44,12 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models import DataSource, MarketEvent, PortfolioSnapshot
+from mutual_fund_agent_analysis.models import (
+    DataSource,
+    MarketEvent,
+    MarketEventRevision,
+    PortfolioSnapshot,
+)
 from mutual_fund_agent_analysis.models.research import ResearchDocument
 
 router = APIRouter(tags=["research-intelligence"])
@@ -375,6 +380,47 @@ def compare_selected_portfolios(
 @router.get("/securities/{security_key}/fund-exposure")
 def get_security_exposure(security_key: str, session: Annotated[Session, Depends(get_db)]) -> dict:
     return security_fund_exposure(session, security_key)
+
+
+@router.get("/events/{event_id}/revisions")
+def get_market_event_revisions(
+    event_id: int,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Return immutable prior source/event versions for one active event."""
+    event = session.get(MarketEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Market event not found.")
+    revisions = session.scalars(
+        select(MarketEventRevision)
+        .where(MarketEventRevision.event_id == event_id)
+        .order_by(MarketEventRevision.revision_number)
+    ).all()
+    return {
+        "event_id": event_id,
+        "current": {
+            "title": event.title,
+            "summary": event.summary,
+            "event_type": event.event_type,
+            "status": event.status,
+            "event_date": event.event_date,
+            "published_at": event.published_at,
+            "canonical_url": event.canonical_url,
+            "evidence_id": event.evidence_id,
+            "metadata": event.metadata_json,
+        },
+        "revision_count": len(revisions),
+        "revisions": [
+            {
+                "revision_id": item.revision_id,
+                "revision_number": item.revision_number,
+                "revision_reason": item.revision_reason,
+                "recorded_at": item.recorded_at,
+                "snapshot": item.snapshot,
+            }
+            for item in revisions
+        ],
+    }
 
 
 @router.post("/events", status_code=status.HTTP_201_CREATED)

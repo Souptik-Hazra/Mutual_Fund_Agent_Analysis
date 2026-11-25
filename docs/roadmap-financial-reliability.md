@@ -206,3 +206,8 @@ The implementation branch `feat/complete-phases-0-7` adds:
 - Offline evidence-contract dataset and CI gate for provenance/time/unsupported-claim regressions.
 
 Still gated by real-world source inputs and acceptance evidence: execute `mfa-audit-local --live` against MFAPI/AMFI/Nifty TRI from the user's local installation; register verified AMC distribution sources and attestations backed by their actual notices; build/test AMC-specific portfolio adapters only against actual source files; review current Reddit/X access and attribution terms; and complete independent portfolio/agent numerical parity, scanned-PDF and prompt-injection fixtures. These items are intentionally not marked complete merely because supporting database/API contracts now exist.
+
+
+### Event revision history
+
+The implementation branch adds `market_event_revisions` to retain prior event states during manual event updates and changed RSS source observations. Previous status, dates, URL, confidence, metadata and evidence provenance are stored in a JSON-safe snapshot. Historical RSS revisions remain labelled as source-reported; the adapter does not promote them to confirmed events.

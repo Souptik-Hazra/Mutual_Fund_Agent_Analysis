@@ -81,3 +81,8 @@ The importer continues to accept normalized CSV/XLSX holdings and requires expli
 - The CSV/XLSX normalizer recognizes common portfolio disclosure columns (ISIN, instrument name, industry, percent to NAV, and market value in INR lakhs) while still requiring an explicit asset class.
 - PDF extraction now reports malformed and password-protected files distinctly; scanned documents remain unsupported because OCR has not been implemented.
 - Offline agent tests cover no-key deterministic fallback and the untrusted-document instruction boundary.
+
+
+## Event correction history
+
+The active event record remains the current view. When a manual event update or an RSS source refresh replaces an existing event state, the prior event fields and a JSON-safe evidence snapshot are appended to `market_event_revisions`. The history route is `GET /api/v1/events/{event_id}/revisions`. RSS observations continue to be stored as reported, not automatically confirmed.

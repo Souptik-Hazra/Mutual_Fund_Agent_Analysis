@@ -234,3 +234,50 @@ def test_pdf_extraction_rejects_malformed_and_encrypted_documents():
     document.close()
     with pytest.raises(ValueError, match="Password-protected"):
         extract_pdf_text(encrypted)
+
+
+def test_event_revision_archiver_preserves_prior_source_state():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import (
+        archive_market_event_revision,
+    )
+
+    event = SimpleNamespace(
+        event_id=7,
+        source_key="exchange",
+        external_id="notice-42",
+        evidence_id=None,
+        related_entity_id=9,
+        title="Original disclosure",
+        summary="Initial summary",
+        event_type="results",
+        status="reported",
+        event_date=date(2026, 10, 1),
+        published_at=datetime(2026, 10, 1, tzinfo=UTC),
+        canonical_url="https://exchange.example/notice-42",
+        confidence=Decimal("0.5"),
+        metadata_json={"revision": "original"},
+    )
+
+    class StubSession:
+        def __init__(self):
+            self.added = []
+
+        def scalar(self, _statement):
+            return 1
+
+        def add(self, value):
+            self.added.append(value)
+
+        def flush(self):
+            return None
+
+    session = StubSession()
+    revision = archive_market_event_revision(session, event, reason="source_correction")
+    assert revision.revision_number == 2
+    assert revision.revision_reason == "source_correction"
+    assert revision.snapshot["title"] == "Original disclosure"
+    assert revision.snapshot["status"] == "reported"
+    assert revision.snapshot["event_date"] == "2026-10-01"
+    assert session.added == [revision]

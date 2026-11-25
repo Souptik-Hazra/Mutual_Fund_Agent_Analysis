@@ -20,6 +20,6 @@ def test_migration_graph_has_single_expected_financial_head():
     config = Config(str(root / "alembic.ini"))
     config.set_main_option("script_location", str(root / "migrations"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["0009_metadata_and_distributions"]
-    revision = scripts.get_revision("0009_metadata_and_distributions")
-    assert revision.down_revision == "0008_investor_ledger"
+    assert scripts.get_heads() == ["0010_market_event_revisions"]
+    revision = scripts.get_revision("0010_market_event_revisions")
+    assert revision.down_revision == "0009_metadata_and_distributions"

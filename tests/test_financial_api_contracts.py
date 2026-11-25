@@ -35,3 +35,8 @@ def test_metadata_quality_and_idcw_payout_contracts_are_registered():
     assert "idcw_payout_total_return" in str(
         paths["/api/v1/schemes/{scheme_code}/idcw-total-return"]
     )
+
+
+def test_event_revision_history_route_is_registered():
+    paths = create_app().openapi()["paths"]
+    assert "/api/v1/events/{event_id}/revisions" in paths
