@@ -58,7 +58,7 @@ def test_trailing_return_exposes_actual_anchor_and_staleness() -> None:
     assert result.target_start_date == date(2023, 1, 10)
     assert result.actual_start_date == date(2023, 1, 10)
     assert result.staleness_days == 0
-    assert result.value == Decimal("0.04761904761904761904761905")
+    assert result.value == Decimal("110") / Decimal("105") - Decimal("1")
 
 
 def test_trailing_return_can_reject_stale_anchor() -> None:
