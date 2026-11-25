@@ -102,21 +102,23 @@ def security_profile(
             for row in holdings
         ]
 
-    event_observation = next(
-        (row for row in observations if row.corporate_events_json), None
-    )
+    event_observation = next((row for row in observations if row.corporate_events_json), None)
 
-    corporate_events = [
-        {
-            **event,
-            "source_key": event.get("source_key") or event_observation.source_key,
-            "canonical_url": event.get("source_url") or event_observation.source_url,
-            "retrieved_at": event_observation.retrieved_at,
-            "verification_status": event.get("verification_status") or "unverified",
-        }
-        for event in (event_observation.corporate_events_json or [])
-        if isinstance(event, dict)
-    ] if event_observation else []
+    corporate_events = (
+        [
+            {
+                **event,
+                "source_key": event.get("source_key") or event_observation.source_key,
+                "canonical_url": event.get("source_url") or event_observation.source_url,
+                "retrieved_at": event_observation.retrieved_at,
+                "verification_status": event.get("verification_status") or "unverified",
+            }
+            for event in (event_observation.corporate_events_json or [])
+            if isinstance(event, dict)
+        ]
+        if event_observation
+        else []
+    )
 
     now = datetime.now(UTC)
     quote_age_hours = (
@@ -131,9 +133,7 @@ def security_profile(
         if quote_age_hours is not None and quote_age_hours <= 24
         else "stale"
     )
-    fundamentals_observation = next(
-        (row for row in observations if row.fundamentals_json), None
-    )
+    fundamentals_observation = next((row for row in observations if row.fundamentals_json), None)
     fundamentals_as_of = (
         fundamentals_observation.fundamentals_as_of if fundamentals_observation else None
     )
@@ -150,14 +150,16 @@ def security_profile(
         "security_key": key,
         "availability": "available" if latest else "no_market_observation",
         "identity": {
-            "security_name": latest.security_name if latest else (
-                positions[0]["security_name"] if positions else key
-            ),
+            "security_name": latest.security_name
+            if latest
+            else (positions[0]["security_name"] if positions else key),
             "isin": latest.isin if latest else None,
             "symbol": latest.symbol if latest else None,
             "exchange": latest.exchange if latest else None,
         },
-        "market": None if latest is None else {
+        "market": None
+        if latest is None
+        else {
             "last_price": latest.last_price,
             "change_pct": latest.change_pct,
             "day_high": latest.day_high,
@@ -185,12 +187,8 @@ def security_profile(
             }
             if fundamentals_observation
             else {},
-            "source_key": fundamentals_observation.source_key
-            if fundamentals_observation
-            else None,
-            "source_url": fundamentals_observation.source_url
-            if fundamentals_observation
-            else None,
+            "source_key": fundamentals_observation.source_key if fundamentals_observation else None,
+            "source_url": fundamentals_observation.source_url if fundamentals_observation else None,
             "retrieved_at": fundamentals_observation.retrieved_at
             if fundamentals_observation
             else None,
@@ -241,14 +239,18 @@ def securities_for_funds(
     """Build a bounded stock-level view from the latest available disclosure per scheme."""
     if not scheme_codes or len(scheme_codes) > 20 or len(set(scheme_codes)) != len(scheme_codes):
         raise ValueError("Provide between one and twenty unique scheme codes.")
-    snapshot_statement = select(PortfolioSnapshot).where(
-        PortfolioSnapshot.scheme_code.in_(scheme_codes),
-        PortfolioSnapshot.effective_date <= (as_of or date.max),
-        PortfolioSnapshot.status.in_(["complete", "partial"]),
-    ).order_by(
-        PortfolioSnapshot.scheme_code,
-        PortfolioSnapshot.effective_date.desc(),
-        PortfolioSnapshot.snapshot_id.desc(),
+    snapshot_statement = (
+        select(PortfolioSnapshot)
+        .where(
+            PortfolioSnapshot.scheme_code.in_(scheme_codes),
+            PortfolioSnapshot.effective_date <= (as_of or date.max),
+            PortfolioSnapshot.status.in_(["complete", "partial"]),
+        )
+        .order_by(
+            PortfolioSnapshot.scheme_code,
+            PortfolioSnapshot.effective_date.desc(),
+            PortfolioSnapshot.snapshot_id.desc(),
+        )
     )
     snapshots = session.scalars(snapshot_statement).all()
     latest_by_scheme: dict[int, PortfolioSnapshot] = {}
@@ -262,12 +264,14 @@ def securities_for_funds(
             "warning": "No eligible AMC portfolio disclosures are stored for these schemes.",
         }
     holdings = session.scalars(
-        select(PortfolioHolding).where(
+        select(PortfolioHolding)
+        .where(
             PortfolioHolding.snapshot_id.in_(
                 [snapshot.snapshot_id for snapshot in latest_by_scheme.values()]
             ),
             PortfolioHolding.asset_class == "equity",
-        ).order_by(PortfolioHolding.weight_pct.desc().nullslast())
+        )
+        .order_by(PortfolioHolding.weight_pct.desc().nullslast())
     ).all()
     keys = list(dict.fromkeys(row.security_key for row in holdings))[: min(max(limit, 1), 100)]
     securities = [
