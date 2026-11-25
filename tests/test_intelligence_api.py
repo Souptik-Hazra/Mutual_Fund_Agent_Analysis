@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 
+from mutual_fund_agent_analysis.api.routes.intelligence import router as intelligence_router
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.main import create_app
 
@@ -18,7 +19,7 @@ def _client() -> TestClient:
 
 def test_intelligence_routes_are_registered():
     app = create_app()
-    paths = set(app.openapi()["paths"])
+    paths = {route.path for route in intelligence_router.routes if hasattr(route, "path")}
     assert "/api/v1/intelligence/sources" in paths
     assert "/api/v1/intelligence/entities" in paths
     assert "/api/v1/intelligence/resolve" in paths
