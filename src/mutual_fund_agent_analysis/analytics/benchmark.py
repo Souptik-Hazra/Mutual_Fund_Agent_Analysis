@@ -54,7 +54,10 @@ def calculate_benchmark_metrics(
         return BenchmarkMetrics(count, None, None, None, None, None)
 
     covariance = sum(
-        ((f_value - f_mean) * (b_value - b_mean) for f_value, b_value in zip(f_values, b_values)),
+        (
+            (f_value - f_mean) * (b_value - b_mean)
+            for f_value, b_value in zip(f_values, b_values)
+        ),
         Decimal("0"),
     )
     beta = covariance / b_variance
