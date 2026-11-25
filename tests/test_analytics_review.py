@@ -134,3 +134,12 @@ def test_calendar_year_does_not_mark_stale_november_data_complete() -> None:
         ("2024-11-15", "110"),
     )
     assert 2024 not in calendar_year_returns(navs, date(2025, 1, 2))
+
+
+def test_semiannual_frequency_is_accepted_for_semiannual_returns() -> None:
+    semiannual = [
+        ReturnPoint(date(2023, 7, 1), Decimal("0.04"), date(2023, 1, 1)),
+        ReturnPoint(date(2024, 1, 1), Decimal("0.05"), date(2023, 7, 1)),
+    ]
+    result = calculate_risk_metrics(semiannual, periods_per_year=2)
+    assert result.coverage.inferred_frequency == "semiannual"
