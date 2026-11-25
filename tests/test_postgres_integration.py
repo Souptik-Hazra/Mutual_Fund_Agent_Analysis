@@ -49,6 +49,8 @@ def migrated_postgres() -> Engine:
     previous_url = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = database_url
     get_settings.cache_clear()
+    get_session_factory.cache_clear()
+    get_engine.cache_clear()
     root = Path(__file__).parents[1]
     config = Config(str(root / "alembic.ini"))
     config.set_main_option("script_location", str(root / "migrations"))
