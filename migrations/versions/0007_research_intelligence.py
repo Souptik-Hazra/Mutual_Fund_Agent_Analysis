@@ -9,8 +9,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    from mutual_fund_agent_analysis.database.base import Base
     import mutual_fund_agent_analysis.models  # noqa: F401
+    from mutual_fund_agent_analysis.database.base import Base
     names = (
         "portfolio_snapshots",
         "portfolio_holdings",
