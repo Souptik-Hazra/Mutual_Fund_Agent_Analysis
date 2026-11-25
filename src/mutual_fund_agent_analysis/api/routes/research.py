@@ -143,10 +143,7 @@ async def import_portfolio_file(
                 uncompressed_size = sum(member.file_size for member in members)
                 if uncompressed_size > 100 * 1024 * 1024 or any(
                     member.file_size > 25 * 1024 * 1024
-                    or (
-                        member.compress_size > 0
-                        and member.file_size / member.compress_size > 100
-                    )
+                    or (member.compress_size > 0 and member.file_size / member.compress_size > 100)
                     for member in members
                 ):
                     raise HTTPException(
@@ -160,8 +157,7 @@ async def import_portfolio_file(
                 if not values:
                     raise ValueError("Workbook is empty.")
                 headers = [
-                    str(value or "").strip().lower().replace(" ", "_")
-                    for value in values[0]
+                    str(value or "").strip().lower().replace(" ", "_") for value in values[0]
                 ]
                 rows = [
                     dict(zip(headers, row, strict=False))
@@ -175,7 +171,9 @@ async def import_portfolio_file(
                 status_code=415, detail="Only .csv and .xlsx portfolio files are supported."
             )
         if len(rows) > 5000:
-            raise HTTPException(status_code=413, detail="Portfolio files are limited to 5,000 holding rows.")
+            raise HTTPException(
+                status_code=413, detail="Portfolio files are limited to 5,000 holding rows."
+            )
         if not rows:
             raise ValueError("No holding rows were found.")
         holdings = []
