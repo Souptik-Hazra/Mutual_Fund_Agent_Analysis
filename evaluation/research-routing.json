@@ -132,7 +132,17 @@
       125497
     ],
     "expected_intents": [
+      "portfolio",
       "security"
+    ]
+  },
+  {
+    "question": "Find the record date and latest dividend announcement for a company in my fund",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "events"
     ]
   }
 ]
