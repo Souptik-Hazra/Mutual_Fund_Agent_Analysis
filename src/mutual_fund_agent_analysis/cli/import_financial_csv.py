@@ -280,9 +280,7 @@ def import_distribution_rows(
                 continue
             previous = None
             if record.supersedes_distribution_id is not None:
-                previous = session.get(
-                    DistributionObservation, record.supersedes_distribution_id
-                )
+                previous = session.get(DistributionObservation, record.supersedes_distribution_id)
                 if (
                     previous is None
                     or previous.scheme_code != scheme_code
@@ -346,9 +344,7 @@ def _common_parser(description: str) -> argparse.ArgumentParser:
 
 def _run_import(kind: str) -> None:
     parser = _common_parser(
-        "Import scheme metadata CSV."
-        if kind == "metadata"
-        else "Import IDCW distribution CSV."
+        "Import scheme metadata CSV." if kind == "metadata" else "Import IDCW distribution CSV."
     )
     args = parser.parse_args()
     rows = read_csv_rows(args.csv_path)
