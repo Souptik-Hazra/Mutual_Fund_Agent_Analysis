@@ -132,15 +132,17 @@ if [[ "$QDRANT_INCLUDED" == "true" ]]; then
 import re
 import sys
 
-def version_parts(value: str) -> tuple[int, int]:
-    match = re.match(r"^v?(\d+)\.(\d+)\.", value)
+def version_parts(value: str) -> tuple[int, int, int]:
+    match = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", value)
     if not match:
         raise SystemExit(f"Unrecognized Qdrant version: {value}")
-    return int(match.group(1)), int(match.group(2))
+    return tuple(int(part) for part in match.groups())
 
 source = version_parts(sys.argv[1])
 target = version_parts(sys.argv[2])
-if target[0] != source[0] or target[1] not in (source[1], source[1] + 1):
+same_minor_supported = target[1] == source[1] and target[2] >= source[2]
+next_minor_supported = target[1] == source[1] + 1
+if target[0] != source[0] or not (same_minor_supported or next_minor_supported):
     raise SystemExit(
         f"Incompatible Qdrant snapshot version {sys.argv[1]} for target {sys.argv[2]}. "
         "Use the same minor version or the next minor version."
