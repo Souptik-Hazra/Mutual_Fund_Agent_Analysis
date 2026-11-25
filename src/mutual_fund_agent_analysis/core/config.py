@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     langsmith_api_key: SecretStr | None = None
     langsmith_tracing: bool = False
     langsmith_project: str = "mutual-fund-agent-analysis"
+    qdrant_url: str | None = None
+    qdrant_api_key: SecretStr | None = None
+    qdrant_collection: str = "mutual_fund_research"
+    document_embedding_model: str = "gemini-embedding-001"
+    reddit_client_id: SecretStr | None = None
+    reddit_client_secret: SecretStr | None = None
+    reddit_user_agent: str = "MutualFundResearch/1.0"
+    x_bearer_token: SecretStr | None = None
+    social_retention_days: int = Field(default=30, ge=1, le=365)
 
     @model_validator(mode="after")
     def validate_production_database_url(self) -> "Settings":
