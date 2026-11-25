@@ -2,6 +2,7 @@
 
 import os
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -130,7 +131,10 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         assert reconciliation is not None
         assert reconciliation.status == "conflict"
         assert reconciliation.canonical_source == "amfi"
-        assert reconciliation.source_values == {"amfi": "25.50", "mfapi": "25.75"}
+        assert {key: Decimal(value) for key, value in reconciliation.source_values.items()} == {
+            "amfi": Decimal("25.50"),
+            "mfapi": Decimal("25.75"),
+        }
         assert sync_runs[0].response_payload["meta"]["scheme_code"] == 991234
         assert sync_runs[0].observation_count == 1
 
