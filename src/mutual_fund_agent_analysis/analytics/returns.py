@@ -66,7 +66,9 @@ def rolling_returns(
 ) -> list[RollingReturn]:
     """Calculate rolling point-to-point returns using the last observation on/before each anchor."""
     prices = normalize_prices(points)
-    if any(isinstance(year, bool) or not isinstance(year, int) or year <= 0 for year in windows_years):
+    if any(
+        isinstance(year, bool) or not isinstance(year, int) or year <= 0 for year in windows_years
+    ):
         raise ValueError("Rolling windows must be positive integers.")
     if len(windows_years) != len(set(windows_years)):
         raise ValueError("Rolling windows must not contain duplicates.")
@@ -102,9 +104,7 @@ def calendar_year_returns(points: Iterable[PricePoint]) -> dict[int, Decimal]:
     for year in sorted(year_ends):
         previous = year_ends.get(year - 1)
         current = year_ends[year]
-        year_is_complete = year < latest_year or (
-            year == latest_year and final_date_is_year_end
-        )
+        year_is_complete = year < latest_year or (year == latest_year and final_date_is_year_end)
         if previous is not None and year_is_complete:
             results[year] = current.value / previous.value - Decimal("1")
     return results
