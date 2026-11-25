@@ -128,7 +128,8 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
         "sector_allocation": [{"sector": k, "weight_pct": v} for k, v in sorted(sectors.items(), key=lambda x: x[1], reverse=True)],
         "asset_allocation": [{"asset_class": k, "weight_pct": v} for k, v in sorted(assets.items(), key=lambda x: x[1], reverse=True)],
         "hhi_0_to_1": hhi,
-        "weight_coverage_pct": weight_coverage,\n        "hhi_coverage_sufficient": hhi is not None,
+        "weight_coverage_pct": weight_coverage,
+        "hhi_coverage_sufficient": hhi is not None,
         "disclosure_url": snapshot.document_url,
     }
 
