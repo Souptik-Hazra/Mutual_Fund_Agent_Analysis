@@ -18,13 +18,17 @@ USER_AGENT = "MutualFundResearch/1.0"
 
 
 def _safe_https_url(value: str, *, allowed_host: str | None = None) -> bool:
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+        port = parsed.port
+    except ValueError:
+        return False
     return bool(
         parsed.scheme == "https"
         and parsed.hostname
         and parsed.username is None
         and parsed.password is None
-        and parsed.port in (None, 443)
+        and port in (None, 443)
         and not parsed.fragment
         and (allowed_host is None or parsed.hostname.casefold() == allowed_host.casefold())
     )
@@ -46,12 +50,9 @@ def _parse_datetime(value: str) -> datetime | None:
 
 
 def _parse_event_date(node: ElementTree.Element) -> date | None:
-    """Read an explicitly supplied effective/event date; never substitute publication date."""
+    """Read an explicit effective/event date; never substitute publication date."""
     candidates = (
-        "eventDate",
-        "effectiveDate",
-        "event_date",
-        "effective_date",
+        "eventDate", "effectiveDate", "event_date", "effective_date",
         "{https://www.nseindia.com/rss}eventDate",
     )
     for tag in candidates:
@@ -69,22 +70,40 @@ def _parse_event_date(node: ElementTree.Element) -> date | None:
 
 
 def fetch_feed(url: str, allowed_host: str) -> list[dict[str, Any]]:
-    """Fetch one explicitly allowlisted HTTPS feed without following redirects."""
+    """Fetch one allowlisted HTTPS feed with bounded transfer and no redirects."""
     if not _safe_https_url(url, allowed_host=allowed_host):
-        raise ValueError("Feed URL must use HTTPS on the registered source host without credentials or a nonstandard port.")
+        raise ValueError(
+            "Feed URL must use HTTPS on the registered source host without credentials or a nonstandard port."
+        )
+    chunks: list[bytes] = []
+    total = 0
     with httpx.Client(
         timeout=httpx.Timeout(20.0, connect=5.0),
         follow_redirects=False,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"},
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",
+        },
     ) as client:
-        response = client.get(url)
-        response.raise_for_status()
-        if len(response.content) > MAX_FEED_BYTES:
-            raise ValueError("RSS/Atom feed exceeds the 5 MB response limit.")
-        if response.status_code != 200:
-            raise ValueError("RSS/Atom feed returned an unexpected status.")
+        with client.stream("GET", url) as response:
+            response.raise_for_status()
+            if response.status_code != 200:
+                raise ValueError("RSS/Atom feed returned an unexpected status.")
+            content_length = response.headers.get("content-length")
+            if content_length and int(content_length) > MAX_FEED_BYTES:
+                raise ValueError("RSS/Atom feed exceeds the 5 MB response limit.")
+            for chunk in response.iter_bytes():
+                total += len(chunk)
+                if total > MAX_FEED_BYTES:
+                    raise ValueError("RSS/Atom feed exceeds the 5 MB response limit.")
+                chunks.append(chunk)
+    content = b"".join(chunks)
+    # ElementTree does not resolve external entities, but reject declarations explicitly
+    # to keep feed parsing deterministic and avoid entity-expansion payloads.
+    if re.search(rb"<!\\s*(DOCTYPE|ENTITY)", content, flags=re.IGNORECASE):
+        raise ValueError("RSS/Atom feed must not contain document type or entity declarations.")
     try:
-        root = ElementTree.fromstring(response.content)
+        root = ElementTree.fromstring(content)
     except ElementTree.ParseError as exc:
         raise ValueError("RSS/Atom feed contains malformed XML.") from exc
 
