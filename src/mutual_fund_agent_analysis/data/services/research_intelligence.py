@@ -333,6 +333,7 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
         or not isinstance(source.metadata_json, dict)
         or source.metadata_json.get("terms_reviewed") is not True
         or source.metadata_json.get("access_confirmed") is not True
+        or not source.metadata_json.get("reviewed_at")
     ):
         raise ValueError("Event feed source must be enabled, official, and registered with an HTTPS base_url.")
     allowed_host = urlparse(source.base_url).hostname
