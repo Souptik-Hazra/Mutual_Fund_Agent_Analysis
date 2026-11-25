@@ -18,7 +18,6 @@ def _client() -> TestClient:
 
 
 def test_intelligence_routes_are_registered():
-    app = create_app()
     paths = {route.path for route in intelligence_router.routes if hasattr(route, "path")}
     assert "/api/v1/intelligence/sources" in paths
     assert "/api/v1/intelligence/entities" in paths
