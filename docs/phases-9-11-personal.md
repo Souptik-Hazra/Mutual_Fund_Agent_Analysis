@@ -1,5 +1,17 @@
 # Phases 9–11 — Personal research workspace
 
+## Framework baselines (November 2026)
+
+The project now targets the current stable API families:
+- LangChain 1.5.2+ and langchain-core 1.8.4+
+- LangGraph 1.2.24+
+- langchain-google-genai 4.5.2+ and langchain-groq 1.2.1+
+- React 19.3.1+, Vite 8.3.8+, and @vitejs/plugin-react 6.3.0+
+- Node.js 20.19+ (CI uses Node 22)
+
+LangGraph is a core dependency because the API imports and uses the compiled research graph. Qdrant and OpenAI provider packages remain optional extras.
+
+
 ## Phase 9: LangGraph orchestration
 
 The FastAPI endpoints `POST /api/v1/assistant/research` and `POST /api/v1/assistant/research/stream` run a supervisor-style LangGraph 1.x `StateGraph`. It deterministically routes questions to only the relevant specialist workflows: fund analytics, portfolio intelligence, event intelligence, social intelligence and document research. Specialist tools call existing Python services directly; they do not reimplement financial calculations. Model initialization uses LangChain 1.x `init_chat_model` through a provider-neutral factory. Model synthesis uses bounded retries. The streaming endpoint emits graph-node progress as Server-Sent Events and returns the same structured final result. Graph state is request-scoped and discarded after the response; no persistent conversation memory is enabled. The configured Gemini/Groq/OpenAI provider is used only for optional synthesis. If no provider is configured, the workflow returns a deterministic result summary and the underlying structured data.
