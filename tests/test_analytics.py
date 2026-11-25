@@ -267,3 +267,26 @@ def test_drawdown_recovery_is_none_when_series_never_declines() -> None:
     assert result.maximum_drawdown == Decimal("0")
     assert result.recovery_date is None
     assert result.recovery_duration_days is None
+
+
+
+def test_absolute_return_requires_two_observations() -> None:
+    with pytest.raises(ValueError, match="at least two"):
+        absolute_return(prices(("2024-01-01", "100")))
+
+
+def test_calendar_year_returns_exclude_incomplete_latest_year() -> None:
+    result = calendar_year_returns(
+        prices(
+            ("2023-01-02", "100"),
+            ("2023-12-29", "110"),
+            ("2024-12-30", "121"),
+            ("2025-06-30", "130"),
+        )
+    )
+    assert result == {2024: Decimal("0.1")}
+
+
+def test_rolling_windows_reject_duplicates() -> None:
+    with pytest.raises(ValueError, match="must not contain duplicates"):
+        rolling_returns(prices(("2023-01-01", "100"), ("2024-01-01", "110")), (1, 1))
