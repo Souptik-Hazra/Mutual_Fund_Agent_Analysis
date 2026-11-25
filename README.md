@@ -630,7 +630,7 @@ The current API exposes:
 - Consecutive-observation returns, 1Y/3Y/5Y rolling returns, trailing returns, and calendar-year returns.
 - Annualized sample volatility, downside deviation, Sharpe, and Sortino ratios.
 - Exact-date fund/benchmark return alignment, beta, arithmetic annualized Jensen alpha, and excess return.
-- Maximum drawdown, peak/trough dates, recovery date, and underwater duration.
+- Maximum drawdown, peak/trough dates, recovery date, trough-to-recovery duration, and underwater duration.
 
 Example:
 
@@ -667,7 +667,7 @@ print(calculate_drawdown(navs))
 - The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers.
 - Sharpe and Sortino are undefined when their respective denominators are zero; these return `None`, not infinity.
 - Beta and alpha use only exact common return dates. No date interpolation or forward-fill is performed. Beta/alpha are undefined with fewer than two aligned observations or zero benchmark variance.
-- Jensen alpha is arithmetic and annualized by multiplying the mean periodic CAPM intercept by the periods per year; it is not CAGR alpha.
+- Jensen alpha is arithmetic and annualized by multiplying the mean periodic CAPM intercept by the periods per year; it is not CAGR alpha. Reported annualized fund and benchmark returns are arithmetic mean returns multiplied by the periods per year, not geometric annualized returns.
 - NAV price returns do not include cash distributions. Growth-option NAVs are the intended input for total-return comparisons; IDCW cash flows require a distribution-aware total-return series or cash-flow methodology.
 - The `analyze_fund(session, scheme_code, ...)` service reads canonical values from `nav_reconciliations` and benchmark TRI from `benchmark_observations`. It rejects unresolved NAV conflicts by default; callers must explicitly opt in to include canonical values from conflict dates. An HTTP endpoint is subsequent integration work.
 
