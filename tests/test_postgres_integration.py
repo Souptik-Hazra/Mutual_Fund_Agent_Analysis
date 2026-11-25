@@ -203,7 +203,6 @@ def test_sync_savepoint_remains_rollbackable_by_outer_transaction(
         assert session.get(MutualFundScheme, 991236) is None
 
 
-
 def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) -> None:
     from mutual_fund_agent_analysis.data.providers.niftyindices import (
         BenchmarkPoint,
@@ -238,9 +237,7 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         benchmark = session.get(BenchmarkIndex, "NIFTY 50")
         assert benchmark is not None
         rows = session.scalars(
-            select(BenchmarkObservation).where(
-                BenchmarkObservation.benchmark_code == "NIFTY 50"
-            )
+            select(BenchmarkObservation).where(BenchmarkObservation.benchmark_code == "NIFTY 50")
         ).all()
         assert len(rows) == 2
         assert {row.source for row in rows} == {"niftyindices"}
