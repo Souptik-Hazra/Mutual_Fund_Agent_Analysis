@@ -5,8 +5,21 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Identity,
-    Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func,
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
