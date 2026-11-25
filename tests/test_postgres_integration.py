@@ -30,6 +30,7 @@ from mutual_fund_agent_analysis.models import (
     EntityIdentifier,
     EntityRelationship,
     EvidenceRecord,
+    InvestorTransaction,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
