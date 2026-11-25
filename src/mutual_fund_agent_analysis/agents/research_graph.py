@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from dataclasses import asdict, is_dataclass
+from functools import lru_cache
 from datetime import date
 from decimal import Decimal
 from typing import Any, TypedDict
@@ -126,7 +127,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                                       "document_url": snapshot.document_url})
                 results[intent] = {
                     "snapshots": snapshots,
-                    "comparison": _jsonable(compare_portfolios(session, codes)) if len(codes) > 1 else None,
+                    "comparison": _jsonable(compare_portfolios(session, codes)) if len(codes) > 1 and len(snapshots) == len(codes) else None,
                 }
             elif intent == "events":
                 if codes:
@@ -208,6 +209,7 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
     return {"answer": answer, "model_used": model_used}
 
 
+@lru_cache(maxsize=1)
 def build_research_graph():
     """Compile a small supervisor graph; DB sessions are passed per invocation."""
     graph = StateGraph(ResearchState)
