@@ -85,6 +85,19 @@ def test_alias_validity_is_temporal(session):
     assert historical.status == "resolved"
 
 
+def test_source_specific_alias_resolution(session):
+    first = create_entity(session, "company", "ABC Holdings")
+    second = create_entity(session, "company", "ABC Limited")
+    add_entity_alias(session, first.entity_id, "ABC", source_key="amfi")
+    add_entity_alias(session, second.entity_id, "ABC", source_key="mfapi")
+    amfi_result = resolve_entity(session, alias="ABC", source_key="amfi")
+    mfapi_result = resolve_entity(session, alias="ABC", source_key="mfapi")
+    assert amfi_result.status == "resolved"
+    assert amfi_result.entity.entity_id == first.entity_id
+    assert mfapi_result.status == "resolved"
+    assert mfapi_result.entity.entity_id == second.entity_id
+
+
 def test_identifier_cannot_be_reassigned(session):
     first = create_entity(session, "company", "ABC Limited")
     second = create_entity(session, "company", "XYZ Limited")
