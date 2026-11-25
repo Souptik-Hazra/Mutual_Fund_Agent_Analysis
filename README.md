@@ -738,6 +738,6 @@ All endpoints are under `/api/v1/intelligence`:
 - `GET /entities/{entity_id}/evidence`: retrieve linked evidence.
 - `POST /resolve`: resolve exact identifiers first and exact aliases second.
 
-The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. Existing NAV and benchmark tables are unchanged in this phase; their existing provider-sync audit records remain the lineage mechanism until a safe backfill and linkage migration is added.
+The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. It also backfills canonical identities for existing schemes and benchmarks. New NAV and benchmark ingestion maintains those identities and identifiers; the original NAV/benchmark schemas and provider-sync audit records remain intact.
 
 See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.md).
