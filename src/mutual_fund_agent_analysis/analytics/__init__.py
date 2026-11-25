@@ -9,8 +9,8 @@ from mutual_fund_agent_analysis.analytics.drawdown import DrawdownMetrics, calcu
 from mutual_fund_agent_analysis.analytics.returns import (
     RollingReturn,
     absolute_return,
-    calendar_year_returns,
     cagr,
+    calendar_year_returns,
     rolling_returns,
     trailing_return,
 )
@@ -18,17 +18,17 @@ from mutual_fund_agent_analysis.analytics.risk import (
     RiskMetrics,
     calculate_risk_metrics,
 )
-from mutual_fund_agent_analysis.analytics.service import (
-    FundAnalyticsReport,
-    analyze_fund,
-    load_benchmark_prices,
-    load_fund_prices,
-)
 from mutual_fund_agent_analysis.analytics.series import (
     PricePoint,
     ReturnPoint,
     normalize_prices,
     period_returns,
+)
+from mutual_fund_agent_analysis.analytics.service import (
+    FundAnalyticsReport,
+    analyze_fund,
+    load_benchmark_prices,
+    load_fund_prices,
 )
 
 __all__ = [
