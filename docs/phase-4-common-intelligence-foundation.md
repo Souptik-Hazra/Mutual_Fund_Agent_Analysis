@@ -12,6 +12,7 @@ Create one canonical identity and provenance layer shared by fund, portfolio, ma
 - Source registry with source type, authority tier (1 is highest), official status, base URL, attribution requirement, enabled state, and metadata. AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI are seeded. Reddit and X are registered but disabled until access, terms, and retention are configured.
 - Evidence records with external ID, canonical URL, title, publication/retrieval times, effective date range, content hash, verification status, confidence, and metadata.
 - Entity-evidence links with relation type, confidence, resolution method, and verification timestamp.
+- Typed entity-to-entity relationships with validity dates, source/evidence references, confidence, verification state, and metadata; for example, a scheme can be related to its AMC with a managed_by edge.
 - Deterministic resolver: exact identifier first, then exact alias; temporal validity and optional source scope are honored; ambiguous aliases return candidates and are never auto-selected.
 - NAV and benchmark ingestion now creates or updates matching canonical entities, provider aliases, and AMFI scheme-code / benchmark-code identifiers; migration backfills identities for already-ingested scheme and benchmark masters.
 - REST API for source listing, entity creation/read, alias and identifier registration, evidence creation, entity-evidence linking, evidence listing, and identity resolution.
@@ -30,6 +31,8 @@ All endpoints are under /api/v1/intelligence.
 | POST | /evidence | Create/update a source evidence reference |
 | POST | /entities/{entity_id}/evidence/{evidence_id} | Link evidence to an entity |
 | GET | /entities/{entity_id}/evidence | List evidence linked to an entity |
+| POST | /entities/{entity_id}/relationships | Create or update a typed temporal relationship |
+| GET | /entities/{entity_id}/relationships | List relationships where the entity is either endpoint |
 | POST | /resolve | Resolve by exact identifier and/or exact alias |
 
 ## Important invariants
@@ -47,7 +50,7 @@ All endpoints are under /api/v1/intelligence.
 
 ## Validation
 
-Unit tests cover normalization, idempotent entity creation, identifier-first resolution, ambiguous aliases, temporal validity, identifier uniqueness, evidence idempotency/linking, invalid URLs/confidence, and disabled sources. API contract tests cover route registration and request validation.
+Unit tests cover normalization, idempotent entity creation, identifier-first resolution, source-aware and ambiguous aliases, temporal validity, identifier uniqueness, evidence idempotency/linking, relationship validation/idempotency, invalid URLs/confidence, and disabled sources. API contract tests cover route registration and request validation.
 
 Run:
 
@@ -59,6 +62,7 @@ Run:
 ## Deliberate follow-up
 
 - Add verified entity-evidence links to NAV and benchmark sync runs after confirming provider record identity and audit semantics.
+- Add reviewed historical validity intervals and conflict-resolution workflow for provider-reported AMC changes.
 - Add evidence links to NAV and benchmark sync runs after validating provider-specific record identity.
 - Add audited entity merge/reconciliation workflow before automatic fuzzy matching.
 - Add source-specific retention enforcement and rights-aware ingestion policies before enabling social connectors.
