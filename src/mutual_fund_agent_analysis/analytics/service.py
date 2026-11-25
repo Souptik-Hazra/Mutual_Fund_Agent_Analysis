@@ -55,7 +55,7 @@ class FundAnalyticsReport:
     benchmark_source: str | None
     nav_conflict_dates: tuple[date, ...]
     calendar_year_as_of_date: date | None
-    frequency: str
+    frequency: str = "daily"
 
 
 @dataclass(frozen=True, slots=True)

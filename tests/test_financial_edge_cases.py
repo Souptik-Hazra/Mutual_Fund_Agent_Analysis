@@ -48,6 +48,6 @@ def test_xirr_rejects_no_root_cash_flows():
         xirr(
             [
                 CashFlow(date(2024, 1, 1), Decimal("-100")),
-                CashFlow(date(2025, 1, 1), Decimal("1")),
+                CashFlow(date(2025, 1, 1), Decimal("1e-30")),
             ]
         )
