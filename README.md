@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Foundation and the first NAV-ingestion vertical slice are implemented on the current development branch. The broader analytics, benchmark verification, holdings, social/news integrations, agent workflows, and frontend remain planned roadmap work.
+> **Project status:** Phases 1–4 are implemented on `main`. Phases 5–8 are implemented on the current feature branch with normalized portfolio ingestion, event intelligence, opt-in social API collection, and PDF document retrieval/Q&A. AMC disclosure files still require source-specific mapping; social APIs require approved credentials and explicit source enablement. See `docs/phases-5-8-implementation.md`.
 
 ## Table of Contents
 
