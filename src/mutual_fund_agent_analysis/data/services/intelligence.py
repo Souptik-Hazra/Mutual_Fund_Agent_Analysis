@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import urlparse
 
@@ -229,7 +229,7 @@ def record_evidence(
         "canonical_url": canonical_url,
         "title": title.strip() if title else None,
         "published_at": published_at,
-        "retrieved_at": retrieved_at or datetime.now().astimezone(),
+        "retrieved_at": retrieved_at or datetime.now(UTC),
         "effective_from": effective_from,
         "effective_to": effective_to,
         "content_hash": content_hash.lower() if content_hash else None,
