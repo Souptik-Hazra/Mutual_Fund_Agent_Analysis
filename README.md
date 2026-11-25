@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Phases 1–4 are implemented on `main`. Phases 5–8 are implemented on the current feature branch with normalized portfolio ingestion, event intelligence, opt-in social API collection, and PDF document retrieval/Q&A. AMC disclosure files still require source-specific mapping; social APIs require approved credentials and explicit source enablement. See `docs/phases-5-8-implementation.md`.
+> **Project status:** Phases 1–8 are implemented on the preceding feature branch; Phases 9–11 add LangGraph research orchestration, a local React workspace, and offline evaluation. This is designed as a personal local application, not a public deployment. See `docs/phases-5-8-implementation.md` and `docs/phases-9-11-personal.md`.
 
 ## Table of Contents
 
@@ -742,3 +742,8 @@ All endpoints are under `/api/v1/intelligence`:
 The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. It also backfills canonical identities for existing schemes, AMCs, and benchmarks, including unverified scheme-to-AMC relationships. New NAV and benchmark ingestion maintains those identities and identifiers. NAV ingestion also registers AMC entities and an unverified `managed_by` relationship from the provider's fund-house field. NAV and benchmark sync runs now create hashed evidence references linked to their canonical entities while keeping full provider payloads in the existing audit tables. The original NAV/benchmark schemas and provider-sync audit records remain intact.
 
 See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.md).
+
+
+## Phases 9–11 — Personal research workspace
+
+Phase 9 adds a LangGraph supervisor that routes questions to deterministic fund, portfolio, event, social and document research services, with optional LLM synthesis. Phase 10 adds the React/Vite workspace in `frontend/`. Phase 11 adds an offline routing benchmark and local operating guidance. Start with `docs/phases-9-11-personal.md` for setup and API usage. The optional LangGraph dependency is installed with `pip install -e ".[agents]"`; the Docker development image includes it automatically.
