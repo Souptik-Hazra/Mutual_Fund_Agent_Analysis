@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,7 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_identifier,
     create_entity,
 )
-from mutual_fund_agent_analysis.models.intelligence import DataSource
+from mutual_fund_agent_analysis.models.intelligence import DataSource, EntityIdentifier, ResearchEntity
 from mutual_fund_agent_analysis.models.benchmark import (
     BenchmarkIndex,
     BenchmarkObservation,
@@ -48,18 +49,27 @@ def upsert_benchmark_response(
     source_key = (
         normalized_source if session.get(DataSource, normalized_source) is not None else None
     )
-    entity = create_entity(
-        session,
-        "benchmark",
-        f"{response.benchmark_name} [{response.benchmark_code}]",
+    entity = session.scalar(
+        select(ResearchEntity)
+        .join(EntityIdentifier, EntityIdentifier.entity_id == ResearchEntity.entity_id)
+        .where(
+            EntityIdentifier.namespace == "BENCHMARK_CODE",
+            EntityIdentifier.normalized_value == response.benchmark_code.upper(),
+        )
     )
+    if entity is None:
+        entity = create_entity(
+            session,
+            "benchmark",
+            f"{response.benchmark_name} [{response.benchmark_code}]",
+        )
+        add_entity_identifier(
+            session, entity.entity_id, "BENCHMARK_CODE", response.benchmark_code,
+            source_key=source_key, is_primary=True,
+        )
     add_entity_alias(
         session, entity.entity_id, response.benchmark_name,
-        alias_type="publisher_name", source_key=source_key, is_primary=True,
-    )
-    add_entity_identifier(
-        session, entity.entity_id, "BENCHMARK_CODE", response.benchmark_code,
-        source_key=source_key, is_primary=True,
+        alias_type="publisher_name", is_primary=True,
     )
 
     fetched_at = datetime.now(UTC)
