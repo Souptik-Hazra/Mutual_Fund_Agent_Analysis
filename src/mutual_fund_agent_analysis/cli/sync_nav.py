@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Sync historical NAV for one mutual fund scheme."
-    )
+    parser = argparse.ArgumentParser(description="Sync historical NAV for one mutual fund scheme.")
     parser.add_argument("scheme_code", type=int, help="AMFI scheme code")
     parser.add_argument("--provider", choices=("mfapi", "amfi"), default="mfapi")
     parser.add_argument("--start-date", type=date.fromisoformat)
