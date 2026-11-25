@@ -729,8 +729,8 @@ def extract_pdf_text(content: bytes) -> tuple[str, int]:
                     ) from exc
             pages.append(extracted)
 
-        text = "\\n\\n".join(
-            f"[Page {index + 1}]\\n{value}"
+        text = "\n\n".join(
+            f"[Page {index + 1}]\n{value}"
             for index, value in enumerate(pages)
             if value
         )
@@ -741,7 +741,7 @@ def extract_pdf_text(content: bytes) -> tuple[str, int]:
                 )
             raise ValueError("PDF text extraction and OCR did not produce enough readable content.")
         if ocr_pages:
-            text = f"[OCR pages: {ocr_pages}]\\n\\n" + text
+            text = f"[OCR pages: {ocr_pages}]\n\n" + text
         return text, len(document)
     finally:
         document.close()
