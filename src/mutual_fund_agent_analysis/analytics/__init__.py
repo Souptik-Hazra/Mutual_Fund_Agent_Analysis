@@ -18,7 +18,7 @@ from mutual_fund_agent_analysis.analytics.risk import (
     RiskMetrics,
     calculate_risk_metrics,
 )
-from mutual_fund_agent_analysis.analytics.series import (
+from mutual_fund_agent_analysis.analytics.service import (\n    FundAnalyticsReport,\n    analyze_fund,\n    load_benchmark_prices,\n    load_fund_prices,\n)\nfrom mutual_fund_agent_analysis.analytics.series import (
     PricePoint,
     ReturnPoint,
     normalize_prices,
@@ -27,19 +27,19 @@ from mutual_fund_agent_analysis.analytics.series import (
 
 __all__ = [
     "BenchmarkMetrics",
-    "DrawdownMetrics",
+    "DrawdownMetrics",\n    "FundAnalyticsReport",
     "PricePoint",
     "ReturnPoint",
     "RiskMetrics",
     "RollingReturn",
-    "absolute_return",
+    "absolute_return",\n    "analyze_fund",
     "align_returns",
     "calculate_benchmark_metrics",
     "calculate_drawdown",
     "calculate_risk_metrics",
     "calendar_year_returns",
     "cagr",
-    "normalize_prices",
+    "load_benchmark_prices",\n    "load_fund_prices",\n    "normalize_prices",
     "period_returns",
     "rolling_returns",
     "trailing_return",
