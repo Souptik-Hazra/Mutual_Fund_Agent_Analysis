@@ -3,6 +3,7 @@
 from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -37,7 +38,7 @@ def _report_payload(report: object) -> dict:
 
 @router.get("/schemes/discover", response_model=SchemeDiscoveryResponse)
 def discover_schemes(
-    q: str = Query(min_length=2, max_length=120),
+    q: Annotated[str, Query(min_length=2, max_length=120)],
 ) -> SchemeDiscoveryResponse:
     """Search the upstream MFAPI scheme directory without writing to the database."""
     normalized = q.strip()
@@ -66,15 +67,15 @@ def discover_schemes(
 
 @router.get("/schemes", response_model=SchemePage)
 def list_schemes(
-    q: str | None = Query(default=None, min_length=2, max_length=120),
-    fund_house: str | None = Query(default=None, min_length=1, max_length=250),
-    category: str | None = Query(default=None, min_length=1, max_length=250),
-    scheme_type: str | None = Query(default=None, min_length=1, max_length=120),
-    plan: str | None = Query(default=None, pattern="^(direct|regular)$"),
-    option: str | None = Query(default=None, pattern="^(growth|idcw)$"),
-    limit: int = Query(default=25, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-    session: Session = Depends(get_db),
+    session: Annotated[Session, Depends(get_db)],
+    q: Annotated[str | None, Query(min_length=2, max_length=120)] = None,
+    fund_house: Annotated[str | None, Query(min_length=1, max_length=250)] = None,
+    category: Annotated[str | None, Query(min_length=1, max_length=250)] = None,
+    scheme_type: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    plan: Annotated[str | None, Query(pattern="^(direct|regular)$")] = None,
+    option: Annotated[str | None, Query(pattern="^(growth|idcw)$")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> SchemePage:
     """List locally ingested schemes with stable pagination and metadata filters."""
     statement = select(MutualFundScheme)
@@ -83,7 +84,10 @@ def list_schemes(
     if q:
         normalized_query = q.strip()
         if len(normalized_query) < 2:
-            raise HTTPException(status_code=422, detail="Search query must contain at least two characters.")
+            raise HTTPException(
+                status_code=422,
+                detail="Search query must contain at least two characters.",
+            )
         pattern = f"%{normalized_query}%"
         filters.append(
             or_(
@@ -131,7 +135,7 @@ def list_schemes(
 @router.get("/schemes/{scheme_code}", response_model=SchemeDetail)
 def get_scheme(
     scheme_code: int,
-    session: Session = Depends(get_db),
+    session: Annotated[Session, Depends(get_db)],
 ) -> SchemeDetail:
     """Return cached scheme metadata and its latest reconciled NAV."""
     _validate_scheme_code(scheme_code)
@@ -158,15 +162,15 @@ def get_scheme(
 @router.get("/schemes/{scheme_code}/analytics", response_model=FundAnalyticsResponse)
 def get_fund_analytics(
     scheme_code: int,
+    session: Annotated[Session, Depends(get_db)],
     start_date: date | None = None,
     end_date: date | None = None,
-    benchmark_code: str | None = Query(default=None, min_length=1, max_length=80),
-    annual_risk_free_rate: Decimal = Query(default=Decimal("0"), ge=Decimal("-1")),
-    periods_per_year: int = Query(default=252, ge=1, le=366),
-    benchmark_source: str = Query(default="niftyindices", min_length=1, max_length=40),
+    benchmark_code: Annotated[str | None, Query(min_length=1, max_length=80)] = None,
+    annual_risk_free_rate: Annotated[Decimal, Query(ge=Decimal("-1"))] = Decimal("0"),
+    periods_per_year: Annotated[int, Query(ge=1, le=366)] = 252,
+    benchmark_source: Annotated[str, Query(min_length=1, max_length=40)] = "niftyindices",
     allow_nav_conflicts: bool = False,
     calendar_year_as_of_date: date | None = None,
-    session: Session = Depends(get_db),
 ) -> FundAnalyticsResponse:
     """Calculate one fund's metrics from reconciled NAV and optional benchmark TRI."""
     _validate_scheme_code(scheme_code)
@@ -198,7 +202,7 @@ def get_fund_analytics(
 @router.post("/schemes/compare", response_model=FundComparisonResponse)
 def compare_selected_funds(
     request: FundComparisonRequest,
-    session: Session = Depends(get_db),
+    session: Annotated[Session, Depends(get_db)],
 ) -> FundComparisonResponse:
     """Compare up to five funds on the exact shared NAV/benchmark observation dates."""
     try:
