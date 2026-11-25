@@ -2,7 +2,6 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal
 
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint, normalize_returns
