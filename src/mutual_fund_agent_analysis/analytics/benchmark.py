@@ -1,8 +1,8 @@
 """Exact-date benchmark alignment, beta, alpha, and excess returns."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
-from collections.abc import Iterable
 
 from mutual_fund_agent_analysis.analytics.risk import DEFAULT_PERIODS_PER_YEAR, _mean
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint
