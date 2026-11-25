@@ -233,3 +233,17 @@ def test_drawdown_recovery_duration_is_measured_from_trough() -> None:
         )
     )
     assert result.recovery_duration_days == 12
+
+
+
+def test_price_inputs_require_decimal_values() -> None:
+    with pytest.raises(TypeError, match="Decimal"):
+        absolute_return([PricePoint(date(2024, 1, 1), 100)])  # type: ignore[arg-type]
+
+
+def test_risk_frequency_must_be_a_positive_integer() -> None:
+    with pytest.raises(ValueError, match="positive integer"):
+        calculate_risk_metrics(
+            returns(("2024-01-02", "0.01"), ("2024-01-03", "0.02")),
+            periods_per_year=12.5,  # type: ignore[arg-type]
+        )
