@@ -190,3 +190,16 @@ def test_database_loader_can_explicitly_include_and_report_nav_conflicts() -> No
     prices, conflicts = load_fund_prices(session, 12345, allow_nav_conflicts=True)
     assert [point.value for point in prices] == [Decimal("100"), Decimal("101")]
     assert conflicts == (conflict_date,)
+
+
+
+def test_one_year_rolling_window_uses_calendar_anniversary() -> None:
+    observations = prices(
+        ("2023-02-28", "100"),
+        ("2023-03-01", "200"),
+        ("2024-02-29", "110"),
+    )
+    result = rolling_returns(observations, windows_years=(1,))
+    latest = next(item for item in result if item.end_date == date(2024, 2, 29))
+    assert latest.start_date == date(2023, 2, 28)
+    assert latest.value == Decimal("0.1")
