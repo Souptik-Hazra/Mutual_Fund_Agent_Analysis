@@ -166,7 +166,7 @@ def resolve_entity_endpoint(
     try:
         result = resolve_entity(
             session, request.entity_type, request.namespace, request.identifier_value,
-            request.alias, request.as_of,
+            request.alias, request.as_of, request.source_key,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
