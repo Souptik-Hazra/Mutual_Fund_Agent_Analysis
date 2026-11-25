@@ -21,3 +21,7 @@ artifacts/
 *.db
 *.sqlite
 *.sqlite3
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
