@@ -23,7 +23,7 @@ def reciprocal_rank_fusion(
         seen: set[tuple[Any, Any]] = set()
         for rank, row in enumerate(rows, start=1):
             citation = row.get("citation") or {}
-            key = (citation.get("document_id", row.get("document_id")), citation.get("chunk_id"))
+            key = (row.get("document_id", citation.get("document_id")), row.get("chunk_index", citation.get("chunk_index", citation.get("chunk_id"))))
             if key[0] is None or key[1] is None or key in seen:
                 continue
             seen.add(key)
