@@ -594,6 +594,7 @@ def test_security_observation_source_url_must_match_registered_https_host():
         "http://www.nseindia.com/filings",
         "https://nseindia.com.attacker.example/filings",
         "https://attacker.example/nse/filings",
+        "https://nseindia.com:8443/filings",
     ):
         with pytest.raises(HTTPException):
             _validate_registered_source_url(source, candidate)
@@ -635,4 +636,30 @@ def test_portfolio_upload_rejects_more_than_5000_rows_before_persistence():
                 effective_date=date(2026, 11, 25),
             )
         )
+    assert error.value.status_code == 413
+
+
+
+def test_portfolio_upload_rejects_xlsx_with_rows_beyond_bounded_scan():
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["security_key", "security_name", "asset_class"])
+    sheet.cell(row=6000, column=1, value="INE000000001")
+    content = io.BytesIO()
+    workbook.save(content)
+    workbook.close()
+    upload = UploadFile(filename="sparse.xlsx", file=io.BytesIO(content.getvalue()))
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_portfolio_file(
+                session=None,
+                file=upload,
+                scheme_code=100,
+                effective_date=date(2026, 11, 25),
+            )
+        )
+
     assert error.value.status_code == 413
