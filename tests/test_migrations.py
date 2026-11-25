@@ -21,5 +21,6 @@ def test_migration_graph_has_single_expected_financial_head():
     config.set_main_option("script_location", str(root / "migrations"))
     scripts = ScriptDirectory.from_config(config)
     assert scripts.get_heads() == ["0011_security_market_obs"]
+    assert len(scripts.get_heads()[0]) <= 32
     revision = scripts.get_revision("0011_security_market_obs")
     assert revision.down_revision == "0010_market_event_revisions"
