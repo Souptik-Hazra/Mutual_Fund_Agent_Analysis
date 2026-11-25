@@ -5,7 +5,6 @@ from pathlib import Path
 from mutual_fund_agent_analysis.evaluation.runner import evaluate_routing, load_and_evaluate
 
 
-
 def test_routing_evaluator_reports_exact_accuracy_and_per_intent_scores():
     result = evaluate_routing(
         [
