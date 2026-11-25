@@ -102,6 +102,10 @@ def security_profile(
             for row in holdings
         ]
 
+    event_observation = next(
+        (row for row in observations if row.corporate_events_json), None
+    )
+
     corporate_events = [
         {
             **event,
@@ -129,9 +133,6 @@ def security_profile(
     )
     fundamentals_observation = next(
         (row for row in observations if row.fundamentals_json), None
-    )
-    event_observation = next(
-        (row for row in observations if row.corporate_events_json), None
     )
     fundamentals_as_of = (
         fundamentals_observation.fundamentals_as_of if fundamentals_observation else None
