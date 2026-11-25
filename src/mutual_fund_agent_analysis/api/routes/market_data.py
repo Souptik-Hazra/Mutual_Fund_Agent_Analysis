@@ -339,14 +339,7 @@ def ingest_security_observation(
             key: str(value) if value is not None else None
             for key, value in payload.fundamentals.items()
         },
-        corporate_events_json=[
-            {
-                **event.model_dump(mode="json"),
-                "source_key": source_key,
-                "verification_status": "unverified",
-            }
-            for event in payload.corporate_events
-        ],
+        corporate_events_json=corporate_events,
         content_hash=digest,
     )
     session.add(row)
