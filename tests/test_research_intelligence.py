@@ -689,10 +689,10 @@ def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypat
     session.flush()
 
     for index in range(205):
-        text = "bank " if index < 204 else " ".join(["bank"] * 20)
+        text = " ".join(["bank"] * 20) if index == 0 else "bank "
         document = ResearchDocument(
             source_key="test_source",
-            title="Older high-relevance document" if index == 204 else f"Document {index}",
+            title="Older high-relevance document" if index == 0 else f"Document {index}",
             media_type="text/plain",
             content_hash=f"{index:064x}",
             extracted_text=text,
