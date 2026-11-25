@@ -280,8 +280,17 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
         raise ValueError("Unknown or disabled source_key.")
     if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
         raise ValueError("Unknown related_entity_id.")
-    if payload.evidence_id and session.get(EvidenceRecord, payload.evidence_id) is None:
+    evidence = session.get(EvidenceRecord, payload.evidence_id) if payload.evidence_id else None
+    if payload.evidence_id and evidence is None:
         raise ValueError("Unknown evidence_id.")
+    if payload.status in {"confirmed", "scheduled", "disproved"} and evidence is None:
+        raise ValueError("Confirmed, scheduled, and disproved events require a linked evidence record.")
+    if payload.status in {"confirmed", "scheduled"} and (
+        evidence is None or evidence.verification_status not in {"verified", "corroborated"}
+    ):
+        raise ValueError("Confirmed or scheduled events require verified or corroborated evidence.")
+    if payload.status == "scheduled" and not source.is_official:
+        raise ValueError("Scheduled events must originate from an official source.")
     event = MarketEvent(
         source_key=payload.source_key, external_id=payload.external_id,
         related_entity_id=payload.related_entity_id, evidence_id=payload.evidence_id,
@@ -313,6 +322,8 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
         raise ValueError("Social source is not registered and enabled. Enable it only after API/terms review.")
     if payload.related_entity_id and session.get(ResearchEntity, payload.related_entity_id) is None:
         raise ValueError("Unknown related_entity_id.")
+    if payload.expires_at <= datetime.now(timezone.utc):
+        raise ValueError("Social post expiry must be in the future.")
     row = session.scalar(select(SocialPost).where(
         SocialPost.source_key == payload.source_key, SocialPost.external_id == payload.external_id
     ))
