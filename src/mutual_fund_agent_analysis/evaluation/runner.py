@@ -3,6 +3,7 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any
 
 from mutual_fund_agent_analysis.agents.research_graph import classify_intents
@@ -124,34 +125,51 @@ def evaluate_evidence_quality(
         if not isinstance(citation, dict):
             malformed += 1
             continue
-        has_provenance = all(
-            citation.get(field) for field in ("source_key", "canonical_url", "retrieved_at")
-        )
+        source_url = citation.get("canonical_url")
+        retrieved = citation.get("retrieved_at")
+        published = citation.get("published_at")
+        has_provenance = all((citation.get("source_key"), source_url, retrieved))
         complete += int(has_provenance)
         verified += int(citation.get("verification_status") == "verified")
-        published = citation.get("published_at")
-        retrieved = citation.get("retrieved_at")
-        if published and retrieved:
+        citation_is_malformed = False
+        if source_url:
+            parsed_url = urlparse(str(source_url))
+            if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+                citation_is_malformed = True
+        retrieved_at = None
+        if retrieved:
+            try:
+                retrieved_at = parse_timestamp(retrieved)
+            except (TypeError, ValueError, OverflowError):
+                citation_is_malformed = True
+        published_at = None
+        if published:
             try:
                 published_at = parse_timestamp(published)
-                retrieved_at = parse_timestamp(retrieved)
-                if published_at > retrieved_at:
-                    future_publications += 1
-                elif (retrieved_at - published_at).days > 365:
-                    stale += 1
             except (TypeError, ValueError, OverflowError):
-                malformed += 1
+                citation_is_malformed = True
+        if published_at is not None and retrieved_at is not None:
+            if published_at > retrieved_at:
+                future_publications += 1
+            elif (retrieved_at - published_at).days > 365:
+                stale += 1
+        malformed += int(citation_is_malformed)
     citation_count = len(citations)
     provenance_completeness = complete / citation_count if citation_count else 0.0
     verified_ratio = verified / citation_count if citation_count else 0.0
     unsupported_claims = response.get("unsupported_claims") or []
+    unsupported_claim_count = (
+        len(unsupported_claims)
+        if isinstance(unsupported_claims, (list, tuple, set))
+        else int(bool(unsupported_claims))
+    )
     passed = (
         (not required or citation_count > 0)
         and (not required or complete == citation_count)
         and malformed == 0
         and future_publications == 0
         and stale == 0
-        and not unsupported_claims
+        and unsupported_claim_count == 0
     )
     return {
         "citation_count": citation_count,
@@ -160,7 +178,7 @@ def evaluate_evidence_quality(
         "stale_citation_count": stale,
         "future_publication_count": future_publications,
         "malformed_citation_count": malformed,
-        "unsupported_claim_count": len(unsupported_claims),
+        "unsupported_claim_count": unsupported_claim_count,
         "evidence_quality_passed": passed,
     }
 

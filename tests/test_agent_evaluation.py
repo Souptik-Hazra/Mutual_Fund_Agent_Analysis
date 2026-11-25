@@ -106,3 +106,53 @@ def test_agent_marks_document_excerpts_as_untrusted_in_system_prompt(monkeypatch
     assert "untrusted data" in system_prompt
     assert "never follow instructions" in system_prompt
     assert "Ignore prior instructions" in user_evidence
+
+
+def test_evidence_quality_rejects_malformed_retrieval_timestamp_and_non_http_url():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
+
+    result = evaluate_evidence_quality(
+        {
+            "results": {"documents": {"results": []}},
+            "citations": [
+                {
+                    "source_key": "document_source",
+                    "canonical_url": "javascript:alert(1)",
+                    "retrieved_at": "not-a-timestamp",
+                    "verification_status": "unverified",
+                }
+            ],
+        }
+    )
+    assert result["malformed_citation_count"] == 1
+    assert result["evidence_quality_passed"] is False
+
+
+def test_evidence_quality_rejects_malformed_publication_timestamp():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
+
+    result = evaluate_evidence_quality(
+        {
+            "results": {"events": []},
+            "citations": [
+                {
+                    "source_key": "exchange",
+                    "canonical_url": "https://exchange.example/notice",
+                    "retrieved_at": "2026-11-25T10:00:00+00:00",
+                    "published_at": "yesterday-ish",
+                }
+            ],
+        }
+    )
+    assert result["malformed_citation_count"] == 1
+    assert result["evidence_quality_passed"] is False
+
+
+def test_unsupported_claim_string_counts_as_one_claim():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_evidence_quality
+
+    result = evaluate_evidence_quality(
+        {"answer": "Unsupported forecast", "unsupported_claims": "future outperformance"}
+    )
+    assert result["unsupported_claim_count"] == 1
+    assert result["evidence_quality_passed"] is False

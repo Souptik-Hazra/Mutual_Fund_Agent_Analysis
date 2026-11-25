@@ -89,5 +89,44 @@
       "answer": "Insufficient source coverage.",
       "citations": []
     }
+  },
+  {
+    "name": "malformed retrieval timestamp and non-http citation URL",
+    "expected_pass": false,
+    "response": {
+      "results": {
+        "documents": {
+          "results": []
+        }
+      },
+      "citations": [
+        {
+          "type": "document_chunk",
+          "source_key": "document_source",
+          "canonical_url": "javascript:alert(1)",
+          "retrieved_at": "not-a-timestamp",
+          "verification_status": "unverified"
+        }
+      ]
+    }
+  },
+  {
+    "name": "stale source citation",
+    "expected_pass": false,
+    "response": {
+      "results": {
+        "events": []
+      },
+      "citations": [
+        {
+          "type": "market_event",
+          "source_key": "exchange_official",
+          "canonical_url": "https://www.nseindia.com/example/old-notice",
+          "retrieved_at": "2026-11-25T10:00:00+00:00",
+          "published_at": "2024-01-01T10:00:00+00:00",
+          "verification_status": "verified"
+        }
+      ]
+    }
   }
 ]
