@@ -1,5 +1,6 @@
 """Personal research assistant endpoints."""
 
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,7 @@ from mutual_fund_agent_analysis.api.schemas.assistant import ResearchAssistantRe
 from mutual_fund_agent_analysis.database.session import get_db
 
 router = APIRouter(prefix="/assistant", tags=["research-assistant"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/capabilities")
@@ -42,4 +44,5 @@ def run_research(
             "model_used": result.get("model_used"),
         })
     except Exception as exc:
+        logger.exception("Research workflow execution failed.")
         raise HTTPException(status_code=500, detail="Research workflow failed. Check local API logs.") from exc
