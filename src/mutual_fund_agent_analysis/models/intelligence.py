@@ -20,6 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -109,6 +110,13 @@ class EntityAlias(Base):
             "entity_id", "normalized_alias", "valid_from", name="uq_entity_alias_identity"
         ),
         Index("ix_entity_aliases_normalized", "normalized_alias"),
+        Index(
+            "uq_entity_aliases_primary",
+            "entity_id",
+            unique=True,
+            postgresql_where=text("is_primary IS TRUE"),
+            sqlite_where=text("is_primary = 1"),
+        ),
     )
 
     alias_id: Mapped[int] = mapped_column(_ID_TYPE, Identity(), primary_key=True)
@@ -140,6 +148,14 @@ class EntityIdentifier(Base):
         ),
         UniqueConstraint("namespace", "normalized_value", name="uq_entity_identifier_value"),
         Index("ix_entity_identifiers_entity", "entity_id"),
+        Index(
+            "uq_entity_identifiers_primary",
+            "entity_id",
+            "namespace",
+            unique=True,
+            postgresql_where=text("is_primary IS TRUE"),
+            sqlite_where=text("is_primary = 1"),
+        ),
     )
 
     identifier_id: Mapped[int] = mapped_column(_ID_TYPE, Identity(), primary_key=True)
