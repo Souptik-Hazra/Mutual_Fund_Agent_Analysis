@@ -9,8 +9,8 @@ from mutual_fund_agent_analysis.analytics import (
     PricePoint,
     ReturnPoint,
     assess_return_coverage,
-    calendar_year_returns,
     calculate_benchmark_metrics,
+    calendar_year_returns,
     trailing_return_details,
 )
 from mutual_fund_agent_analysis.analytics.risk import calculate_risk_metrics
