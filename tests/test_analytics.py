@@ -1,6 +1,6 @@
 """Tests for deterministic financial analytics."""
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -29,7 +29,14 @@ def prices(*items: tuple[str, str]) -> list[PricePoint]:
 
 
 def returns(*items: tuple[str, str]) -> list[ReturnPoint]:
-    return [ReturnPoint(date.fromisoformat(day), Decimal(value)) for day, value in items]
+    return [
+        ReturnPoint(
+            date.fromisoformat(day),
+            Decimal(value),
+            date.fromisoformat(day) - timedelta(days=1),
+        )
+        for day, value in items
+    ]
 
 
 def test_absolute_return_and_cagr() -> None:
@@ -137,7 +144,7 @@ def test_drawdown_reports_peak_trough_and_recovery() -> None:
     assert result.trough_date == date(2024, 1, 20)
     assert result.recovery_date == date(2024, 2, 1)
     assert result.drawdown_duration_days == 10
-    assert result.recovery_duration_days == 22
+    assert result.recovery_duration_days == 12
 
 
 def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
@@ -201,3 +208,28 @@ def test_one_year_rolling_window_uses_calendar_anniversary() -> None:
     latest = next(item for item in result if item.end_date == date(2024, 2, 29))
     assert latest.start_date == date(2023, 2, 28)
     assert latest.value == Decimal("0.1")
+
+
+
+def test_return_alignment_rejects_missing_or_invalid_intervals() -> None:
+    invalid = ReturnPoint(date(2024, 1, 2), Decimal("0.01"), date(2024, 1, 2))
+    with pytest.raises(ValueError, match="start_date earlier than date"):
+        align_returns([invalid], [])
+
+
+def test_return_alignment_rejects_duplicate_intervals() -> None:
+    duplicate = ReturnPoint(date(2024, 1, 2), Decimal("0.01"), date(2024, 1, 1))
+    with pytest.raises(ValueError, match="Duplicate return observation intervals"):
+        align_returns([duplicate, duplicate], [duplicate])
+
+
+def test_drawdown_recovery_duration_is_measured_from_trough() -> None:
+    result = calculate_drawdown(
+        prices(
+            ("2024-01-01", "100"),
+            ("2024-01-10", "120"),
+            ("2024-01-20", "90"),
+            ("2024-02-01", "125"),
+        )
+    )
+    assert result.recovery_duration_days == 12
