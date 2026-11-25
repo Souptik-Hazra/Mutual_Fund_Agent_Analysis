@@ -57,9 +57,19 @@ def calculate_benchmark_metrics(
     if any(not value.is_finite() or value <= Decimal("-1") for value in f_values + b_values):
         raise ValueError("Returns must be finite and greater than -100%.")
     f_mean, b_mean = _mean(f_values), _mean(b_values)
+    annualized_fund = f_mean * Decimal(periods_per_year)
+    annualized_benchmark = b_mean * Decimal(periods_per_year)
+    mean_excess = f_mean - b_mean
     b_variance = sum(((value - b_mean) ** 2 for value in b_values), Decimal("0"))
     if b_variance == 0:
-        return BenchmarkMetrics(count, None, None, None, None, None)
+        return BenchmarkMetrics(
+            count,
+            None,
+            None,
+            annualized_fund,
+            annualized_benchmark,
+            mean_excess,
+        )
 
     covariance = sum(
         (
@@ -75,7 +85,7 @@ def calculate_benchmark_metrics(
         count,
         beta,
         alpha,
-        f_mean * Decimal(periods_per_year),
-        b_mean * Decimal(periods_per_year),
-        f_mean - b_mean,
+        annualized_fund,
+        annualized_benchmark,
+        mean_excess,
     )
