@@ -100,7 +100,8 @@ def get_entity(entity_id: int, session: Annotated[Session, Depends(get_db)]):
 
 
 @router.post(
-    "/entities/{entity_id}/aliases", response_model=AliasResponse,
+    "/entities/{entity_id}/aliases",
+    response_model=AliasResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def add_alias_endpoint(
