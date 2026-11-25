@@ -85,11 +85,11 @@ def test_amfi_chunks_long_date_ranges() -> None:
         row = f"125497;HDFC Test Fund;ISIN;-;10.2500;0;0;{chunk_date.strftime('%d-%b-%Y')}"
         return httpx.Response(200, text=row)
 
-    with AMFIClient(transport=httpx.MockTransport(handler), chunk_days=10) as client:
+    with AMFIClient(transport=httpx.MockTransport(handler), chunk_days=7) as client:
         response = client.get_nav_history(125497, date(2024, 10, 1), date(2024, 10, 20))
 
-    assert len(requests) == 2
-    assert len(response.data) == 2
+    assert len(requests) == 3
+    assert len(response.data) == 3
 
 
 def test_amfi_default_chunk_is_seven_days() -> None:
