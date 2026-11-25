@@ -14,7 +14,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mutual_fund_agent_analysis.analytics.distributions import reinvested_distribution_index
+from mutual_fund_agent_analysis.analytics.distributions import (
+    payout_distribution_index,
+    reinvested_distribution_index,
+)
 from mutual_fund_agent_analysis.api.schemas.financial import (
     CoverageAuditResponse,
     DistributionCoverageAttestationCreate,

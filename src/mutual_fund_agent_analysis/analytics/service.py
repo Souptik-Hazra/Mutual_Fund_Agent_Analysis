@@ -205,12 +205,28 @@ def _build_report(
             "nav_return_basis": "NAV-only price return; IDCW distributions are excluded.",
             "absolute_return": "(ending NAV / starting NAV) - 1.",
             "cagr": "Geometric annualization using 365.25 calendar days.",
-            "annualized_volatility": "Sample standard deviation of periodic simple NAV returns multiplied by sqrt(periods_per_year).",
-            "annualized_downside_deviation": "Root mean square periodic shortfall below the periodic risk-free rate, multiplied by sqrt(periods_per_year).",
-            "sharpe_sortino": "Periodic excess returns use annual_risk_free_rate / periods_per_year.",
-            "beta": "Sample covariance of exact interval-aligned fund and TRI returns divided by sample benchmark variance.",
-            "alpha": "Arithmetic annualized Jensen alpha using the periodic risk-free rate.",
-            "benchmark_return": "Arithmetic mean of exact interval-aligned TRI simple returns multiplied by periods_per_year; not CAGR.",
+            "annualized_volatility": (
+                "Sample standard deviation of periodic simple NAV returns multiplied by "
+                "sqrt(periods_per_year)."
+            ),
+            "annualized_downside_deviation": (
+                "Root mean square periodic shortfall below the periodic risk-free rate, "
+                "multiplied by sqrt(periods_per_year)."
+            ),
+            "sharpe_sortino": (
+                "Periodic excess returns use annual_risk_free_rate / periods_per_year."
+            ),
+            "beta": (
+                "Sample covariance of exact interval-aligned fund and TRI returns divided "
+                "by sample benchmark variance."
+            ),
+            "alpha": (
+                "Arithmetic annualized Jensen alpha using the periodic risk-free rate."
+            ),
+            "benchmark_return": (
+                "Arithmetic mean of exact interval-aligned TRI simple returns multiplied "
+                "by periods_per_year; not CAGR."
+            ),
         },
     )
 
