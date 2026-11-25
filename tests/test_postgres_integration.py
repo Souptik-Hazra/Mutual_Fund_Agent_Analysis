@@ -25,10 +25,16 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkIndex,
     BenchmarkObservation,
     BenchmarkSyncRun,
+    EntityAlias,
+    EntityEvidenceLink,
+    EntityIdentifier,
+    EntityRelationship,
+    EvidenceRecord,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
     ProviderSyncRun,
+    ResearchEntity,
 )
 
 
@@ -88,6 +94,24 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     command.upgrade(config, "0001_initial_market_data")
     original_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(original_key["constrained_columns"]) == {"scheme_code", "nav_date"}
+    with migrated_postgres.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO mutual_fund_schemes "
+                "(scheme_code, scheme_name, fund_house, source) "
+                "VALUES (880001, 'Migration Backfill Equity Fund', "
+                "'Migration AMC', 'amfi')"
+            )
+        )
+    command.upgrade(config, "0005_benchmark_tri")
+    with migrated_postgres.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO benchmark_indices "
+                "(benchmark_code, benchmark_name, provider) "
+                "VALUES ('MIGRATION_TEST', 'Migration Test Index', 'niftyindices')"
+            )
+        )
     command.upgrade(config, "head")
     tables = inspect(migrated_postgres).get_table_names()
     assert "mutual_fund_schemes" in tables
@@ -97,7 +121,62 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "benchmark_indices" in tables
     assert "benchmark_observations" in tables
     assert "benchmark_sync_runs" in tables
+    assert "data_sources" in tables
+    assert "research_entities" in tables
+    assert "entity_aliases" in tables
+    assert "entity_identifiers" in tables
+    assert "evidence_records" in tables
+    assert "entity_evidence_links" in tables
+    assert "entity_relationships" in tables
     assert "alembic_version" in tables
+    alias_indexes = {
+        item["name"] for item in inspect(migrated_postgres).get_indexes("entity_aliases")
+    }
+    identifier_indexes = {
+        item["name"] for item in inspect(migrated_postgres).get_indexes("entity_identifiers")
+    }
+    assert "uq_entity_aliases_primary" in alias_indexes
+    assert "uq_entity_identifiers_primary" in identifier_indexes
+    with Session(migrated_postgres) as session:
+        scheme_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+                EntityIdentifier.normalized_value == "880001",
+            )
+        )
+        benchmark_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "BENCHMARK_CODE",
+                EntityIdentifier.normalized_value == "MIGRATION_TEST",
+            )
+        )
+        assert scheme_identifier is not None
+        assert benchmark_identifier is not None
+        benchmark_alias = session.scalar(
+            select(EntityAlias).where(
+                EntityAlias.entity_id == benchmark_identifier.entity_id,
+                EntityAlias.normalized_alias == "migration test index",
+            )
+        )
+        assert benchmark_alias is not None
+        scheme_entity = session.get(ResearchEntity, scheme_identifier.entity_id)
+        assert scheme_entity is not None
+        amc_entity = session.scalar(
+            select(ResearchEntity).where(
+                ResearchEntity.entity_type == "amc",
+                ResearchEntity.canonical_name == "Migration AMC",
+            )
+        )
+        assert amc_entity is not None
+        relationship = session.scalar(
+            select(EntityRelationship).where(
+                EntityRelationship.from_entity_id == scheme_entity.entity_id,
+                EntityRelationship.to_entity_id == amc_entity.entity_id,
+                EntityRelationship.relation_type == "managed_by",
+            )
+        )
+        assert relationship is not None
+        assert relationship.verification_status == "unverified"
     source_key = inspect(migrated_postgres).get_pk_constraint("nav_observations")
     assert set(source_key["constrained_columns"]) == {"scheme_code", "nav_date", "source"}
     check_database_connection()
@@ -137,6 +216,74 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         }
         assert sync_runs[0].response_payload["meta"]["scheme_code"] == 991234
         assert sync_runs[0].observation_count == 1
+        scheme_entity = session.scalar(
+            select(ResearchEntity).where(
+                ResearchEntity.entity_type == "scheme",
+                ResearchEntity.canonical_name == "Integration Test Equity Fund [991234]",
+            )
+        )
+        assert scheme_entity is not None
+        scheme_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+                EntityIdentifier.normalized_value == "991234",
+            )
+        )
+        assert scheme_identifier is not None
+        assert scheme_identifier.entity_id == scheme_entity.entity_id
+        manager_relationship = session.scalar(
+            select(EntityRelationship).where(
+                EntityRelationship.from_entity_id == scheme_entity.entity_id,
+                EntityRelationship.relation_type == "managed_by",
+            )
+        )
+        assert manager_relationship is not None
+        assert manager_relationship.verification_status == "unverified"
+        assert manager_relationship.evidence_id is not None
+        sync_evidence = session.scalars(
+            select(EvidenceRecord).where(
+                EvidenceRecord.source_key.in_(["amfi", "mfapi"]),
+                EvidenceRecord.external_id.like("provider-sync-run:%"),
+            )
+        ).all()
+        assert len(sync_evidence) == 3
+        assert all(
+            session.get(EntityEvidenceLink, (scheme_entity.entity_id, item.evidence_id))
+            for item in sync_evidence
+        )
+
+
+def test_scheme_identity_survives_provider_name_changes(migrated_postgres: Engine) -> None:
+    first = MFAPINavResponse.model_validate(
+        {
+            "meta": {"scheme_code": 991237, "scheme_name": "Old Scheme Name"},
+            "data": [{"date": "25-11-2026", "nav": "10.0"}],
+            "status": "SUCCESS",
+        }
+    )
+    renamed = MFAPINavResponse.model_validate(
+        {
+            "meta": {"scheme_code": 991237, "scheme_name": "New Scheme Name"},
+            "data": [{"date": "26-11-2026", "nav": "10.1"}],
+            "status": "SUCCESS",
+        }
+    )
+    with Session(migrated_postgres) as session, session.begin():
+        upsert_nav_response(session, first, source="mfapi")
+        upsert_nav_response(session, renamed, source="amfi")
+
+    with Session(migrated_postgres) as session:
+        identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+                EntityIdentifier.normalized_value == "991237",
+            )
+        )
+        assert identifier is not None
+        aliases = session.scalars(
+            select(EntityAlias).where(EntityAlias.entity_id == identifier.entity_id)
+        ).all()
+        assert {alias.alias for alias in aliases} >= {"Old Scheme Name", "New Scheme Name"}
 
 
 def test_postgres_upsert_does_not_erase_optional_scheme_metadata(
@@ -251,3 +398,24 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         ).all()
         assert len(runs) == 2
         assert runs[0].response_payload["fixture"] is True
+        benchmark_identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "BENCHMARK_CODE",
+                EntityIdentifier.normalized_value == "NIFTY50",
+            )
+        )
+        assert benchmark_identifier is not None
+        benchmark_entity = session.get(ResearchEntity, benchmark_identifier.entity_id)
+        assert benchmark_entity is not None
+        assert benchmark_entity.entity_type == "benchmark"
+        benchmark_evidence = session.scalars(
+            select(EvidenceRecord).where(
+                EvidenceRecord.source_key == "niftyindices",
+                EvidenceRecord.external_id.like("benchmark-sync-run:%"),
+            )
+        ).all()
+        assert len(benchmark_evidence) == 2
+        assert all(
+            session.get(EntityEvidenceLink, (benchmark_entity.entity_id, item.evidence_id))
+            for item in benchmark_evidence
+        )

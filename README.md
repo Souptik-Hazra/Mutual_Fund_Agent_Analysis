@@ -378,13 +378,14 @@ Implementation should proceed in working milestones rather than creating all age
 | 1. Foundation and ingestion | Repository setup, configuration, FastAPI, PostgreSQL, NAV reconciliation, benchmark TRI | Reliable application and financial data foundation |
 | 2. Deterministic analytics | Returns, rolling metrics, risk, benchmark attribution, drawdown | Tested quantitative calculation library |
 | 3. Fund analysis | Explorer, filters, single-fund views, comparison engine | Usable fund analytics |
-| 4. Agent orchestration | LangGraph state, supervisor, financial tools and agents | Working financial agent workflow |
+| 4. Common intelligence foundation | Canonical entities, identifiers, aliases, sources, evidence provenance | Shared identity and evidence layer |
 | 5. Portfolio intelligence | AMC disclosures, holdings, sector exposure, overlap | Stock-level fund exposure |
-| 6. Social intelligence | Reddit and X connectors, entity resolution, sentiment, topics | Stock and fund discussion analysis |
-| 7. News and events | Exchange filings, event calendar, news discovery, watchlists | News and event radar |
+| 6. News and events | Exchange filings, event calendar, news discovery, watchlists | Verified news and event radar |
+| 7. Social intelligence | Reddit and X connectors, entity resolution, sentiment, topics | Qualified public-discussion intelligence |
 | 8. Document intelligence | PDF parsing, embeddings, Qdrant, retrieval and citations | Financial-document RAG |
-| 9. Frontend integration | Dashboard, comparison studio, charts, AI research interface | Complete user experience |
-| 10. Evaluation and deployment | Financial tests, agent/RAG evaluation, Docker, monitoring | Tested deployable system |
+| 9. Agent orchestration | LangGraph state, supervisor, specialist tools and synthesis | Evidence-grounded research workflow |
+| 10. Frontend integration | Dashboard, comparison studio, charts, AI research interface | Complete user experience |
+| 11. Evaluation and deployment | Financial tests, agent/RAG evaluation, Docker, monitoring | Tested deployable system |
 
 ## Evaluation and Reliability
 
@@ -720,3 +721,24 @@ Example request:
 ### Phase 3 boundaries
 
 This phase delivers backend API contracts and services, not a React dashboard. Expense ratios, AUM, fund-manager history, holdings, IDCW distribution-aware total returns, SIP/XIRR, and agent-generated narratives are not included because the current normalized database does not yet contain the required source data or workflows. Add those only with their own verified data models and methodology.
+
+
+## Phase 4 — Common intelligence foundation
+
+The shared identity and provenance layer is implemented on the development branch. It provides canonical entities, source-aware temporal aliases, namespaced identifiers, a source-authority registry, evidence records, entity-evidence links, and deterministic exact-match resolution. Ambiguous aliases are returned as candidates rather than silently resolved.
+
+All endpoints are under `/api/v1/intelligence`:
+
+- `GET /sources`: list registered sources and authority metadata.
+- `POST /entities`, `GET /entities`, `GET /entities/{entity_id}`: create, search, list, and retrieve canonical entities with bounded pagination and type/status filters.
+- `POST /entities/{entity_id}/aliases`, `GET /entities/{entity_id}/aliases`: register and list source-aware aliases and validity intervals.
+- `POST /entities/{entity_id}/identifiers`, `GET /entities/{entity_id}/identifiers`: register and list unique namespaced identifiers.
+- `POST /evidence`: record source references, publication/retrieval/effective dates, content hash, verification status, and confidence.
+- `POST /entities/{entity_id}/evidence/{evidence_id}`: link evidence to an entity.
+- `GET /entities/{entity_id}/evidence?limit=50&offset=0`: retrieve linked evidence with bounded pagination.
+- `POST /entities/{entity_id}/relationships`, `GET /entities/{entity_id}/relationships`: manage typed, temporal links between entities.
+- `POST /resolve`: resolve exact identifiers first and exact aliases second.
+
+The migration seeds AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI. Reddit and X are registered disabled by default; enabling them requires separate access, terms, and retention review. It also backfills canonical identities for existing schemes, AMCs, and benchmarks, including unverified scheme-to-AMC relationships. New NAV and benchmark ingestion maintains those identities and identifiers. NAV ingestion also registers AMC entities and an unverified `managed_by` relationship from the provider's fund-house field. NAV and benchmark sync runs now create hashed evidence references linked to their canonical entities while keeping full provider payloads in the existing audit tables. The original NAV/benchmark schemas and provider-sync audit records remain intact.
+
+See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.md).

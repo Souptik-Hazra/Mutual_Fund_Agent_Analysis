@@ -1,5 +1,7 @@
 """Idempotent PostgreSQL upserts for schemes, NAVs, and reconciliation results."""
 
+import hashlib
+import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -8,11 +10,22 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.data.providers.contracts import NavResponse
+from mutual_fund_agent_analysis.data.services.intelligence import (
+    add_entity_alias,
+    add_entity_identifier,
+    create_entity,
+    create_entity_relationship,
+    link_entity_evidence,
+    record_evidence,
+)
 from mutual_fund_agent_analysis.data.services.nav_reconciliation import (
     NAV_RECONCILIATION_TOLERANCE,
     build_reconciliation,
 )
 from mutual_fund_agent_analysis.models import (
+    DataSource,
+    EntityIdentifier,
+    ResearchEntity,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -107,6 +120,52 @@ def upsert_nav_response(
     )
     session.execute(scheme_statement)
 
+    source_key = (
+        normalized_source if session.get(DataSource, normalized_source) is not None else None
+    )
+    entity = session.scalar(
+        select(ResearchEntity)
+        .join(EntityIdentifier, EntityIdentifier.entity_id == ResearchEntity.entity_id)
+        .where(
+            EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+            EntityIdentifier.normalized_value == str(metadata.scheme_code),
+        )
+    )
+    if entity is None:
+        entity = create_entity(
+            session,
+            "scheme",
+            f"{metadata.scheme_name} [{metadata.scheme_code}]",
+        )
+        add_entity_identifier(
+            session, entity.entity_id, "AMFI_SCHEME_CODE", str(metadata.scheme_code),
+            source_key=source_key, is_primary=True,
+        )
+    add_entity_alias(
+        session, entity.entity_id, metadata.scheme_name,
+        alias_type="provider_name", source_key=source_key, is_primary=True,
+    )
+    for isin in (metadata.isin_growth, metadata.isin_div_reinvestment):
+        if isin:
+            add_entity_identifier(
+                session, entity.entity_id, "ISIN", isin, source_key=source_key,
+            )
+    if metadata.fund_house:
+        amc = create_entity(session, "amc", metadata.fund_house)
+        add_entity_alias(
+            session, amc.entity_id, metadata.fund_house,
+            alias_type="provider_name", source_key=source_key, is_primary=True,
+        )
+        create_entity_relationship(
+            session,
+            entity.entity_id,
+            amc.entity_id,
+            "managed_by",
+            source_key=source_key,
+            verification_status="unverified",
+            metadata={"provider_scheme_code": metadata.scheme_code},
+        )
+
     fetched_at = datetime.now(UTC)
     nav_values = [
         {
@@ -151,14 +210,51 @@ def upsert_nav_response(
                 ],
             }
         )
-    session.add(
-        ProviderSyncRun(
-            scheme_code=metadata.scheme_code,
-            source=normalized_source,
-            fetched_at=fetched_at,
-            observation_count=processed,
-            response_payload=raw_payload,
-        )
+    sync_run = ProviderSyncRun(
+        scheme_code=metadata.scheme_code,
+        source=normalized_source,
+        fetched_at=fetched_at,
+        observation_count=processed,
+        response_payload=raw_payload,
     )
+    session.add(sync_run)
+    session.flush()
+    if source_key is not None:
+        content_hash = hashlib.sha256(
+            json.dumps(raw_payload, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        evidence = record_evidence(
+            session,
+            source_key,
+            external_id=f"provider-sync-run:{sync_run.id}",
+            title=f"NAV provider sync for scheme {metadata.scheme_code}",
+            retrieved_at=fetched_at,
+            content_hash=content_hash,
+            verification_status="unverified",
+            metadata={
+                "scheme_code": metadata.scheme_code,
+                "sync_run_id": sync_run.id,
+                "observation_count": processed,
+            },
+        )
+        link_entity_evidence(
+            session,
+            entity.entity_id,
+            evidence.evidence_id,
+            relation_type="nav_sync",
+            resolution_method="identifier",
+        )
+        if metadata.fund_house:
+            amc = create_entity(session, "amc", metadata.fund_house)
+            create_entity_relationship(
+                session,
+                entity.entity_id,
+                amc.entity_id,
+                "managed_by",
+                source_key=source_key,
+                evidence_id=evidence.evidence_id,
+                verification_status="unverified",
+                metadata={"provider_scheme_code": metadata.scheme_code},
+            )
     _reconcile_dates(session, metadata.scheme_code, affected_dates)
     return processed
