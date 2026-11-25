@@ -37,8 +37,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    from mutual_fund_agent_analysis.database.base import Base
     import mutual_fund_agent_analysis.models  # noqa: F401
+    from mutual_fund_agent_analysis.database.base import Base
     names = (
         "document_chunks",
         "research_documents",
