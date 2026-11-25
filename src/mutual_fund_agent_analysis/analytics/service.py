@@ -24,10 +24,7 @@ from mutual_fund_agent_analysis.analytics.risk import (
     RiskMetrics,
     calculate_risk_metrics,
 )
-from mutual_fund_agent_analysis.analytics.series import (
-    PricePoint,
-    period_returns,
-)
+from mutual_fund_agent_analysis.analytics.series import PricePoint, period_returns
 from mutual_fund_agent_analysis.models.benchmark import BenchmarkObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 
@@ -52,6 +49,7 @@ class FundAnalyticsReport:
     benchmark_code: str | None
     benchmark_source: str | None
     nav_conflict_dates: tuple[date, ...]
+    calendar_year_as_of_date: date | None
 
 
 def load_fund_prices(
@@ -117,8 +115,9 @@ def analyze_fund(
     periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
     benchmark_source: str = "niftyindices",
     allow_nav_conflicts: bool = False,
+    calendar_year_as_of_date: date | None = None,
 ) -> FundAnalyticsReport:
-    """Run the complete deterministic analytics suite over reconciled database data."""
+    """Run deterministic analytics and retain explicit calendar-year completion context."""
     prices, conflicts = load_fund_prices(
         session,
         scheme_code,
@@ -128,6 +127,11 @@ def analyze_fund(
     )
     if len(prices) < 2:
         raise ValueError("At least two NAV observations are required for fund analytics.")
+    if calendar_year_as_of_date is not None and (
+        type(calendar_year_as_of_date) is not date
+        or calendar_year_as_of_date < prices[-1].date
+    ):
+        raise ValueError("calendar_year_as_of_date must be a date on or after the latest NAV.")
 
     fund_returns = period_returns(prices)
     benchmark_metrics = None
@@ -154,7 +158,9 @@ def analyze_fund(
         absolute_return=absolute_return(prices),
         cagr=cagr(prices),
         rolling_returns=tuple(rolling_returns(prices)),
-        calendar_year_returns=tuple(sorted(calendar_year_returns(prices).items())),
+        calendar_year_returns=tuple(
+            sorted(calendar_year_returns(prices, calendar_year_as_of_date).items())
+        ),
         risk=calculate_risk_metrics(
             fund_returns,
             annual_risk_free_rate,
@@ -167,4 +173,5 @@ def analyze_fund(
         benchmark_code=benchmark_code,
         benchmark_source=benchmark_source if benchmark_code is not None else None,
         nav_conflict_dates=conflicts,
+        calendar_year_as_of_date=calendar_year_as_of_date,
     )
