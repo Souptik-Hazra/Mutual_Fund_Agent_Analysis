@@ -27,7 +27,8 @@ export default function App() {
   useEffect(() => { fetch("/health/live").then((r) => r.ok ? r.json() : Promise.reject()).then(() => setHealth("API connected")).catch(() => setHealth("API offline")); }, []);
   async function run(fn) { setBusy(true); setError(""); setData(null); try { setData(await fn()); } catch (e) { setError(e.message); } finally { setBusy(false); } }
   function json(method, body) { return { method, body: JSON.stringify(body) }; }
-  const runFunds = () => run(() => request(query.trim() ? `/schemes?q=${encodeURIComponent(query.trim())}&limit=30` : "/schemes?limit=30"));\n  const runFundAnalysis = (code) => { setCodes(String(code)); run(() => request(`/schemes/${code}/analytics?benchmark_code=${encodeURIComponent(benchmark)}&start_date=${dateFrom}&end_date=${dateTo}`)); };
+  const runFunds = () => run(() => request(query.trim() ? `/schemes?q=${encodeURIComponent(query.trim())}&limit=30` : "/schemes?limit=30"));
+  const runFundAnalysis = (code) => { setCodes(String(code)); run(() => request(`/schemes/${code}/analytics?benchmark_code=${encodeURIComponent(benchmark)}&start_date=${dateFrom}&end_date=${dateTo}`)); };
   const runCompare = () => run(() => request("/schemes/compare", json("POST", { scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo })));
   const runPortfolio = () => run(() => request(`/portfolios/${schemeCodes[0]}`));
   const runEvents = () => run(() => request(`/events/fund-exposure/${schemeCodes[0]}?start_date=${dateFrom}&end_date=${dateTo}`));
