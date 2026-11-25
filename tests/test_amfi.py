@@ -1,4 +1,5 @@
 """Contract tests for the AMFI historical NAV adapter."""
+
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -8,7 +9,8 @@ import pytest
 from mutual_fund_agent_analysis.data.providers.amfi import AMFIClient
 
 HISTORY_ROW = (
-    "125497;HDFC Top 100 Fund - Direct Plan - Growth;INF179K01BE2;-;892.4560;0;0;26-Oct-2024"
+    "125497;HDFC Top 100 Fund - Direct Plan - Growth;"
+    "INF179K01BE2;-;892.4560;0;0;26-Oct-2024"
 )
 
 

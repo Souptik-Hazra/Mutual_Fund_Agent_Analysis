@@ -1,6 +1,7 @@
 """Contract tests for Nifty Indices TRI/NTR ingestion."""
+
 import json
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import httpx
@@ -91,10 +92,8 @@ def test_niftyindices_splits_ranges_into_max_365_day_chunks() -> None:
         body = json.loads(request.content)["cinfo"]
         start = body.split("'startDate':'", 1)[1].split("'", 1)[0]
         end = body.split("'endDate':'", 1)[1].split("'", 1)[0]
-        start_date = date.fromisoformat(
-            __import__("datetime").datetime.strptime(start, "%d-%b-%Y").date().isoformat()
-        )
-        end_date = __import__("datetime").datetime.strptime(end, "%d-%b-%Y").date()
+        start_date = datetime.strptime(start, "%d-%b-%Y").date()
+        end_date = datetime.strptime(end, "%d-%b-%Y").date()
         assert (end_date - start_date).days <= 364
         requests.append(request)
         row = {
