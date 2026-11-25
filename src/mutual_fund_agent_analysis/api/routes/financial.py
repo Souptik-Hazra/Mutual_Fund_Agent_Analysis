@@ -458,15 +458,40 @@ def get_idcw_total_return(
     end_date: date,
     coverage_attestation_id: int | None = None,
 ) -> IDCWTotalReturnResponse:
-    """Build an IDCW index only against a persisted, verified official coverage attestation."""
+    """Build the option-specific IDCW series only against a verified coverage attestation."""
     scheme = _scheme_or_404(session, scheme_code)
     if start_date >= end_date:
         raise HTTPException(status_code=422, detail="start_date must be earlier than end_date.")
 
-    limitations = [
-        "This is a scheme-level reinvested distribution index, not an investor-specific post-tax return.",
-        "Exit loads, investor tax, transaction timing and actual investor reinvestment charges are excluded.",
-    ]
+    if scheme.option_type == "idcw_payout":
+        return_basis = "idcw_payout_total_return"
+        methodology = (
+            "Fixed original units; cumulative per-unit cash payouts are added to the "
+            "ex-date NAV and are not reinvested or assumed to earn interest."
+        )
+        index_builder = payout_distribution_index
+        limitations = [
+            "This scheme-level payout index is pre-tax and assumes payout cash earns no interest.",
+            "Investor tax, transaction timing, actual cash use and reinvestment are excluded.",
+        ]
+    elif scheme.option_type == "idcw_reinvestment":
+        return_basis = "idcw_reinvested_total_return"
+        methodology = (
+            "Base-100 index; ex-date distributions are reinvested at the ex-date NAV "
+            "using (NAV + distribution per unit) / prior NAV."
+        )
+        index_builder = reinvested_distribution_index
+        limitations = [
+            "This is a scheme-level reinvested distribution index, not an investor-specific post-tax return.",
+            "Exit loads, investor tax, transaction timing and reinvestment charges are excluded.",
+        ]
+    else:
+        return_basis = "idcw_reinvested_total_return"
+        methodology = "Unavailable: scheme option is not explicitly classified as IDCW payout or reinvestment."
+        index_builder = reinvested_distribution_index
+        limitations = [
+            "The scheme must have a verified IDCW payout or IDCW reinvestment option classification.",
+        ]
 
     def blocked(reason: str) -> IDCWTotalReturnResponse:
         return IDCWTotalReturnResponse(
@@ -474,8 +499,8 @@ def get_idcw_total_return(
             start_date=start_date,
             end_date=end_date,
             status="blocked_incomplete_coverage",
-            return_basis="idcw_reinvested_total_return",
-            methodology="Ex-date distribution reinvestment at the ex-date NAV.",
+            return_basis=return_basis,
+            methodology=methodology,
             coverage_complete=False,
             coverage_attestation_id=coverage_attestation_id,
             observation_count=0,
@@ -483,13 +508,9 @@ def get_idcw_total_return(
             limitations=limitations + [reason],
         )
 
-    if scheme.option_type not in {
-        "idcw_payout",
-        "idcw_reinvestment",
-        "idcw_transfer",
-    }:
+    if scheme.option_type not in {"idcw_payout", "idcw_reinvestment"}:
         return blocked(
-            "The scheme must have a verified IDCW option classification before total-return calculation."
+            "Only explicitly classified IDCW payout and IDCW reinvestment options are supported."
         )
     if coverage_attestation_id is None:
         return blocked("A persisted official-source coverage attestation is required.")
@@ -558,7 +579,7 @@ def get_idcw_total_return(
         )
 
     try:
-        points = reinvested_distribution_index(
+        points = index_builder(
             [(row.nav_date, Decimal(row.canonical_nav)) for row in nav_rows],
             distributions,
         )
@@ -569,11 +590,8 @@ def get_idcw_total_return(
         start_date=points[0].date,
         end_date=points[-1].date,
         status="ready",
-        return_basis="idcw_reinvested_total_return",
-        methodology=(
-            "Base-100 index; ex-date distributions are reinvested at the ex-date NAV "
-            "using (NAV + distribution per unit) / prior NAV."
-        ),
+        return_basis=return_basis,
+        methodology=methodology,
         coverage_complete=True,
         coverage_attestation_id=attestation.attestation_id,
         observation_count=len(points),
@@ -587,8 +605,7 @@ def get_idcw_total_return(
             }
             for item in points
         ],
-        limitations=limitations
-        + [
+        limitations=limitations + [
             "Coverage is based on the stored source attestation; the application does not independently discover omitted distributions."
         ],
     )

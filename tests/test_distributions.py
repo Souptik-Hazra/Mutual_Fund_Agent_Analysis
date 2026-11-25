@@ -80,3 +80,33 @@ def test_distribution_dates_are_validated():
             amount_per_unit=Decimal("1.25"),
             option_type="idcw_payout",
         )
+
+
+def test_payout_index_accumulates_cash_without_reinvestment():
+    from mutual_fund_agent_analysis.analytics.distributions import payout_distribution_index
+
+    navs = [
+        (date(2024, 1, 1), Decimal("100")),
+        (date(2024, 1, 2), Decimal("98")),
+        (date(2024, 1, 3), Decimal("99")),
+    ]
+    payouts = payout_distribution_index(navs, {date(2024, 1, 2): Decimal("3")})
+    reinvested = reinvested_distribution_index(
+        navs, {date(2024, 1, 2): Decimal("3")}
+    )
+    assert payouts[1].total_return_index == Decimal("101")
+    assert payouts[2].total_return_index == Decimal("102")
+    assert reinvested[2].total_return_index > payouts[2].total_return_index
+
+
+def test_zero_distribution_payout_index_matches_nav_index():
+    from mutual_fund_agent_analysis.analytics.distributions import payout_distribution_index
+
+    points = payout_distribution_index(
+        [
+            (date(2024, 1, 1), Decimal("100")),
+            (date(2024, 1, 2), Decimal("105")),
+        ],
+        {},
+    )
+    assert points[-1].total_return_index == points[-1].nav_index

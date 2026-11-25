@@ -73,6 +73,10 @@ class FundAnalyticsResponse(BaseModel):
     nav_conflict_dates: list[date]
     calendar_year_as_of_date: date | None
     frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"]
+    return_basis: Literal["nav_only_excludes_idcw"] = "nav_only_excludes_idcw"
+    benchmark_return_basis: Literal["tri"] | None = None
+    base100_series: list[tuple[date, Decimal]] = Field(default_factory=list)
+    methodology: dict[str, str] = Field(default_factory=dict)
 
 
 class FundComparisonRequest(BaseModel):

@@ -159,7 +159,7 @@ class IDCWTotalReturnResponse(BaseModel):
     start_date: date
     end_date: date
     status: Literal["ready", "blocked_incomplete_coverage"]
-    return_basis: Literal["idcw_reinvested_total_return"]
+    return_basis: Literal["idcw_payout_total_return", "idcw_reinvested_total_return"]
     methodology: str
     coverage_complete: bool
     coverage_attestation_id: int | None

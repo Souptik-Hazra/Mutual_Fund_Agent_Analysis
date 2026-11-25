@@ -62,3 +62,54 @@ def reinvested_distribution_index(
             total_index *= (nav + distribution) / previous[1]
             output.append(TotalReturnPoint(day, nav, distribution, nav_index, total_index))
     return output
+
+
+
+def payout_distribution_index(
+    navs: Sequence[tuple[date, Decimal]],
+    distributions: Mapping[date, Decimal],
+    *,
+    base_value: Decimal = Decimal("100"),
+) -> list[TotalReturnPoint]:
+    """Build a non-reinvested payout index for fixed original units.
+
+    Cash distributions accumulate as cash without interest. The index value
+    is the ex-distribution NAV plus cumulative per-original-unit cash payouts,
+    normalized to the first NAV. This excludes tax and investor cash usage.
+    """
+    if len(navs) < 2:
+        raise ValueError("At least two NAV observations are required.")
+    if not base_value.is_finite() or base_value <= 0:
+        raise ValueError("base_value must be finite and greater than zero.")
+    ordered = list(navs)
+    dates = [item[0] for item in ordered]
+    if any(type(day) is not date for day in dates):
+        raise ValueError("NAV dates must be datetime.date values.")
+    if dates != sorted(set(dates)):
+        raise ValueError("NAV observations must have unique, ascending dates.")
+    if any(not value.is_finite() or value <= 0 for _, value in ordered):
+        raise ValueError("NAV values must be finite and greater than zero.")
+    valid_dates = set(dates[1:])
+    if any(day not in valid_dates for day in distributions):
+        raise ValueError(
+            "Each distribution ex-date must have an NAV observation after the base date."
+        )
+    if any(not amount.is_finite() or amount < 0 for amount in distributions.values()):
+        raise ValueError("Distribution amounts must be finite and non-negative.")
+
+    first_date, first_nav = ordered[0]
+    cumulative_distribution = Decimal("0")
+    output = [
+        TotalReturnPoint(first_date, first_nav, Decimal("0"), base_value, base_value)
+    ]
+    with localcontext() as context:
+        context.prec = 36
+        for day, nav in ordered[1:]:
+            distribution = distributions.get(day, Decimal("0"))
+            cumulative_distribution += distribution
+            nav_index = base_value * nav / first_nav
+            total_index = base_value * (nav + cumulative_distribution) / first_nav
+            output.append(
+                TotalReturnPoint(day, nav, distribution, nav_index, total_index)
+            )
+    return output

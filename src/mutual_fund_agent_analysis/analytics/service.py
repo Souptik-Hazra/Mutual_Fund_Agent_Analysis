@@ -56,6 +56,10 @@ class FundAnalyticsReport:
     nav_conflict_dates: tuple[date, ...]
     calendar_year_as_of_date: date | None
     frequency: str = "daily"
+    return_basis: str = "nav_only_excludes_idcw"
+    benchmark_return_basis: str | None = None
+    base100_series: tuple[tuple[date, Decimal], ...] = ()
+    methodology: dict[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +195,23 @@ def _build_report(
         nav_conflict_dates=conflicts,
         calendar_year_as_of_date=calendar_year_as_of_date,
         frequency=frequency,
+        return_basis="nav_only_excludes_idcw",
+        benchmark_return_basis="tri" if benchmark_code is not None else None,
+        base100_series=tuple(
+            (point.date, Decimal("100") * point.value / prices[0].value)
+            for point in prices
+        ),
+        methodology={
+            "nav_return_basis": "NAV-only price return; IDCW distributions are excluded.",
+            "absolute_return": "(ending NAV / starting NAV) - 1.",
+            "cagr": "Geometric annualization using 365.25 calendar days.",
+            "annualized_volatility": "Sample standard deviation of periodic simple NAV returns multiplied by sqrt(periods_per_year).",
+            "annualized_downside_deviation": "Root mean square periodic shortfall below the periodic risk-free rate, multiplied by sqrt(periods_per_year).",
+            "sharpe_sortino": "Periodic excess returns use annual_risk_free_rate / periods_per_year.",
+            "beta": "Sample covariance of exact interval-aligned fund and TRI returns divided by sample benchmark variance.",
+            "alpha": "Arithmetic annualized Jensen alpha using the periodic risk-free rate.",
+            "benchmark_return": "Arithmetic mean of exact interval-aligned TRI simple returns multiplied by periods_per_year; not CAGR.",
+        },
     )
 
 
