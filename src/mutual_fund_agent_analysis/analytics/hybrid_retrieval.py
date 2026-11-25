@@ -23,7 +23,11 @@ def reciprocal_rank_fusion(
         seen: set[tuple[Any, Any]] = set()
         for rank, row in enumerate(rows, start=1):
             citation = row.get("citation") or {}
-            key = (row.get("document_id", citation.get("document_id")), row.get("chunk_index", citation.get("chunk_index", citation.get("chunk_id"))))
+            document_id = row.get("document_id", citation.get("document_id"))
+            chunk_index = row.get(
+                "chunk_index", citation.get("chunk_index", citation.get("chunk_id"))
+            )
+            key = (document_id, chunk_index)
             if key[0] is None or key[1] is None or key in seen:
                 continue
             seen.add(key)
@@ -32,7 +36,7 @@ def reciprocal_rank_fusion(
             if key not in merged:
                 merged[key] = dict(row)
             else:
-                # Prefer the richer lexical record for provenance fields; semantic text may be retained
+                # Prefer the richer lexical record for provenance; semantic text fills missing fields.
                 # when the lexical channel did not return this chunk.
                 for field, value in row.items():
                     if merged[key].get(field) in (None, "") and value not in (None, ""):
