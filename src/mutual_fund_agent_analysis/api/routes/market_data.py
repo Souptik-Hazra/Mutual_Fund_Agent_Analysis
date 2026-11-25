@@ -239,7 +239,24 @@ def ingest_security_observation(
             status_code=422,
             detail="Provide source_url or register a base_url for the enabled source.",
         )
+    corporate_events = [
+        {
+            **event.model_dump(mode="json"),
+            "source_key": source_key,
+            "source_url": str(event.source_url) if event.source_url else source_url,
+            "verification_status": "unverified",
+        }
+        for event in payload.corporate_events
+    ]
     canonical = payload.model_dump(mode="json")
+    canonical.update(
+        {
+            "security_key": payload.security_key.strip().upper(),
+            "source_key": source_key,
+            "source_url": source_url,
+            "corporate_events": corporate_events,
+        }
+    )
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
     row = SecurityMarketObservation(
         security_key=payload.security_key.strip().upper(),
