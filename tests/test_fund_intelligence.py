@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from mutual_fund_agent_analysis.analytics import fund_intelligence
 from mutual_fund_agent_analysis.api.routes.fund_intelligence import (
+    FundCompareRequest,
     MarketObservationRequest,
     router,
 )
@@ -20,6 +21,11 @@ def test_fund_intelligence_routes_are_registered():
     assert "/fund-intelligence/schemes/{scheme_code}/equity-status" in paths
     assert "/fund-intelligence/securities/{security_key}/market-status" in paths
     assert "/fund-intelligence/market-observations" in paths
+
+
+def test_fund_compare_rejects_boolean_scheme_codes():
+    with pytest.raises(ValidationError):
+        FundCompareRequest(scheme_codes=[True, 2])
 
 
 def test_market_observation_requires_timezone_aware_timestamp():
