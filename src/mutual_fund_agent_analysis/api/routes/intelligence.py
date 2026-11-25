@@ -8,14 +8,27 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.api.schemas.intelligence import (
-    AliasCreateRequest, AliasResponse, DataSourceResponse, EntityCreateRequest,
-    EntityEvidenceLinkRequest, EntityEvidenceLinkResponse, EntityResolveRequest,
-    EntityResolveResponse, EntityResponse, EvidenceCreateRequest, EvidenceResponse,
-    IdentifierCreateRequest, IdentifierResponse,
+    AliasCreateRequest,
+    AliasResponse,
+    DataSourceResponse,
+    EntityCreateRequest,
+    EntityEvidenceLinkRequest,
+    EntityEvidenceLinkResponse,
+    EntityResolveRequest,
+    EntityResolveResponse,
+    EntityResponse,
+    EvidenceCreateRequest,
+    EvidenceResponse,
+    IdentifierCreateRequest,
+    IdentifierResponse,
 )
 from mutual_fund_agent_analysis.data.services.intelligence import (
-    add_entity_alias, add_entity_identifier, create_entity, link_entity_evidence,
-    record_evidence, resolve_entity,
+    add_entity_alias,
+    add_entity_identifier,
+    create_entity,
+    link_entity_evidence,
+    record_evidence,
+    resolve_entity,
 )
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import (
