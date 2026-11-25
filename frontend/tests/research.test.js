@@ -38,8 +38,8 @@ test("research stream consumes progress and final SSE events", async () => {
   const { streamRequest } = await import("../src/api.js");
   const originalFetch = globalThis.fetch;
   const frames = [
-    'event: progress\\ndata: {"node":"plan","message":"Planned","intents":["fund"]}\\n\\n',
-    'event: complete\\ndata: {"answer":"Completed","intents":["fund"],"results":{},"citations":[]}\\n\\n',
+    'event: progress\ndata: {"node":"plan","message":"Planned","intents":["fund"]}\n\n',
+    'event: complete\ndata: {"answer":"Completed","intents":["fund"],"results":{},"citations":[]}\n\n',
   ].join("");
   globalThis.fetch = async () => new Response(frames, {
     status: 200,
