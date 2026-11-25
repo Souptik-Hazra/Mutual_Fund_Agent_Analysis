@@ -17,7 +17,7 @@ from mutual_fund_agent_analysis.api.schemas.research import (
 from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.social import SocialProviderError, search_reddit, search_x
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
-    collect_rss_events, compare_portfolios, create_market_event, create_social_post, extract_pdf_text,
+    collect_rss_events, compare_portfolios, create_market_event, create_social_post,\n    events_for_fund_exposure, extract_pdf_text, fund_social_sentiment,
     import_portfolio_snapshot, latest_snapshot, portfolio_history, portfolio_payload,
     search_documents, security_fund_exposure, social_analytics, store_document,
 )
@@ -328,6 +328,34 @@ def get_social_analytics(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be <= end_date.")
     return social_analytics(session, entity_id, start_date, end_date)
+
+
+@router.get("/events/fund-exposure/{scheme_code}")
+def get_fund_event_exposure(
+    scheme_code: int,
+    session: Annotated[Session, Depends(get_db)],
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = Query(default=100, ge=1, le=200),
+) -> dict:
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be <= end_date.")
+    return events_for_fund_exposure(session, scheme_code, start_date, end_date, limit)
+
+
+@router.get("/social/funds/{scheme_code}/sentiment")
+def get_fund_social_sentiment(
+    scheme_code: int,
+    start_date: date,
+    end_date: date,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be <= end_date.")
+    try:
+        return fund_social_sentiment(session, scheme_code, start_date, end_date)
+    except ValueError as exc:
+        raise _domain_error(exc) from exc
 
 
 @router.post("/documents/upload", status_code=status.HTTP_201_CREATED)
