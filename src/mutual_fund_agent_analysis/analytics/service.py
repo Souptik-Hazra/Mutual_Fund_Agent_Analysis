@@ -32,6 +32,7 @@ from mutual_fund_agent_analysis.analytics.series import (
 )
 from mutual_fund_agent_analysis.models.benchmark import BenchmarkObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
+from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +74,7 @@ class FundComparisonReport:
     funds: tuple[FundAnalyticsReport, ...]
     benchmark_code: str | None
     frequency: str = "daily"
+    comparability_warnings: tuple[str, ...] = ()
 
 
 def load_fund_prices(
@@ -292,6 +294,43 @@ def compare_funds(
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be on or before end_date.")
 
+    scheme_rows = session.scalars(
+        select(MutualFundScheme).where(MutualFundScheme.scheme_code.in_(codes))
+    ).all()
+    option_by_code = {row.scheme_code: row.option_type for row in scheme_rows}
+    unclassified_codes = [
+        code
+        for code in codes
+        if option_by_code.get(code) in {None, "unknown"}
+    ]
+    known_options = {
+        option_by_code[code]
+        for code in codes
+        if option_by_code.get(code) not in {None, "unknown"}
+    }
+    if len(known_options) > 1:
+        raise ValueError(
+            "Fund comparison requires like-for-like scheme options. "
+            "Growth and IDCW options cannot be compared using NAV-only returns."
+        )
+    if known_options and unclassified_codes:
+        raise ValueError(
+            "Cannot confirm comparable scheme options because one or more selected schemes "
+            "have unclassified plan/option metadata."
+        )
+    comparability_warnings = []
+    if not known_options:
+        comparability_warnings.append(
+            "Scheme options are unclassified. Results are NAV-only and IDCW distributions "
+            "are excluded; this is not a verified total-return comparison."
+        )
+    elif next(iter(known_options)) != "growth":
+        comparability_warnings.append(
+            "Selected schemes share an IDCW option classification, but these comparison "
+            "metrics are still NAV-only and exclude IDCW distributions. Use verified "
+            "IDCW total-return series for distribution-aware comparison."
+        )
+
     loaded: dict[int, tuple[list[PricePoint], tuple[date, ...]]] = {
         code: load_fund_prices(session, code, start_date, end_date, allow_nav_conflicts)
         for code in codes
@@ -348,4 +387,5 @@ def compare_funds(
         funds=tuple(reports),
         benchmark_code=benchmark_code,
         frequency=frequency,
+        comparability_warnings=tuple(comparability_warnings),
     )

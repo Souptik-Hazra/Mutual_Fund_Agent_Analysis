@@ -90,6 +90,7 @@ class FundComparisonRequest(BaseModel):
     allow_nav_conflicts: bool = False
     calendar_year_as_of_date: date | None = None
     frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"] = "daily"
+    comparability_warnings: list[str] = Field(default_factory=list)
 
     @field_validator("scheme_codes")
     @classmethod

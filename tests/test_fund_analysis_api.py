@@ -146,6 +146,10 @@ def test_comparison_uses_exact_shared_dates() -> None:
                 nav_date=date(2024, 1, 4), canonical_nav=Decimal("60"), status="matched"
             ),
         ],
+        [
+            SimpleNamespace(scheme_code=100, option_type="growth"),
+            SimpleNamespace(scheme_code=200, option_type="growth"),
+        ],
     ]
     result = compare_funds(session, [100, 200])
     assert result.observation_count == 2
@@ -156,6 +160,7 @@ def test_comparison_uses_exact_shared_dates() -> None:
         Decimal("0.21"),
         Decimal("0.1"),
     ]
+    assert result.comparability_warnings == ()
 
 
 def test_single_fund_endpoint_serializes_analytics_report(monkeypatch) -> None:
@@ -198,3 +203,54 @@ def test_single_fund_endpoint_serializes_analytics_report(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json()["absolute_return"] == "0.1"
     assert response.json()["observation_count"] == 2
+
+
+
+def test_comparison_rejects_growth_and_idcw_option_mismatch(monkeypatch):
+    from mutual_fund_agent_analysis.analytics import service as analytics_service
+
+    session = Mock()
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(scheme_code=100, option_type="growth"),
+        SimpleNamespace(scheme_code=200, option_type="idcw_payout"),
+    ]
+    monkeypatch.setattr(
+        analytics_service,
+        "load_fund_prices",
+        lambda *_args, **_kwargs: (
+            [
+                analytics_service.PricePoint(date(2024, 1, 1), Decimal("100")),
+                analytics_service.PricePoint(date(2024, 1, 2), Decimal("101")),
+            ],
+            (),
+        ),
+    )
+    with pytest.raises(ValueError, match="like-for-like scheme options"):
+        analytics_service.compare_funds(session, [100, 200])
+
+
+def test_idcw_same_option_comparison_warns_nav_only_distributions_excluded(monkeypatch):
+    from mutual_fund_agent_analysis.analytics import service as analytics_service
+
+    session = Mock()
+    session.scalars.return_value.all.side_effect = [
+        [
+            SimpleNamespace(scheme_code=100, option_type="idcw_reinvestment"),
+            SimpleNamespace(scheme_code=200, option_type="idcw_reinvestment"),
+        ],
+        [],
+        [],
+    ]
+    points = [
+        analytics_service.PricePoint(date(2024, 1, 1), Decimal("100")),
+        analytics_service.PricePoint(date(2024, 1, 2), Decimal("101")),
+    ]
+    monkeypatch.setattr(
+        analytics_service,
+        "load_fund_prices",
+        lambda *_args, **_kwargs: (points, ()),
+    )
+    result = analytics_service.compare_funds(session, [100, 200])
+    assert result.comparability_warnings
+    assert "NAV-only" in result.comparability_warnings[0]
+    assert "exclude IDCW distributions" in result.comparability_warnings[0]
