@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
@@ -25,7 +25,10 @@ def security_profile(
         raise ValueError("security_key must contain at least two characters.")
 
     statement = select(SecurityMarketObservation).where(
-        SecurityMarketObservation.security_key == key
+        or_(
+            SecurityMarketObservation.security_key == key,
+            SecurityMarketObservation.isin == key,
+        )
     )
     if as_of:
         cutoff = datetime.combine(as_of, time.max, tzinfo=UTC)
@@ -39,7 +42,8 @@ def security_profile(
     latest = observations[0] if observations else None
 
     snapshot_statement = select(PortfolioSnapshot).where(
-        PortfolioSnapshot.effective_date <= (as_of or date.max)
+        PortfolioSnapshot.effective_date <= (as_of or date.max),
+        PortfolioSnapshot.status.in_(["complete", "partial"]),
     )
     if scheme_codes:
         snapshot_statement = snapshot_statement.where(
@@ -63,7 +67,7 @@ def security_profile(
                 PortfolioHolding.snapshot_id.in_(
                     [snapshot.snapshot_id for snapshot in latest_by_scheme.values()]
                 ),
-                PortfolioHolding.security_key == key,
+                or_(PortfolioHolding.security_key == key, PortfolioHolding.isin == key),
             )
         ).all()
         positions = [
@@ -180,6 +184,7 @@ def securities_for_funds(
     snapshot_statement = select(PortfolioSnapshot).where(
         PortfolioSnapshot.scheme_code.in_(scheme_codes),
         PortfolioSnapshot.effective_date <= (as_of or date.max),
+        PortfolioSnapshot.status.in_(["complete", "partial"]),
     ).order_by(
         PortfolioSnapshot.scheme_code,
         PortfolioSnapshot.effective_date.desc(),
