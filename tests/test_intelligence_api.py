@@ -21,7 +21,7 @@ def test_intelligence_routes_are_registered():
     paths = {route.path for route in intelligence_router.routes if hasattr(route, "path")}
     assert "/intelligence/sources" in paths
     assert "/intelligence/entities" in paths
-    assert "/api/v1/intelligence/resolve" in paths
+    assert "/intelligence/resolve" in paths
     assert "/intelligence/entities/{entity_id}/relationships" in paths
     assert "/intelligence/entities/{entity_id}/aliases" in paths
     assert "/intelligence/entities/{entity_id}/identifiers" in paths
