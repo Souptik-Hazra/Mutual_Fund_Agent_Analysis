@@ -115,6 +115,15 @@ def classify_intents(question: str, scheme_codes: list[int] | None = None) -> li
         )
     ):
         selected.remove("portfolio")
+    if (
+        "events" in selected
+        and re.search(r"\\bdividend yield\\b", normalized)
+        and not any(
+            term in normalized
+            for term in ("dividend announcement", "record date", "ex-date", "board meeting")
+        )
+    ):
+        selected.remove("events")
     if not selected:
         selected = ["fund"] if scheme_codes else ["documents"]
     if (
