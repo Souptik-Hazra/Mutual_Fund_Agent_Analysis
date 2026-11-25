@@ -254,11 +254,20 @@ def _validate_registered_source_url(source: DataSource, candidate: str) -> str:
     supplied = urlsplit(candidate)
     registered_host = (registered.hostname or "").lower().rstrip(".")
     supplied_host = (supplied.hostname or "").lower().rstrip(".")
+    try:
+        registered_port = registered.port or 443
+        supplied_port = supplied.port or 443
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="source_url must use a valid port on the registered data-source host.",
+        ) from exc
     if (
         registered.scheme.lower() != "https"
         or supplied.scheme.lower() != "https"
         or not registered_host
         or not supplied_host
+        or registered_port != supplied_port
         or supplied.username is not None
         or supplied.password is not None
         or not (supplied_host == registered_host or supplied_host.endswith("." + registered_host))
