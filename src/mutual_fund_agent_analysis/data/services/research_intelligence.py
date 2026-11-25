@@ -34,20 +34,51 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
     ))
     if existing:
         return existing
+    evidence_external_id = (
+        f"portfolio:{payload.scheme_code}:{payload.effective_date}:{payload.content_hash}"
+    )
+    evidence = session.scalar(select(EvidenceRecord).where(
+        EvidenceRecord.source_key == payload.source_key,
+        EvidenceRecord.external_id == evidence_external_id,
+    ))
+    if evidence is None:
+        evidence = EvidenceRecord(
+            source_key=payload.source_key, external_id=evidence_external_id,
+            canonical_url=str(payload.document_url) if payload.document_url else None,
+            title=f"Portfolio disclosure for scheme {payload.scheme_code}",
+            published_at=payload.published_at, effective_from=payload.effective_date,
+            content_hash=payload.content_hash, verification_status="unverified",
+            metadata_json={"scheme_code": payload.scheme_code, "ingestion": "portfolio_snapshot"},
+        )
+        session.add(evidence)
+        session.flush()
     snapshot = PortfolioSnapshot(
         scheme_code=payload.scheme_code, source_key=payload.source_key,
-        effective_date=payload.effective_date, published_at=payload.published_at,
+        evidence_id=evidence.evidence_id, effective_date=payload.effective_date,
+        published_at=payload.published_at,
         document_url=str(payload.document_url) if payload.document_url else None,
         content_hash=payload.content_hash, total_market_value=payload.total_market_value,
         status=payload.status, metadata_json=payload.metadata,
     )
     session.add(snapshot)
     session.flush()
+    from mutual_fund_agent_analysis.models import EntityIdentifier
     for item in payload.holdings:
+        company_entity_id = None
+        if item.isin:
+            company_entity_id = session.scalar(
+                select(EntityIdentifier.entity_id)
+                .join(ResearchEntity, ResearchEntity.entity_id == EntityIdentifier.entity_id)
+                .where(EntityIdentifier.namespace == "ISIN")
+                .where(EntityIdentifier.normalized_value == item.isin.strip().upper())
+                .where(ResearchEntity.entity_type.in_([ "company", "security" ]))
+                .limit(1)
+            )
         session.add(PortfolioHolding(
             snapshot_id=snapshot.snapshot_id, security_key=item.security_key.strip().upper(),
             isin=item.isin.strip().upper() if item.isin else None,
-            security_name=item.security_name.strip(), sector=item.sector,
+            security_name=item.security_name.strip(), company_entity_id=company_entity_id,
+            sector=item.sector,
             asset_class=item.asset_class, quantity=item.quantity, market_value=item.market_value,
             weight_pct=item.weight_pct, currency=item.currency.upper(), metadata_json=item.metadata,
         ))
@@ -69,7 +100,7 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
     ).order_by(PortfolioHolding.weight_pct.desc().nullslast(), PortfolioHolding.security_name)).all()
     known = [r for r in rows if r.weight_pct is not None]
     weights = [r.weight_pct / D("100") for r in known]
-    hhi = sum((w * w for w in weights), D("0")) if weights else None
+    weight_coverage = sum((r.weight_pct for r in known), D("0"))\n    hhi = (sum((w * w for w in weights), D("0"))\n           if weights and D("99") <= weight_coverage <= D("101") else None)
     sectors: dict[str, Decimal] = defaultdict(lambda: D("0"))
     assets: dict[str, Decimal] = defaultdict(lambda: D("0"))
     for row in rows:
@@ -91,7 +122,7 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
         "sector_allocation": [{"sector": k, "weight_pct": v} for k, v in sorted(sectors.items(), key=lambda x: x[1], reverse=True)],
         "asset_allocation": [{"asset_class": k, "weight_pct": v} for k, v in sorted(assets.items(), key=lambda x: x[1], reverse=True)],
         "hhi_0_to_1": hhi,
-        "weight_coverage_pct": sum((r.weight_pct for r in known), D("0")),
+        "weight_coverage_pct": weight_coverage,\n        "hhi_coverage_sufficient": hhi is not None,
         "disclosure_url": snapshot.document_url,
     }
 
