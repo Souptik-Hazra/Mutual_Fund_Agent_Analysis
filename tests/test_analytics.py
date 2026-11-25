@@ -1,0 +1,139 @@
+"""Tests for deterministic financial analytics."""
+
+from datetime import date
+from decimal import Decimal
+
+import pytest
+
+from mutual_fund_agent_analysis.analytics import (
+    PricePoint,
+    ReturnPoint,
+    absolute_return,
+    align_returns,
+    calculate_benchmark_metrics,
+    calculate_drawdown,
+    calculate_risk_metrics,
+    calendar_year_returns,
+    cagr,
+    period_returns,
+    rolling_returns,
+    trailing_return,
+)
+
+
+def prices(*items: tuple[str, str]) -> list[PricePoint]:
+    return [PricePoint(date.fromisoformat(day), Decimal(value)) for day, value in items]
+
+
+def returns(*items: tuple[str, str]) -> list[ReturnPoint]:
+    return [ReturnPoint(date.fromisoformat(day), Decimal(value)) for day, value in items]
+
+
+def test_absolute_return_and_cagr() -> None:
+    observations = prices(("2020-01-01", "100"), ("2021-01-01", "110"))
+    assert absolute_return(observations) == Decimal("0.1")
+    assert cagr(observations) == pytest.approx(Decimal("0.0997"), abs=Decimal("0.001"))
+
+
+def test_period_returns_sort_observations_and_preserve_actual_dates() -> None:
+    result = period_returns(prices(("2024-01-03", "121"), ("2024-01-01", "100")))
+    assert [(point.date.isoformat(), point.value) for point in result] == [
+        ("2024-01-03", Decimal("0.21"))
+    ]
+
+
+def test_rolling_returns_and_calendar_year_returns() -> None:
+    observations = prices(
+        ("2022-01-03", "100"),
+        ("2022-12-30", "110"),
+        ("2023-12-29", "121"),
+        ("2024-12-31", "133.1"),
+    )
+    rolling = rolling_returns(observations, windows_years=(1,))
+    assert rolling
+    assert rolling[-1].value == Decimal("0.1")
+    calendar = calendar_year_returns(observations)
+    assert calendar[2023] == Decimal("0.1")
+    assert calendar[2024] == Decimal("0.1")
+
+
+def test_trailing_return_requires_sufficient_history() -> None:
+    observations = prices(("2023-01-01", "100"), ("2024-01-02", "120"))
+    assert trailing_return(observations, 1) == Decimal("0.2")
+    with pytest.raises(ValueError, match="Insufficient history"):
+        trailing_return(observations, 3)
+
+
+def test_duplicate_and_non_positive_prices_are_rejected() -> None:
+    with pytest.raises(ValueError, match="Duplicate"):
+        absolute_return(prices(("2024-01-01", "10"), ("2024-01-01", "11")))
+    with pytest.raises(ValueError, match="greater than zero"):
+        absolute_return(prices(("2024-01-01", "0")))
+
+
+def test_risk_metrics_use_sample_volatility_and_explicit_frequency() -> None:
+    result = calculate_risk_metrics(
+        returns(("2024-01-02", "0.01"), ("2024-01-03", "-0.01")),
+        annual_risk_free_rate=Decimal("0"),
+        periods_per_year=2,
+    )
+    assert result.observation_count == 2
+    assert result.annualized_volatility is not None
+    assert result.sharpe_ratio == pytest.approx(Decimal("0"))
+    assert result.sortino_ratio is not None
+
+
+def test_zero_volatility_has_undefined_sharpe() -> None:
+    result = calculate_risk_metrics(
+        returns(("2024-01-02", "0.01"), ("2024-01-03", "0.01"))
+    )
+    assert result.annualized_volatility == 0
+    assert result.sharpe_ratio is None
+
+
+def test_benchmark_metrics_align_exact_dates_and_calculate_beta_alpha() -> None:
+    fund = returns(
+        ("2024-01-02", "0.02"),
+        ("2024-01-03", "0.04"),
+        ("2024-01-04", "0.06"),
+    )
+    benchmark = returns(
+        ("2024-01-02", "0.01"),
+        ("2024-01-04", "0.03"),
+        ("2024-01-05", "0.99"),
+    )
+    aligned_fund, aligned_benchmark = align_returns(fund, benchmark)
+    assert [point.date for point in aligned_fund] == [
+        date(2024, 1, 2),
+        date(2024, 1, 4),
+    ]
+    metrics = calculate_benchmark_metrics(fund, benchmark, periods_per_year=1)
+    assert metrics.observation_count == 2
+    assert metrics.beta == Decimal("2")
+    assert metrics.annualized_alpha == Decimal("0")
+
+
+def test_insufficient_benchmark_history_returns_undefined_metrics() -> None:
+    metrics = calculate_benchmark_metrics(
+        returns(("2024-01-02", "0.02")),
+        returns(("2024-01-02", "0.01")),
+    )
+    assert metrics.beta is None
+    assert metrics.annualized_alpha is None
+
+
+def test_drawdown_reports_peak_trough_and_recovery() -> None:
+    result = calculate_drawdown(
+        prices(
+            ("2024-01-01", "100"),
+            ("2024-01-10", "120"),
+            ("2024-01-20", "90"),
+            ("2024-02-01", "125"),
+        )
+    )
+    assert result.maximum_drawdown == Decimal("-0.25")
+    assert result.peak_date == date(2024, 1, 10)
+    assert result.trough_date == date(2024, 1, 20)
+    assert result.recovery_date == date(2024, 2, 1)
+    assert result.drawdown_duration_days == 10
+    assert result.recovery_duration_days == 22
