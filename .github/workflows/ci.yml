@@ -48,6 +48,8 @@ jobs:
         run: ruff check .
       - name: Ruff format check
         run: ruff format --check .
+      - name: Validate local backup and restore scripts
+        run: bash -n scripts/backup-local.sh scripts/restore-local.sh
       - name: Validate Docker Compose configuration
         run: docker compose config --quiet
       - name: Build API image
