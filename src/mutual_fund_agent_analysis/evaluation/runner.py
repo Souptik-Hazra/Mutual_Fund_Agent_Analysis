@@ -3,8 +3,8 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urlparse
 from typing import Any
+from urllib.parse import urlparse
 
 from mutual_fund_agent_analysis.agents.research_graph import classify_intents
 
