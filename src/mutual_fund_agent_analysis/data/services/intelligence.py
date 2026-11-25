@@ -353,3 +353,74 @@ def resolve_entity(
     if len(candidates) > 1:
         return EntityResolution("ambiguous", None, "exact_alias", candidates)
     return EntityResolution("not_found", None, None)
+
+
+
+def create_entity_relationship(
+    session: Session,
+    from_entity_id: int,
+    to_entity_id: int,
+    relation_type: str,
+    source_key: str | None = None,
+    evidence_id: int | None = None,
+    valid_from: date | None = None,
+    valid_to: date | None = None,
+    confidence: Decimal | None = None,
+    verification_status: str = "unverified",
+    metadata: dict | None = None,
+) -> EntityRelationship:
+    """Create or update a typed, temporal relationship between canonical entities."""
+    _require_entity(session, from_entity_id)
+    _require_entity(session, to_entity_id)
+    if from_entity_id == to_entity_id:
+        raise ValueError("An entity cannot have a relationship with itself.")
+    normalized_relation = relation_type.strip().lower()
+    if not re.fullmatch(r"[a-z][a-z0-9_]{1,49}", normalized_relation):
+        raise ValueError("relation_type must be a 2–50 character lowercase identifier.")
+    _validate_date_range(valid_from, valid_to)
+    if verification_status not in VERIFICATION_STATUSES:
+        raise ValueError("Unsupported verification_status.")
+    if confidence is not None and (
+        not confidence.is_finite() or confidence < 0 or confidence > 1
+    ):
+        raise ValueError("confidence must be between 0 and 1.")
+    if source_key and session.get(DataSource, source_key) is None:
+        raise ValueError(f"Unknown source_key: {source_key!r}.")
+    evidence = session.get(EvidenceRecord, evidence_id) if evidence_id else None
+    if evidence_id and evidence is None:
+        raise ValueError(f"Evidence {evidence_id} does not exist.")
+    if evidence is not None:
+        if source_key and evidence.source_key != source_key:
+            raise ValueError("source_key must match the linked evidence source.")
+        source_key = source_key or evidence.source_key
+
+    existing = session.scalar(
+        select(EntityRelationship).where(
+            EntityRelationship.from_entity_id == from_entity_id,
+            EntityRelationship.to_entity_id == to_entity_id,
+            EntityRelationship.relation_type == normalized_relation,
+            EntityRelationship.valid_from.is_not_distinct_from(valid_from),
+        )
+    )
+    values = {
+        "source_key": source_key,
+        "evidence_id": evidence_id,
+        "valid_to": valid_to,
+        "confidence": confidence,
+        "verification_status": verification_status,
+        "metadata_json": metadata or {},
+    }
+    if existing:
+        for key, value in values.items():
+            setattr(existing, key, value)
+        return existing
+    record = EntityRelationship(
+        from_entity_id=from_entity_id,
+        to_entity_id=to_entity_id,
+        relation_type=normalized_relation,
+        valid_from=valid_from,
+        **values,
+    )
+    session.add(record)
+    session.flush()
+    return record
