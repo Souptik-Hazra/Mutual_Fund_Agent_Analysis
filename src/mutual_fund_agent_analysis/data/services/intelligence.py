@@ -56,7 +56,9 @@ def _require_entity(session: Session, entity_id: int) -> ResearchEntity:
     if entity is None:
         raise ValueError(f"Entity {entity_id} does not exist.")
     if entity.status != "active":
-        raise ValueError("Aliases, identifiers, and evidence can only be linked to active entities.")
+        raise ValueError(
+            "Aliases, identifiers, and evidence can only be linked to active entities."
+        )
     return entity
 
 
