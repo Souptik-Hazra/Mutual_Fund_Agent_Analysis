@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models import (
@@ -691,7 +691,7 @@ def social_analytics(
 
 
 def extract_pdf_text(content: bytes) -> tuple[str, int]:
-    """Extract embedded PDF text and reject malformed, encrypted, or scanned documents."""
+    """Extract text per page; optionally OCR scanned pages when explicitly enabled."""
     import fitz
 
     try:
@@ -703,16 +703,45 @@ def extract_pdf_text(content: bytes) -> tuple[str, int]:
             raise ValueError("Password-protected PDFs are not supported.")
         if document.page_count < 1:
             raise ValueError("PDF contains no pages.")
-        pages = [page.get_text("text").strip() for page in document]
-        text = "\n\n".join(
-            f"[Page {index + 1}]\n{value}"
+
+        from mutual_fund_agent_analysis.core.config import get_settings
+
+        ocr_enabled = get_settings().document_ocr_enabled
+        pages: list[str] = []
+        ocr_pages = 0
+        for page in document:
+            extracted = page.get_text("text").strip()
+            if len(extracted) < 30 and ocr_enabled:
+                try:
+                    from io import BytesIO
+
+                    import pytesseract
+                    from PIL import Image
+
+                    pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                    image = Image.open(BytesIO(pixmap.tobytes("png")))
+                    extracted = pytesseract.image_to_string(image).strip()
+                    if extracted:
+                        ocr_pages += 1
+                except (ImportError, OSError) as exc:
+                    raise ValueError(
+                        "OCR is enabled but pytesseract, Pillow, or the Tesseract binary is unavailable."
+                    ) from exc
+            pages.append(extracted)
+
+        text = "\\n\\n".join(
+            f"[Page {index + 1}]\\n{value}"
             for index, value in enumerate(pages)
             if value
         )
         if len(text.strip()) < 80:
-            raise ValueError(
-                "PDF has no usable embedded text; OCR is required for scanned documents."
-            )
+            if not ocr_enabled:
+                raise ValueError(
+                    "PDF has no usable embedded text; enable DOCUMENT_OCR_ENABLED and install the OCR extra."
+                )
+            raise ValueError("PDF text extraction and OCR did not produce enough readable content.")
+        if ocr_pages:
+            text = f"[OCR pages: {ocr_pages}]\\n\\n" + text
         return text, len(document)
     finally:
         document.close()
