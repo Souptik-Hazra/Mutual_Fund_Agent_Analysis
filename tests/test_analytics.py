@@ -260,8 +260,6 @@ def test_rolling_windows_reject_duplicates() -> None:
     with pytest.raises(ValueError, match="must not contain duplicates"):
         rolling_returns(prices(("2023-01-01", "100"), ("2024-01-01", "110")), (1, 1))
 
-
-
 def test_return_alignment_rejects_overlapping_intervals() -> None:
     overlapping = [
         ReturnPoint(date(2024, 1, 3), Decimal("0.02"), date(2024, 1, 1)),
@@ -269,8 +267,6 @@ def test_return_alignment_rejects_overlapping_intervals() -> None:
     ]
     with pytest.raises(ValueError, match="must not overlap"):
         align_returns(overlapping, overlapping)
-
-
 
 def test_constant_benchmark_keeps_return_metrics_but_not_beta_or_alpha() -> None:
     fund = returns(("2024-01-02", "0.02"), ("2024-01-03", "0.04"))
@@ -281,8 +277,6 @@ def test_constant_benchmark_keeps_return_metrics_but_not_beta_or_alpha() -> None
     assert result.annualized_fund_return == Decimal("0.36")
     assert result.annualized_benchmark_return == Decimal("0.12")
     assert result.mean_period_excess_return == Decimal("0.02")
-
-
 
 def test_database_service_builds_report_from_reconciled_navs() -> None:
     session = Mock()
