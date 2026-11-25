@@ -36,8 +36,7 @@ def reciprocal_rank_fusion(
             if key not in merged:
                 merged[key] = dict(row)
             else:
-                # Prefer the richer lexical record for provenance; semantic text fills missing fields.
-                # when the lexical channel did not return this chunk.
+                # Prefer lexical provenance; semantic content fills missing fields.
                 for field, value in row.items():
                     if merged[key].get(field) in (None, "") and value not in (None, ""):
                         merged[key][field] = value
