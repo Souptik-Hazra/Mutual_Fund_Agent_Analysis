@@ -39,7 +39,10 @@ def sync_twelvedata_quote(
     if not settings.twelve_data_exchange_access_confirmed:
         raise HTTPException(
             status_code=403,
-            detail="Confirm NSE/BSE exchange entitlement and personal-use rights before enabling this provider.",
+            detail=(
+                "Confirm NSE/BSE exchange entitlement and personal-use rights "
+                "before enabling this provider."
+            ),
         )
     source = session.get(DataSource, "twelvedata")
     if source is None:
@@ -135,6 +138,7 @@ def sync_twelvedata_quote(
         "limitations": [
             "This is a provider quote observation, not a guaranteed real-time exchange tick.",
             "Fundamentals and corporate actions are not populated by this quote endpoint.",
-            "Exchange coverage and use rights depend on the operator's active subscription and approvals.",
+            "Exchange coverage and use rights depend on the operator's active "
+            "subscription and approvals.",
         ],
     }
