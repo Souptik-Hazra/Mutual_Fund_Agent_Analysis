@@ -11,7 +11,7 @@ from decimal import Decimal
 from functools import lru_cache
 from typing import Any, TypedDict
 
-from langgraph.graph import END, StateGraph
+from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.service import analyze_fund, compare_funds
@@ -347,7 +347,7 @@ def build_research_graph():
     graph.add_node("plan", _plan)
     graph.add_node("specialist_agents", _run_tools)
     graph.add_node("synthesize", _synthesize)
-    graph.set_entry_point("plan")
+    graph.add_edge(START, "plan")
     graph.add_edge("plan", "specialist_agents")
     graph.add_edge("specialist_agents", "synthesize")
     graph.add_edge("synthesize", END)
