@@ -483,6 +483,20 @@ def upgrade() -> None:
          AND e.normalized_name = lower(btrim(b.benchmark_name || ' [' || b.benchmark_code || ']'))
         ON CONFLICT (namespace, normalized_value) DO NOTHING
     """)
+    op.execute("""
+        INSERT INTO entity_aliases (
+            entity_id, alias, normalized_alias, alias_type, source_key, is_primary
+        )
+        SELECT e.entity_id, b.benchmark_name, lower(btrim(b.benchmark_name)),
+               'publisher_name', b.provider, true
+        FROM benchmark_indices b
+        JOIN research_entities e
+          ON e.entity_type = 'benchmark'
+         AND e.normalized_name = lower(btrim(
+             b.benchmark_name || ' [' || b.benchmark_code || ']'
+         ))
+        ON CONFLICT DO NOTHING
+    """)
 
     # Backfill AMC identities and scheme-to-AMC relationships from existing provider metadata.
     op.execute("""
