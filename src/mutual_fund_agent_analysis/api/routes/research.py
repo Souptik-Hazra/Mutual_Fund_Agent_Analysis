@@ -40,6 +40,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     search_documents,
     security_fund_exposure,
     social_analytics,
+    source_social_retention_days,
     store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
@@ -459,6 +460,12 @@ def collect_social_posts(
             detail="Social source is disabled. Review API terms and enable it explicitly.",
         )
     try:
+        retention_days = source_social_retention_days(
+            registry, get_settings().social_retention_days
+        )
+    except ValueError as exc:
+        raise _domain_error(exc) from exc
+    try:
         posts = search_reddit(q, limit) if source == "reddit" else search_x(q, limit)
         saved = 0
         for item in posts:
@@ -471,7 +478,7 @@ def collect_social_posts(
                 content_hash=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
                 published_at=item.get("published_at"),
                 engagement_count=item.get("engagement_count", 0),
-                expires_at=datetime.now(UTC) + timedelta(days=get_settings().social_retention_days),
+                expires_at=datetime.now(UTC) + timedelta(days=retention_days),
                 metadata=item.get("metadata", {}),
             )
             create_social_post(session, payload)

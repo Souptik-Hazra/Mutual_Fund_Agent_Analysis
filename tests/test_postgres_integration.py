@@ -1,14 +1,14 @@
 """PostgreSQL integration tests for migrations and NAV persistence."""
 
 import os
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect, select, text
+from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkIndex,
     BenchmarkObservation,
     BenchmarkSyncRun,
+    DataSource,
     EntityAlias,
     EntityEvidenceLink,
     EntityIdentifier,
@@ -36,6 +37,7 @@ from mutual_fund_agent_analysis.models import (
     NavReconciliation,
     ProviderSyncRun,
     ResearchEntity,
+    SocialPost,
 )
 
 
@@ -459,3 +461,70 @@ def test_postgres_investor_ledger_persists_decimal_entries(migrated_postgres: En
         assert saved.units == Decimal("100.12345678")
         assert saved.nav == Decimal("124.95750000")
         assert saved.currency == "INR"
+
+
+def test_postgres_social_purge_deletes_only_expired_records(migrated_postgres: Engine) -> None:
+    """Verify retention deletion in PostgreSQL while preserving unexpired records."""
+    from mutual_fund_agent_analysis.data.services.research_intelligence import (
+        purge_expired_social_posts,
+    )
+
+    source_key = "integration_social_retention"
+    now = datetime.now(UTC)
+    with Session(migrated_postgres) as session:
+        if session.get(DataSource, source_key) is None:
+            session.add(
+                DataSource(
+                    source_key=source_key,
+                    display_name="Social retention integration fixture",
+                    source_type="social",
+                    authority_tier=5,
+                    is_official=False,
+                    enabled=False,
+                    metadata_json={},
+                )
+            )
+            session.commit()
+
+        session.execute(delete(SocialPost).where(SocialPost.source_key == source_key))
+        session.commit()
+        session.add_all(
+            [
+                SocialPost(
+                    source_key=source_key,
+                    external_id="expired-record",
+                    content_hash="a" * 64,
+                    published_at=now - timedelta(days=40),
+                    engagement_count=0,
+                    expires_at=now - timedelta(days=1),
+                    metadata_json={},
+                ),
+                SocialPost(
+                    source_key=source_key,
+                    external_id="unexpired-record",
+                    content_hash="b" * 64,
+                    published_at=now - timedelta(days=1),
+                    engagement_count=0,
+                    expires_at=now + timedelta(days=1),
+                    metadata_json={},
+                ),
+            ]
+        )
+        session.commit()
+
+        deleted_count = purge_expired_social_posts(session)
+        assert deleted_count == 1
+        expired = session.scalar(
+            select(SocialPost).where(
+                SocialPost.source_key == source_key,
+                SocialPost.external_id == "expired-record",
+            )
+        )
+        unexpired = session.scalar(
+            select(SocialPost).where(
+                SocialPost.source_key == source_key,
+                SocialPost.external_id == "unexpired-record",
+            )
+        )
+        assert expired is None
+        assert unexpired is not None

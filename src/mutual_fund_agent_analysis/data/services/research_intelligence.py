@@ -526,6 +526,25 @@ def search_documents(session: Session, query: str, scheme_code: int | None, limi
     return {"query": query, "results": results, "retrieval_mode": "lexical_fallback"}
 
 
+def source_social_retention_days(source: DataSource, default_days: int) -> int:
+    """Resolve a source-specific retention override with a bounded global fallback."""
+    if source.source_type != "social":
+        raise ValueError("Social retention can only be configured for a social data source.")
+    if type(default_days) is not int or not 1 <= default_days <= 365:
+        raise ValueError("Default social retention must be an integer between 1 and 365 days.")
+    metadata = source.metadata_json or {}
+    if not isinstance(metadata, dict):
+        raise ValueError("Data source metadata must be a JSON object.")
+    configured = metadata.get("retention_days")
+    if configured is None:
+        return default_days
+    if type(configured) is not int or not 1 <= configured <= 365:
+        raise ValueError(
+            "Data source metadata.retention_days must be an integer between 1 and 365 days."
+        )
+    return configured
+
+
 def purge_expired_social_posts(session: Session) -> int:
     """Delete expired social identifiers and derived metadata according to provider retention."""
     result = session.execute(
