@@ -1,5 +1,6 @@
-from fastapi.testclient import TestClient
 from unittest.mock import Mock
+
+from fastapi.testclient import TestClient
 
 from mutual_fund_agent_analysis.api.routes import funds
 from mutual_fund_agent_analysis.database.session import get_db
