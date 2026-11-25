@@ -190,7 +190,9 @@ def test_quote_only_observation_does_not_erase_older_fundamentals_or_events():
             "source_url": "https://example.com/fundamentals",
             "fundamentals_as_of": date(2026, 9, 30),
             "fundamentals_json": {"pe_ratio": "22.5"},
-            "corporate_events_json": [{"title": "Board meeting", "verification_status": "unverified"}],
+            "corporate_events_json": [
+                {"title": "Board meeting", "verification_status": "unverified"}
+            ],
             "content_hash": "a" * 64,
         }
     )
@@ -243,7 +245,10 @@ def test_security_grounding_accepts_holdings_disclosure_when_market_data_is_unav
 
     result = evaluate_grounding_contract(
         {
-            "answer": "Underlying shares were identified from the AMC disclosure; no market quote is stored.",
+            "answer": (
+                "Underlying shares were identified from the AMC disclosure; "
+                "no market quote is stored."
+            ),
             "results": {"security": {"securities": [{"availability": "no_market_observation"}]}},
             "citations": [{"type": "portfolio_disclosure"}],
         }
