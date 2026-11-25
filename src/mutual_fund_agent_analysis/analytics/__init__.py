@@ -5,6 +5,20 @@ from mutual_fund_agent_analysis.analytics.benchmark import (
     align_returns,
     calculate_benchmark_metrics,
 )
+from mutual_fund_agent_analysis.analytics.active_risk import (
+    ActiveRiskMetrics,
+    calculate_active_risk_metrics,
+)
+from mutual_fund_agent_analysis.analytics.investor import (
+    InvestorReturnReport,
+    InvestorTransactionInput,
+    calculate_investor_returns,
+)
+from mutual_fund_agent_analysis.analytics.sip import (
+    SipInstallment,
+    SipSimulation,
+    simulate_monthly_sip,
+)
 from mutual_fund_agent_analysis.analytics.cashflows import (
     CashFlow,
     normalize_cash_flows,
@@ -44,6 +58,14 @@ from mutual_fund_agent_analysis.analytics.service import (
 )
 
 __all__ = [
+    "ActiveRiskMetrics",
+    "InvestorReturnReport",
+    "InvestorTransactionInput",
+    "SipInstallment",
+    "SipSimulation",
+    "calculate_active_risk_metrics",
+    "calculate_investor_returns",
+    "simulate_monthly_sip",
     "CashFlow",
     "BenchmarkMetrics",
     "DrawdownMetrics",
