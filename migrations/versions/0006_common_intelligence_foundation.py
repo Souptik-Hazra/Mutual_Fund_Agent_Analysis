@@ -23,6 +23,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -111,6 +112,13 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_entity_aliases_normalized", "entity_aliases", ["normalized_alias"])
+    op.create_index(
+        "uq_entity_aliases_primary",
+        "entity_aliases",
+        ["entity_id"],
+        unique=True,
+        postgresql_where=text("is_primary IS TRUE"),
+    )
     op.create_table(
         "entity_identifiers",
         Column("identifier_id", BigInteger(), Identity(), primary_key=True),
@@ -139,6 +147,13 @@ def upgrade() -> None:
         UniqueConstraint("namespace", "normalized_value", name="uq_entity_identifier_value"),
     )
     op.create_index("ix_entity_identifiers_entity", "entity_identifiers", ["entity_id"])
+    op.create_index(
+        "uq_entity_identifiers_primary",
+        "entity_identifiers",
+        ["entity_id", "namespace"],
+        unique=True,
+        postgresql_where=text("is_primary IS TRUE"),
+    )
     op.create_table(
         "evidence_records",
         Column("evidence_id", BigInteger(), Identity(), primary_key=True),
@@ -562,8 +577,10 @@ def downgrade() -> None:
     op.drop_index("ix_evidence_content_hash", table_name="evidence_records")
     op.drop_index("ix_evidence_source_published", table_name="evidence_records")
     op.drop_table("evidence_records")
+    op.drop_index("uq_entity_identifiers_primary", table_name="entity_identifiers")
     op.drop_index("ix_entity_identifiers_entity", table_name="entity_identifiers")
     op.drop_table("entity_identifiers")
+    op.drop_index("uq_entity_aliases_primary", table_name="entity_aliases")
     op.drop_index("ix_entity_aliases_normalized", table_name="entity_aliases")
     op.drop_table("entity_aliases")
     op.drop_index("ix_research_entities_type_status", table_name="research_entities")
