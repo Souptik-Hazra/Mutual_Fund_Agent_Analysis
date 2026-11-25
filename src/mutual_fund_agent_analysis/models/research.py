@@ -140,6 +140,29 @@ class MarketEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MarketEventRevision(Base):
+    """Immutable snapshot of an event state replaced by a later source observation."""
+
+    __tablename__ = "market_event_revisions"
+    __table_args__ = (
+        UniqueConstraint("event_id", "revision_number", name="uq_market_event_revision_number"),
+        Index("ix_market_event_revisions_recorded", "event_id", "recorded_at"),
+    )
+
+    revision_id: Mapped[int] = mapped_column(_ID, Identity(), primary_key=True)
+    event_id: Mapped[int] = mapped_column(
+        ForeignKey("market_events.event_id", ondelete="CASCADE"), nullable=False
+    )
+    revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision_reason: Mapped[str] = mapped_column(String(80), nullable=False)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(
+        "snapshot", _JSON, nullable=False, default=dict
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class SocialPost(Base):
     __tablename__ = "social_posts"
     __table_args__ = (

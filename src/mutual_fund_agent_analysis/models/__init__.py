@@ -26,6 +26,7 @@ from mutual_fund_agent_analysis.models.provider_sync_run import ProviderSyncRun
 from mutual_fund_agent_analysis.models.research import (
     DocumentChunk,
     MarketEvent,
+    MarketEventRevision,
     PortfolioHolding,
     PortfolioSnapshot,
     ResearchDocument,
@@ -54,6 +55,7 @@ __all__ = [
     "PortfolioSnapshot",
     "PortfolioHolding",
     "MarketEvent",
+    "MarketEventRevision",
     "SocialPost",
     "ResearchDocument",
     "DocumentChunk",
