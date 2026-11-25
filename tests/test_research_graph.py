@@ -14,7 +14,9 @@ def test_router_selects_multiple_specialists_when_question_needs_them():
 
 
 def test_router_does_not_call_fund_analytics_for_portfolio_overlap():
-    assert classify_intents("Compare overlap between two portfolios", [125497, 120503]) == ["portfolio"]
+    assert classify_intents("Compare overlap between two portfolios", [125497, 120503]) == [
+        "portfolio"
+    ]
 
 
 def test_router_defaults_to_fund_for_explicit_scheme_code():
@@ -26,7 +28,9 @@ def test_router_defaults_to_document_search_without_other_intent():
 
 
 def test_assistant_request_validates_codes_and_date_order():
-    request = ResearchAssistantRequest(question="Compare these funds", scheme_codes=[125497, 120503])
+    request = ResearchAssistantRequest(
+        question="Compare these funds", scheme_codes=[125497, 120503]
+    )
     assert len(request.scheme_codes) == 2
 
 

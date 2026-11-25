@@ -19,7 +19,13 @@ logger = logging.getLogger(__name__)
 def assistant_capabilities() -> dict[str, Any]:
     return {
         "orchestration": "LangGraph",
-        "agents": ["fund_research", "portfolio_intelligence", "news_event", "social_intelligence", "document_research"],
+        "agents": [
+            "fund_research",
+            "portfolio_intelligence",
+            "news_event",
+            "social_intelligence",
+            "document_research",
+        ],
         "llm_synthesis": "optional; configured provider required",
         "financial_calculations": "deterministic analytics services",
         "supported_providers": ["gemini", "groq", "openai"],
@@ -34,15 +40,19 @@ def run_research(
     try:
         graph = build_research_graph()
         result = graph.invoke({"request": request, "session": session})
-        return jsonable_encoder({
-            "question": request.question,
-            "intents": result.get("intents", []),
-            "answer": result.get("answer", "No answer generated."),
-            "results": result.get("results", {}),
-            "citations": result.get("citations", []),
-            "errors": result.get("errors", []),
-            "model_used": result.get("model_used"),
-        })
+        return jsonable_encoder(
+            {
+                "question": request.question,
+                "intents": result.get("intents", []),
+                "answer": result.get("answer", "No answer generated."),
+                "results": result.get("results", {}),
+                "citations": result.get("citations", []),
+                "errors": result.get("errors", []),
+                "model_used": result.get("model_used"),
+            }
+        )
     except Exception as exc:
         logger.exception("Research workflow execution failed.")
-        raise HTTPException(status_code=500, detail="Research workflow failed. Check local API logs.") from exc
+        raise HTTPException(
+            status_code=500, detail="Research workflow failed. Check local API logs."
+        ) from exc
