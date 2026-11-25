@@ -292,6 +292,7 @@ def resolve_entity(
     identifier_value: str | None = None,
     alias: str | None = None,
     as_of: date | None = None,
+    source_key: str | None = None,
 ) -> EntityResolution:
     """Resolve exact identifiers first, then exact aliases; never fuzzy-match identities."""
     normalized_type = entity_type.strip().lower() if entity_type else None
@@ -323,6 +324,8 @@ def resolve_entity(
             return EntityResolution("resolved", entity, "identifier", (entity,))
         if not alias:
             return EntityResolution("not_found", None, None)
+    if source_key and session.get(DataSource, source_key) is None:
+        raise ValueError(f"Unknown source_key: {source_key!r}.")
     normalized_alias = normalize_name(alias) if alias else None
     statement = (
         select(ResearchEntity)
@@ -334,6 +337,12 @@ def resolve_entity(
             (EntityAlias.valid_to.is_(None)) | (EntityAlias.valid_to >= effective_date),
         )
     )
+    if source_key:
+        from sqlalchemy import or_
+
+        statement = statement.where(
+            or_(EntityAlias.source_key == source_key, EntityAlias.source_key.is_(None))
+        )
     if normalized_type:
         statement = statement.where(ResearchEntity.entity_type == normalized_type)
     candidates = tuple(
