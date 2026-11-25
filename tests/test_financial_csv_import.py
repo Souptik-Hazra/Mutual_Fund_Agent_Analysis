@@ -84,14 +84,10 @@ def test_verified_import_requires_official_enabled_source_and_matching_host():
     )
     _validate_source_policy(source, "https://www.amc.example/notice", "verified")
     with pytest.raises(ValueError, match="does not match"):
-        _validate_source_policy(
-            source, "https://attacker.example/notice", "verified"
-        )
+        _validate_source_policy(source, "https://attacker.example/notice", "verified")
     source.enabled = False
     with pytest.raises(ValueError, match="disabled"):
-        _validate_source_policy(
-            source, "https://www.amc.example/notice", "unverified"
-        )
+        _validate_source_policy(source, "https://www.amc.example/notice", "unverified")
 
 
 def test_csv_reader_accepts_utf8_bom_and_rejects_missing_file(tmp_path):

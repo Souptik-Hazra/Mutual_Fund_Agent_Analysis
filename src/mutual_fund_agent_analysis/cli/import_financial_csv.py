@@ -73,9 +73,7 @@ def _validate_source_policy(
         actual_host = parsed.hostname.lower()
         if not registered_host:
             raise ValueError("Registered source base_url is invalid.")
-        if actual_host != registered_host and not actual_host.endswith(
-            "." + registered_host
-        ):
+        if actual_host != registered_host and not actual_host.endswith("." + registered_host):
             raise ValueError("Evidence URL host does not match the registered source host.")
 
 
@@ -205,9 +203,7 @@ def import_scheme_metadata_rows(
                     source_key=source_key,
                     source_url=evidence_url,
                     content_hash=payload_hash,
-                    **record.model_dump(
-                        exclude={"source_key", "source_url", "metadata"}
-                    ),
+                    **record.model_dump(exclude={"source_key", "source_url", "metadata"}),
                     metadata_json=record.metadata,
                 )
                 session.add(observation)
@@ -224,9 +220,7 @@ def import_scheme_metadata_rows(
                             setattr(scheme, field_name, value)
                     if record.expense_ratio is not None:
                         scheme.effective_expense_ratio = record.expense_ratio
-                        scheme.expense_ratio_effective_date = (
-                            record.expense_ratio_effective_date
-                        )
+                        scheme.expense_ratio_effective_date = record.expense_ratio_effective_date
                         scheme.expense_ratio_source_key = source_key
                 session.flush()
             counts["imported"] += 1
