@@ -24,6 +24,10 @@ def normalize_prices(points: Iterable[PricePoint]) -> list[PricePoint]:
     result = list(points)
     if not result:
         raise ValueError("At least one price observation is required.")
+    if any(type(point.date) is not date for point in result):
+        raise ValueError("Price observation dates must be datetime.date values.")
+    if any(not isinstance(point.value, Decimal) for point in result):
+        raise TypeError("Price observations must use Decimal values.")
     if any(not point.value.is_finite() or point.value <= 0 for point in result):
         raise ValueError("Price observations must be finite and greater than zero.")
     dates = [point.date for point in result]
@@ -49,8 +53,12 @@ def normalize_returns(points: Iterable[ReturnPoint]) -> list[ReturnPoint]:
     """Validate and sort returns with explicit, unique observation intervals."""
     result = list(points)
     for point in result:
-        if point.start_date is None or point.start_date >= point.date:
+        if type(point.date) is not date or type(point.start_date) is not date:
+            raise ValueError("Return observation dates must be datetime.date values.")
+        if point.start_date >= point.date:
             raise ValueError("Return observations require start_date earlier than date.")
+        if not isinstance(point.value, Decimal):
+            raise TypeError("Return observations must use Decimal values.")
         if not point.value.is_finite() or point.value <= Decimal("-1"):
             raise ValueError("Returns must be finite and greater than -100%.")
     intervals = [(point.start_date, point.date) for point in result]
