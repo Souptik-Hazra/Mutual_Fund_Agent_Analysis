@@ -17,10 +17,15 @@ from mutual_fund_agent_analysis.models.intelligence import (
 from mutual_fund_agent_analysis.models.nav import NavObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.provider_sync_run import ProviderSyncRun
-from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 from mutual_fund_agent_analysis.models.research import (
-    DocumentChunk, MarketEvent, PortfolioHolding, PortfolioSnapshot, ResearchDocument, SocialPost,
+    DocumentChunk,
+    MarketEvent,
+    PortfolioHolding,
+    PortfolioSnapshot,
+    ResearchDocument,
+    SocialPost,
 )
+from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
 __all__ = [
     "BenchmarkIndex",
