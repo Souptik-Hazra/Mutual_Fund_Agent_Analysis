@@ -24,7 +24,6 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
 )
 from mutual_fund_agent_analysis.llm.providers import create_chat_model
 
-INTENTS = ("fund", "portfolio", "events", "social", "documents")
 KEYWORDS = {
     "fund": ("return", "cagr", "performance", "risk", "drawdown", "sharpe", "benchmark", "volatility"),
     "portfolio": ("holding", "holdings", "portfolio", "sector", "exposure", "allocation", "overlap", "concentration"),
@@ -50,11 +49,11 @@ def classify_intents(question: str, scheme_codes: list[int] | None = None) -> li
     normalized = " ".join(question.casefold().split())
     selected = [
         intent for intent, words in KEYWORDS.items()
-        if any(re.search(rf"\\b{re.escape(word)}\\b", normalized) for word in words)
+        if any(re.search(rf"\b{re.escape(word)}\b", normalized) for word in words)
     ]
     if not selected:
         selected = ["fund"] if scheme_codes else ["documents"]
-    if "compare" in normalized and scheme_codes and len(scheme_codes) > 1 and "fund" not in selected:
+    if "compare" in normalized and scheme_codes and len(scheme_codes) > 1 and any(term in normalized for term in ("return", "benchmark", "performance")) and "fund" not in selected:
         selected.insert(0, "fund")
     return selected
 
@@ -188,8 +187,8 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
                     "Financial metrics must be described as computed by deterministic services."
                 )),
                 HumanMessage(content=(
-                    f"Question: {request.question}\\nRetrieved evidence JSON: {evidence}\\n"
-                    f"Available source reference IDs: {json.dumps(citations, default=str)}\\n"
+                    f"Question: {request.question}\nRetrieved evidence JSON: {evidence}\n"
+                    f"Available source reference IDs: {json.dumps(citations, default=str)}\n"
                     "Summarize the evidence concisely. Do not fabricate citation IDs."
                 )),
             ])
@@ -198,7 +197,7 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
         except Exception:
             pass
     if errors:
-        answer += "\\n\\nLimitations: " + "; ".join(errors)
+        answer += "\n\nLimitations: " + "; ".join(errors)
     return {"answer": answer, "model_used": model_used}
 
 
