@@ -507,3 +507,142 @@ def purge_expired_social_posts(session: Session) -> int:
     )
     session.commit()
     return int(result.rowcount or 0)
+
+
+def fund_social_sentiment(
+    session: Session, scheme_code: int, start: date, end: date
+) -> dict[str, Any]:
+    """Aggregate scored company discussion against holdings effective at each post date."""
+    snapshots = session.scalars(
+        select(PortfolioSnapshot)
+        .where(PortfolioSnapshot.scheme_code == scheme_code)
+        .where(PortfolioSnapshot.effective_date <= end)
+        .order_by(PortfolioSnapshot.effective_date, PortfolioSnapshot.snapshot_id)
+    ).all()
+    if not snapshots:
+        raise ValueError("No portfolio snapshots are available in the requested period.")
+    posts = session.scalars(
+        select(SocialPost)
+        .where(SocialPost.related_entity_id.is_not(None))
+        .where(SocialPost.sentiment_score.is_not(None))
+        .where(SocialPost.is_spam.is_(False))
+        .where(SocialPost.published_at >= datetime.combine(start, datetime.min.time(), timezone.utc))
+        .where(SocialPost.published_at < datetime.combine(end, datetime.max.time(), timezone.utc))
+        .where((SocialPost.expires_at.is_(None)) | (SocialPost.expires_at > datetime.now(timezone.utc)))
+        .order_by(SocialPost.published_at)
+    ).all()
+    total_weight_days = D("0")
+    covered_weight_days = D("0")
+    sentiment_weight_days = D("0")
+    intervals = []
+    for index, snapshot in enumerate(snapshots):
+        interval_start = max(start, snapshot.effective_date)
+        interval_end = min(
+            end,
+            snapshots[index + 1].effective_date - date.resolution
+            if index + 1 < len(snapshots) else end,
+        )
+        if interval_start > interval_end:
+            continue
+        days = D((interval_end - interval_start).days + 1)
+        holdings = session.scalars(select(PortfolioHolding).where(
+            PortfolioHolding.snapshot_id == snapshot.snapshot_id
+        )).all()
+        weight_by_entity = {
+            row.company_entity_id: row.weight_pct
+            for row in holdings
+            if row.company_entity_id is not None and row.weight_pct is not None
+        }
+        total_weight = sum((row.weight_pct or D("0") for row in holdings), D("0"))
+        total_weight_days += total_weight * days
+        relevant = [
+            post for post in posts
+            if post.published_at and interval_start <= post.published_at.date() <= interval_end
+            and post.related_entity_id in weight_by_entity
+        ]
+        grouped: dict[int, list[Decimal]] = defaultdict(list)
+        for post in relevant:
+            grouped[post.related_entity_id].append(post.sentiment_score)
+        interval_covered = D("0")
+        interval_score = D("0")
+        for entity_id, scores in grouped.items():
+            weight = weight_by_entity[entity_id]
+            average = sum(scores, D("0")) / len(scores)
+            interval_covered += weight
+            interval_score += weight * average
+        covered_weight_days += interval_covered * days
+        sentiment_weight_days += interval_score * days
+        intervals.append({
+            "snapshot_id": snapshot.snapshot_id,
+            "effective_date": snapshot.effective_date,
+            "period_start": interval_start,
+            "period_end": interval_end,
+            "scored_company_count": len(grouped),
+            "post_count": len(relevant),
+            "coverage_weight_pct": interval_covered,
+        })
+    return {
+        "scheme_code": scheme_code, "start_date": start, "end_date": end,
+        "weighted_sentiment": sentiment_weight_days / covered_weight_days if covered_weight_days else None,
+        "coverage_pct": (covered_weight_days / total_weight_days * D("100")) if total_weight_days else D("0"),
+        "covered_weight_days": covered_weight_days,
+        "total_weight_days": total_weight_days,
+        "intervals": intervals,
+        "method": "time-weighted company sentiment using disclosure-effective portfolio weights",
+        "warning": "Experimental discussion indicator; it is not a NAV, return, or investment recommendation.",
+    }
+
+
+def events_for_fund_exposure(
+    session: Session, scheme_code: int, start: date | None, end: date | None, limit: int = 100
+) -> dict[str, Any]:
+    """Map company/sector events to the fund holdings snapshot effective on the event date."""
+    from mutual_fund_agent_analysis.models import EntityRelationship
+
+    entity_filter = select(MarketEvent).where(MarketEvent.related_entity_id.is_not(None))
+    if start:
+        entity_filter = entity_filter.where(MarketEvent.event_date >= start)
+    if end:
+        entity_filter = entity_filter.where(MarketEvent.event_date <= end)
+    events = session.scalars(
+        entity_filter.order_by(MarketEvent.event_date.desc().nullslast()).limit(limit)
+    ).all()
+    mapped = []
+    for event in events:
+        if event.event_date is None:
+            mapped.append({"event_id": event.event_id, "title": event.title,
+                           "status": event.status, "exposure_found": False,
+                           "reason": "Event has no effective event date."})
+            continue
+        snapshot = latest_snapshot(session, scheme_code, event.event_date)
+        if snapshot is None:
+            mapped.append({"event_id": event.event_id, "title": event.title,
+                           "status": event.status, "exposure_found": False,
+                           "reason": "No portfolio disclosure effective on or before the event date."})
+            continue
+        entity = session.get(ResearchEntity, event.related_entity_id)
+        holdings = session.scalars(select(PortfolioHolding).where(
+            PortfolioHolding.snapshot_id == snapshot.snapshot_id
+        )).all()
+        matches = []
+        for holding in holdings:
+            matched = holding.company_entity_id == event.related_entity_id
+            if entity and entity.entity_type == "sector" and holding.sector:
+                matched = holding.sector.strip().casefold() == entity.canonical_name.strip().casefold()
+            if matched:
+                matches.append({
+                    "security_key": holding.security_key,
+                    "security_name": holding.security_name,
+                    "sector": holding.sector,
+                    "weight_pct": holding.weight_pct,
+                })
+        mapped.append({
+            "event_id": event.event_id, "title": event.title,
+            "event_type": event.event_type, "status": event.status,
+            "event_date": event.event_date, "source_key": event.source_key,
+            "evidence_id": event.evidence_id, "canonical_url": event.canonical_url,
+            "portfolio_effective_date": snapshot.effective_date,
+            "exposure_found": bool(matches), "holdings": matches,
+            "aggregate_exposure_pct": sum((item["weight_pct"] or D("0") for item in matches), D("0")),
+        })
+    return {"scheme_code": scheme_code, "count": len(mapped), "events": mapped}
