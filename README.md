@@ -622,9 +622,7 @@ values or fund NAVs, and missing benchmark dates are not forward-filled.
 
 ## Deterministic financial analytics (Phase 2)
 
-The `mutual_fund_agent_analysis.analytics` package is a pure-Python calculation layer.
-It accepts dated `Decimal` observations and does not make database, network, or LLM calls.
-The current API exposes:
+The analytics core accepts dated `Decimal` observations and performs deterministic calculations without network or LLM calls. The adjacent `analytics.service` module loads reconciled NAV and benchmark TRI observations from PostgreSQL and assembles a reproducible report. The public API exposes:
 
 - Absolute point-to-point return and date-aware CAGR (365.25-day year).
 - Consecutive-observation returns, 1Y/3Y/5Y rolling returns, trailing returns, and completed calendar-year returns (an incomplete latest year is excluded).
@@ -649,6 +647,7 @@ from mutual_fund_agent_analysis.analytics import (
 
 navs = [
     PricePoint(date(2023, 1, 2), Decimal("100")),
+    PricePoint(date(2023, 7, 3), Decimal("105")),
     PricePoint(date(2024, 1, 2), Decimal("112")),
 ]
 print(absolute_return(navs))
@@ -661,7 +660,7 @@ print(calculate_drawdown(navs))
 ### Calculation conventions and limitations
 
 - Inputs must be positive, finite prices with unique dates. They are sorted chronologically; duplicate dates are rejected.
-- Returns are calculated between consecutive available observations. The package does not invent missing trading-day values or forward-fill NAV/benchmark series.
+- Returns are calculated between consecutive available observations. The package does not invent missing trading-day values or forward-fill NAV/benchmark series. If a source has missing sessions, the multi-session return is still treated as one observation; callers must validate coverage before applying a daily annualization factor.
 - Rolling/trailing windows use calendar anniversaries (a leap-day anchor maps to February 28) and the closest observed value on or before the anchor date. CAGR uses 365.25 days per year.
 - Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 12 for monthly observations).
 - The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers.
