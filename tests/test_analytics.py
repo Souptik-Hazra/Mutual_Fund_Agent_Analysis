@@ -116,7 +116,7 @@ def test_benchmark_metrics_align_exact_dates_and_calculate_beta_alpha() -> None:
         date(2024, 1, 2),
         date(2024, 1, 4),
     ]
-    metrics = calculate_benchmark_metrics(fund, benchmark, periods_per_year=1)
+    metrics = calculate_benchmark_metrics(fund, benchmark, periods_per_year=252)
     assert metrics.observation_count == 2
     assert metrics.beta == Decimal("2")
     assert metrics.annualized_alpha == Decimal("0")
@@ -299,11 +299,11 @@ def test_return_alignment_rejects_overlapping_intervals() -> None:
 def test_constant_benchmark_keeps_return_metrics_but_not_beta_or_alpha() -> None:
     fund = returns(("2024-01-02", "0.02"), ("2024-01-03", "0.04"))
     benchmark = returns(("2024-01-02", "0.01"), ("2024-01-03", "0.01"))
-    result = calculate_benchmark_metrics(fund, benchmark, periods_per_year=12)
+    result = calculate_benchmark_metrics(fund, benchmark, periods_per_year=252)
     assert result.beta is None
     assert result.annualized_alpha is None
-    assert result.annualized_fund_return == Decimal("0.36")
-    assert result.annualized_benchmark_return == Decimal("0.12")
+    assert result.annualized_fund_return == Decimal("15.12")
+    assert result.annualized_benchmark_return == Decimal("5.04")
     assert result.mean_period_excess_return == Decimal("0.02")
 
 
