@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { request, streamRequest } from "./api";
 import { buildDocumentSearchPath, eventRows } from "./research";
 
-const tabs = ["Overview", "Funds", "Compare", "Portfolio", "Investments", "Events", "Social", "Documents", "Assistant"];
+const tabs = ["Overview", "Funds", "Compare", "Portfolio", "Investments", "Category & Equity", "Events", "Social", "Documents", "Assistant"];
 const money = (value) => value == null ? "—" : Number(value).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const percent = (value) => value == null ? "—" : `${(Number(value) * 100).toFixed(2)}%`;
 const base100Points = (series = []) => {
@@ -58,6 +58,20 @@ export default function App() {
   const runFunds = () => run(() => request(query.trim() ? `/schemes?q=${encodeURIComponent(query.trim())}&limit=30` : "/schemes?limit=30"));
   const runFundAnalysis = (code) => { setCodes(String(code)); run(() => request(`/schemes/${code}/analytics?benchmark_code=${encodeURIComponent(benchmark)}&start_date=${dateFrom}&end_date=${dateTo}&frequency=${analysisFrequency}`)); };
   const runCompare = () => run(() => request("/schemes/compare", json("POST", { scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo, frequency: analysisFrequency })));
+  const runCategoryAnalysis = () => {
+    if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
+    const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo });
+    if (benchmark.trim()) params.set("benchmark_code", benchmark.trim());
+    return run(() => request(`/fund-intelligence/schemes/${schemeCodes[0]}/category?${params.toString()}`));
+  };
+  const runEquityStatus = () => {
+    if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
+    return run(() => request(`/fund-intelligence/schemes/${schemeCodes[0]}/equity-status`));
+  };
+  const runEquityComparison = () => {
+    if (schemeCodes.length < 2 || schemeCodes.length > 5) return setError("Enter two to five scheme codes.");
+    return run(() => request("/fund-intelligence/compare", json("POST", { scheme_codes: schemeCodes })));
+  };
   const runPortfolio = () => run(async () => {
     const snapshot = await request(`/portfolios/${schemeCodes[0]}`);
     const quality = await request(`/portfolios/${schemeCodes[0]}/quality`);
@@ -230,6 +244,50 @@ export default function App() {
             </>}
             {data?.transaction_id && <p className="muted">Transaction #{data.transaction_id} saved. Refresh the ledger to view all entries.</p>}
           </Panel>
+        </>}
+        {tab === "Category & Equity" && <>
+          <Panel title="Category-relative fund analysis">
+            <p className="muted">Compare the selected scheme with funds sharing its stored category, scheme type, plan and option. Use a category-appropriate benchmark TRI where available.</p>
+            <div className="field-row">
+              <div className="field"><label>Scheme codes</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div>
+              <div className="field"><label>Benchmark TRI (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} /></div>
+            </div>
+            <div className="field-row">
+              <div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+              <div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+            </div>
+            <div className="toolbar">
+              <button className="primary" disabled={busy} onClick={runCategoryAnalysis}>Analyse category peers</button>
+              <button className="secondary" disabled={busy} onClick={runEquityStatus}>Check underlying equities</button>
+              <button className="secondary" disabled={busy || schemeCodes.length < 2 || schemeCodes.length > 5} onClick={runEquityComparison}>Compare holdings (2–5 funds)</button>
+            </div>
+          </Panel>
+          {data?.selected_fund && <Panel title={`Category peers · ${data.category}`}>
+            <div className="analysis-grid">
+              <div className="metric"><small>Peer count</small><strong>{data.peer_count}</strong></div>
+              <div className="metric"><small>CAGR rank</small><strong>{data.selected_fund.cagr_rank ?? "—"} / {data.peer_count}</strong></div>
+              <div className="metric"><small>CAGR percentile</small><strong>{data.selected_fund.cagr_percentile == null ? "—" : `${money(data.selected_fund.cagr_percentile)}%`}</strong></div>
+              <div className="metric"><small>Sharpe rank</small><strong>{data.selected_fund.sharpe_ratio_rank ?? "—"} / {data.peer_count}</strong></div>
+            </div>
+            <p className="muted">Cohort: {data.peer_definition?.scheme_type || "—"} · {data.peer_definition?.plan_type || "—"} · {data.peer_definition?.option_type || "—"} · benchmark {data.benchmark_code || "not selected"}</p>
+            <div className="table-wrap"><table><thead><tr><th>Scheme</th><th>CAGR</th><th>Volatility</th><th>Sharpe</th><th>Max drawdown</th><th>Rank</th></tr></thead><tbody>{data.peers?.map((peer) => <tr key={peer.scheme_code}><td>{peer.scheme_name}<small>{peer.scheme_code} · {peer.fund_house || "—"}</small></td><td>{percent(peer.cagr)}</td><td>{percent(peer.annualized_volatility)}</td><td>{money(peer.sharpe_ratio)}</td><td>{percent(peer.maximum_drawdown)}</td><td>{peer.cagr_rank ?? "—"}</td></tr>)}</tbody></table></div>
+            <p className="muted">{data.excluded_peer_count} peer(s) excluded for insufficient NAV history. Rankings are descriptive, not recommendations.</p>
+          </Panel>}
+          {data?.items && <Panel title={`Underlying equity status · holdings as of ${data.holdings_as_of}`}>
+            <div className="analysis-grid">
+              <div className="metric"><small>Equity securities</small><strong>{data.equity_security_count}</strong></div>
+              <div className="metric"><small>Market observations</small><strong>{data.market_data_available_count}</strong></div>
+            </div>
+            <div className="table-wrap"><table><thead><tr><th>Security</th><th>Fund weight</th><th>Last price</th><th>Day change</th><th>Market status</th><th>Freshness</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.security_key}><td>{item.security_name}<small>{item.isin || item.security_key}</small></td><td>{item.disclosed_weight_pct == null ? "—" : `${money(item.disclosed_weight_pct)}%`}</td><td>{item.market_data ? money(item.market_data.last_price) : "Unavailable"}</td><td>{item.market_data?.change_pct == null ? "—" : `${money(item.market_data.change_pct)}%`}</td><td>{item.market_data?.market_status || "—"}</td><td>{item.freshness || "—"}</td></tr>)}</tbody></table></div>
+            {data.items.filter((item) => item.health_signals?.length).map((item) => <p className="muted" key={item.security_key}><strong>{item.security_name}:</strong> {item.health_signals.map((signal) => signal.message).join(" ")}</p>)}
+            <p className="muted">{data.warning} Market status is based on the latest stored provider observation, not a live exchange connection.</p>
+          </Panel>}
+          {data?.pairwise_overlap && <Panel title="Multi-fund equity overlap">
+            <div className="table-wrap"><table><thead><tr><th>Fund A</th><th>Fund B</th><th>Overlap</th><th>Common shares</th></tr></thead><tbody>{data.pairwise_overlap.map((pair) => <tr key={`${pair.scheme_a}-${pair.scheme_b}`}><td>{pair.scheme_a}</td><td>{pair.scheme_b}</td><td>{money(pair.overlap_pct)}%</td><td>{pair.common_security_count}</td></tr>)}</tbody></table></div>
+            <h3>Equal-weighted combined exposure</h3>
+            <div className="table-wrap"><table><thead><tr><th>Underlying share</th><th>Funds present</th><th>Combined exposure</th></tr></thead><tbody>{data.aggregated_equity_exposure?.slice(0, 30).map((item) => <tr key={item.security_key}><td>{item.name}<small>{item.security_key}</small></td><td>{item.funds_present}</td><td>{money(item.equal_weight_exposure_pct)}%</td></tr>)}</tbody></table></div>
+            <p className="muted">{data.aggregation_basis} {data.disclosure_warning}</p>
+          </Panel>}
         </>}
         {tab === "Events" && <Panel title="Event and news intelligence"><div className="field-row"><div className="field"><label>Scheme code</label><input value={codes} onChange={(e) => setCodes(e.target.value)} /></div><div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div><div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div></div><div className="field-row"><div className="field"><label>Status</label><select value={eventStatus} onChange={(e) => setEventStatus(e.target.value)}><option value="">All statuses</option>{["confirmed","scheduled","reported","unverified","speculative","disproved","outdated"].map((value) => <option key={value}>{value}</option>)}</select></div><div className="field"><label>Source key (optional)</label><input value={eventSource} onChange={(e) => setEventSource(e.target.value)} placeholder="e.g. nse_announcements" /></div></div><button className="primary" disabled={busy} onClick={runEvents}>Load events and fund exposure</button>{eventRows(data).length ? <div className="event-list">{eventRows(data).map((event) => <article className="event-row" key={event.event_id}><div><strong>{event.title}</strong><small>{event.event_date || "Effective date unavailable"} · published {event.published_at || "unknown"} · {event.status} · {event.source_key || "source unknown"}</small><small>Evidence: {event.evidence?.verification_status || "not linked"} · authority tier {event.source?.authority_tier ?? "—"}</small>{event.canonical_url && <a href={event.canonical_url} target="_blank" rel="noreferrer">Open source</a>}</div><b>{event.exposure_found ? `${money(event.aggregate_exposure_pct)}% exposure` : "Exposure unavailable"}</b></article>)}</div> : <Empty>{data ? "No events matched these filters." : "Filter reported and verified events, then inspect historical fund exposure."}</Empty>}</Panel>}
         {tab === "Documents" && <Panel title="Document research"><div className="upload-block"><div className="field"><label>Upload a text-based PDF factsheet, SID or disclosure</label><input type="file" accept="application/pdf,.pdf" onChange={(e) => setSelectedDocument(e.target.files?.[0] || null)} /></div><div className="field"><label>Document title</label><input value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} placeholder="Optional title (defaults to filename)" /></div><button className="secondary" disabled={busy} onClick={importDocument}>Upload and index PDF</button></div><div className="toolbar"><input value={documentQuery} onChange={(e) => setDocumentQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runDocuments()} /><button className="primary" disabled={busy} onClick={runDocuments}>Search documents</button></div>{data?.document_id ? <div className="upload-success"><strong>PDF uploaded successfully</strong><p>{data.title} · Document #{data.document_id} · {data.page_count} page(s)</p><small>Document stored. Search the indexed documents above to retrieve relevant excerpts.</small></div> : data?.results?.length ? data.results.map((item, i) => <article className="document-result" key={i}><div><strong>{item.title}</strong><small>Page {item.page_number || "—"} · {item.retrieval_mode || data.retrieval_mode}</small></div><p>{item.text}</p><small>Document #{item.document_id} · chunk #{item.citation?.chunk_id || item.chunk_index}</small></article>) : <Empty>{data ? "No matching document chunks." : "Search indexed PDFs and factsheets."}</Empty>}</Panel>}
