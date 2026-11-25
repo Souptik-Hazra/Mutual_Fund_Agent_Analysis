@@ -60,6 +60,13 @@ def test_security_router_selects_underlying_security_specialist():
     ) == ["security"]
 
 
+def test_security_router_does_not_misclassify_dividend_yield_as_an_event():
+    assert classify_intents(
+        "Show the stock valuation and dividend yield for my holdings",
+        [125497],
+    ) == ["portfolio", "security"]
+
+
 def test_security_router_can_run_with_fund_performance():
     assert classify_intents(
         "Show fund returns and underlying stock fundamentals",
