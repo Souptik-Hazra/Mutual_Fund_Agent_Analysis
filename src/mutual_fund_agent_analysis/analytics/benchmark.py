@@ -62,9 +62,7 @@ def calculate_benchmark_metrics(
     )
     beta = covariance / b_variance
     periodic_rf = annual_risk_free_rate / Decimal(periods_per_year)
-    alpha = (
-        (f_mean - periodic_rf) - beta * (b_mean - periodic_rf)
-    ) * Decimal(periods_per_year)
+    alpha = ((f_mean - periodic_rf) - beta * (b_mean - periodic_rf)) * Decimal(periods_per_year)
     return BenchmarkMetrics(
         count,
         beta,
