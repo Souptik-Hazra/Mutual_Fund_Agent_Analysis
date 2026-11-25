@@ -14,6 +14,7 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_identifier,
     create_entity,
     link_entity_evidence,
+    normalize_identifier,
     record_evidence,
 )
 from mutual_fund_agent_analysis.models.intelligence import (
@@ -62,7 +63,7 @@ def upsert_benchmark_response(
         .join(EntityIdentifier, EntityIdentifier.entity_id == ResearchEntity.entity_id)
         .where(
             EntityIdentifier.namespace == "BENCHMARK_CODE",
-            EntityIdentifier.normalized_value == response.benchmark_code.upper(),
+            EntityIdentifier.normalized_value == normalize_identifier(response.benchmark_code),
         )
     )
     if entity is None:
