@@ -1,6 +1,6 @@
 """Regression coverage for security data, hybrid retrieval and research routing."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -17,7 +17,7 @@ def valid_security_observation(**overrides):
         "security_key": "INE002A01018",
         "security_name": "Example Industries",
         "source_key": "test_provider",
-        "observed_at": datetime(2026, 11, 25, 10, 0, tzinfo=timezone.utc),
+        "observed_at": datetime(2026, 11, 25, 10, 0, tzinfo=UTC),
         "last_price": Decimal("125.50"),
         "fundamentals_as_of": "2026-09-30",
         "fundamentals": {"pe_ratio": "22.5", "roe_pct": "14.2"},
