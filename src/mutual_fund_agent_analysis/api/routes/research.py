@@ -4,9 +4,10 @@
 import csv
 import hashlib
 import io
-from itertools import islice
+import zipfile
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from itertools import islice
 from typing import Annotated, Any
 
 import httpx
@@ -137,10 +138,25 @@ async def import_portfolio_file(
         elif filename.endswith(".xlsx"):
             from openpyxl import load_workbook
 
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                members = archive.infolist()
+                uncompressed_size = sum(member.file_size for member in members)
+                if uncompressed_size > 100 * 1024 * 1024 or any(
+                    member.file_size > 25 * 1024 * 1024
+                    or (
+                        member.compress_size > 0
+                        and member.file_size / member.compress_size > 100
+                    )
+                    for member in members
+                ):
+                    raise HTTPException(
+                        status_code=413,
+                        detail="XLSX expands beyond the permitted workbook resource limits.",
+                    )
             workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
             try:
                 sheet = workbook.active
-                values = list(islice(sheet.iter_rows(values_only=True), 5002))
+                values = list(islice(sheet.iter_rows(max_col=100, values_only=True), 5002))
                 if not values:
                     raise ValueError("Workbook is empty.")
                 headers = [
