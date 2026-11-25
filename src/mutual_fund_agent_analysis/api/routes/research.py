@@ -486,7 +486,7 @@ def collect_social_posts(
         }
     except SocialProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Exception:
+    except Exception as exc:
         raise HTTPException(status_code=502, detail="Social provider request failed.") from exc
 
 
@@ -631,6 +631,7 @@ def ask_research_documents(
             "grounded": False,
         }
     from langchain_core.messages import HumanMessage, SystemMessage
+
     from mutual_fund_agent_analysis.llm.providers import create_chat_model
 
     excerpts = []
