@@ -106,9 +106,9 @@ def xirr(flows: Iterable[CashFlow]) -> Decimal:
         for index in range(1, _SCAN_STEPS + 1):
             right = _MIN_LOG_GROSS_RATE + step * Decimal(index)
             right_value = value_at(right)
-            if left_value == 0:
-                brackets.append((left, left))
-            elif right_value == 0 or (left_value < 0) != (right_value < 0):
+            if right_value == 0:
+                brackets.append((right, right))
+            elif left_value != 0 and (left_value < 0) != (right_value < 0):
                 brackets.append((left, right))
             left, left_value = right, right_value
 
