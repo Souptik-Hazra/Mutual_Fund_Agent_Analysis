@@ -105,6 +105,15 @@ def test_source_specific_alias_resolution(session):
     assert mfapi_result.entity.entity_id == second.entity_id
 
 
+def test_alias_and_evidence_relationship_types_are_validated(session):
+    entity = create_entity(session, "company", "Example Limited")
+    with pytest.raises(ValueError, match="alias_type"):
+        add_entity_alias(session, entity.entity_id, "Example", alias_type=" ")
+    evidence = record_evidence(session, "amfi", external_id="example-evidence")
+    with pytest.raises(ValueError, match="relation_type"):
+        link_entity_evidence(session, entity.entity_id, evidence.evidence_id, relation_type=" ")
+
+
 def test_identifier_cannot_be_reassigned(session):
     first = create_entity(session, "company", "ABC Limited")
     second = create_entity(session, "company", "XYZ Limited")
