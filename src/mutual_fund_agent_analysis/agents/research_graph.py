@@ -242,8 +242,11 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             or fundamentals.get("source_key"),
                             "observed_at": market.get("observed_at"),
                             "fundamentals_as_of": fundamentals.get("as_of"),
-                            "source_url": market.get("source_url")
+                            "canonical_url": market.get("source_url")
                             or fundamentals.get("source_url"),
+                            "retrieved_at": market.get("retrieved_at")
+                            or fundamentals.get("retrieved_at"),
+                            "verification_status": "unverified",
                         })
             elif intent == "events":
                 if codes:
