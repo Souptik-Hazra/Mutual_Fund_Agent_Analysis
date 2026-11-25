@@ -56,6 +56,8 @@ def load_fund_prices(
     allow_nav_conflicts: bool = False,
 ) -> tuple[list[PricePoint], tuple[date, ...]]:
     """Load canonical reconciled NAVs; conflicts are rejected unless explicitly allowed."""
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise ValueError("start_date must be on or before end_date.")
     statement = select(NavReconciliation).where(NavReconciliation.scheme_code == scheme_code)
     if start_date is not None:
         statement = statement.where(NavReconciliation.nav_date >= start_date)
@@ -83,6 +85,8 @@ def load_benchmark_prices(
     source: str = "niftyindices",
 ) -> list[PricePoint]:
     """Load one source-specific benchmark TRI series without filling missing dates."""
+    if start_date > end_date:
+        raise ValueError("start_date must be on or before end_date.")
     statement = (
         select(BenchmarkObservation)
         .where(
