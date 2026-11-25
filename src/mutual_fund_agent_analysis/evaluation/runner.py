@@ -125,8 +125,7 @@ def evaluate_evidence_quality(
             malformed += 1
             continue
         has_provenance = all(
-            citation.get(field)
-            for field in ("source_key", "canonical_url", "retrieved_at")
+            citation.get(field) for field in ("source_key", "canonical_url", "retrieved_at")
         )
         complete += int(has_provenance)
         verified += int(citation.get("verification_status") == "verified")

@@ -294,7 +294,9 @@ def add_distribution_observation(
                 detail="A correction must retain the source/external ID and increase the revision.",
             )
         if previous.status != "active":
-            raise HTTPException(status_code=409, detail="Only an active distribution can be superseded.")
+            raise HTTPException(
+                status_code=409, detail="Only an active distribution can be superseded."
+            )
 
     payload = request.model_dump(mode="json")
     payload_hash = _hash_payload(payload)
@@ -523,7 +525,9 @@ def get_idcw_total_return(
             detail="NAV conflicts must be resolved before total-return calculation.",
         )
     if len(nav_rows) < 2:
-        raise HTTPException(status_code=422, detail="At least two reconciled NAV observations are required.")
+        raise HTTPException(
+            status_code=422, detail="At least two reconciled NAV observations are required."
+        )
 
     distribution_rows = session.scalars(
         select(DistributionObservation)
