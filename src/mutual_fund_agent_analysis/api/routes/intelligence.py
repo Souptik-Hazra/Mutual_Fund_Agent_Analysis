@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -36,7 +36,9 @@ from mutual_fund_agent_analysis.data.services.intelligence import (
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.intelligence import (
     DataSource,
+    EntityAlias,
     EntityEvidenceLink,
+    EntityIdentifier,
     EntityRelationship,
     EvidenceRecord,
     ResearchEntity,
@@ -122,6 +124,17 @@ def add_alias_endpoint(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@router.get("/entities/{entity_id}/aliases", response_model=list[AliasResponse])
+def list_entity_aliases(entity_id: int, session: Annotated[Session, Depends(get_db)]):
+    _entity_or_404(session, entity_id)
+    rows = session.scalars(
+        select(EntityAlias)
+        .where(EntityAlias.entity_id == entity_id)
+        .order_by(EntityAlias.is_primary.desc(), EntityAlias.alias_id)
+    ).all()
+    return [AliasResponse.model_validate(row) for row in rows]
+
+
 @router.post(
     "/entities/{entity_id}/identifiers", response_model=IdentifierResponse,
     status_code=status.HTTP_201_CREATED,
@@ -145,6 +158,19 @@ def add_identifier_endpoint(
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/entities/{entity_id}/identifiers", response_model=list[IdentifierResponse]
+)
+def list_entity_identifiers(entity_id: int, session: Annotated[Session, Depends(get_db)]):
+    _entity_or_404(session, entity_id)
+    rows = session.scalars(
+        select(EntityIdentifier)
+        .where(EntityIdentifier.entity_id == entity_id)
+        .order_by(EntityIdentifier.namespace, EntityIdentifier.identifier_id)
+    ).all()
+    return [IdentifierResponse.model_validate(row) for row in rows]
 
 
 @router.post("/evidence", response_model=EvidenceResponse, status_code=status.HTTP_201_CREATED)
@@ -198,13 +224,20 @@ def link_evidence_endpoint(
 
 
 @router.get("/entities/{entity_id}/evidence", response_model=list[EvidenceResponse])
-def list_entity_evidence(entity_id: int, session: Annotated[Session, Depends(get_db)]):
+def list_entity_evidence(
+    entity_id: int,
+    session: Annotated[Session, Depends(get_db)],
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
     _entity_or_404(session, entity_id)
     rows = session.scalars(
         select(EvidenceRecord)
         .join(EntityEvidenceLink, EntityEvidenceLink.evidence_id == EvidenceRecord.evidence_id)
         .where(EntityEvidenceLink.entity_id == entity_id)
         .order_by(EvidenceRecord.published_at.desc().nullslast(), EvidenceRecord.evidence_id.desc())
+        .limit(limit)
+        .offset(offset)
     ).all()
     return [EvidenceResponse.model_validate(row) for row in rows]
 
