@@ -1,0 +1,93 @@
+[
+  {
+    "name": "verified official citation with ordered timestamps",
+    "expected_pass": true,
+    "response": {
+      "answer": "The event is disclosed in an official notice.",
+      "results": {
+        "events": [
+          {
+            "status": "confirmed"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "type": "market_event",
+          "source_key": "exchange_official",
+          "canonical_url": "https://www.nseindia.com/example/notice",
+          "retrieved_at": "2026-11-25T10:00:00+00:00",
+          "published_at": "2026-11-24T10:00:00+00:00",
+          "verification_status": "verified"
+        }
+      ]
+    }
+  },
+  {
+    "name": "research result without source provenance",
+    "expected_pass": false,
+    "response": {
+      "results": {
+        "fund": {
+          "cagr": "0.12"
+        }
+      },
+      "citations": [
+        {
+          "type": "financial_data"
+        }
+      ]
+    }
+  },
+  {
+    "name": "citation published after retrieval",
+    "expected_pass": false,
+    "response": {
+      "results": {
+        "events": []
+      },
+      "citations": [
+        {
+          "type": "market_event",
+          "source_key": "exchange_official",
+          "canonical_url": "https://www.nseindia.com/example/notice",
+          "retrieved_at": "2026-11-24T10:00:00+00:00",
+          "published_at": "2026-11-25T10:00:00+00:00",
+          "verification_status": "verified"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsupported claim attached to evidence",
+    "expected_pass": false,
+    "response": {
+      "results": {
+        "fund": {
+          "cagr": "0.12"
+        }
+      },
+      "unsupported_claims": [
+        "The fund will outperform next year."
+      ],
+      "citations": [
+        {
+          "type": "financial_data",
+          "source_key": "nav_provider",
+          "canonical_url": "https://example.com/nav",
+          "retrieved_at": "2026-11-25T10:00:00+00:00",
+          "verification_status": "verified"
+        }
+      ]
+    }
+  },
+  {
+    "name": "abstention without evidence",
+    "expected_pass": true,
+    "require_citations": false,
+    "response": {
+      "answer": "Insufficient source coverage.",
+      "citations": []
+    }
+  }
+]

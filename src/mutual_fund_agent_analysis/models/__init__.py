@@ -5,6 +5,11 @@ from mutual_fund_agent_analysis.models.benchmark import (
     BenchmarkObservation,
     BenchmarkSyncRun,
 )
+from mutual_fund_agent_analysis.models.financial import (
+    DistributionCoverageAttestation,
+    DistributionObservation,
+    SchemeMetadataObservation,
+)
 from mutual_fund_agent_analysis.models.intelligence import (
     DataSource,
     EntityAlias,
@@ -33,6 +38,8 @@ __all__ = [
     "BenchmarkObservation",
     "BenchmarkSyncRun",
     "DataSource",
+    "DistributionCoverageAttestation",
+    "DistributionObservation",
     "EntityAlias",
     "EntityEvidenceLink",
     "EntityIdentifier",
@@ -50,4 +57,5 @@ __all__ = [
     "SocialPost",
     "ResearchDocument",
     "DocumentChunk",
+    "SchemeMetadataObservation",
 ]

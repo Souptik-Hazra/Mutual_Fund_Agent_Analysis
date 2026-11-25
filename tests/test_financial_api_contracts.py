@@ -1,0 +1,24 @@
+from mutual_fund_agent_analysis.main import create_app
+
+
+def test_financial_reliability_routes_are_registered():
+    paths = create_app().openapi()["paths"]
+    assert "/api/v1/audit/coverage" in paths
+    assert "/api/v1/schemes/{scheme_code}/metadata-observations" in paths
+    assert "/api/v1/schemes/{scheme_code}/distributions" in paths
+    assert "/api/v1/schemes/{scheme_code}/distribution-coverage" in paths
+    assert "/api/v1/schemes/{scheme_code}/idcw-total-return" in paths
+    assert "/api/v1/portfolios/{scheme_code}/quality" in paths
+
+
+def test_analytics_contract_exposes_all_sampling_frequencies():
+    paths = create_app().openapi()["paths"]
+    parameters = paths["/api/v1/schemes/{scheme_code}/analytics"]["get"]["parameters"]
+    frequency = next(item for item in parameters if item["name"] == "frequency")
+    assert frequency["schema"]["enum"] == [
+        "daily",
+        "weekly",
+        "monthly",
+        "quarterly",
+        "yearly",
+    ]

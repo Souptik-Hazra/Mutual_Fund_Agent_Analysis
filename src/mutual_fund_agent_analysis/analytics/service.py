@@ -24,7 +24,12 @@ from mutual_fund_agent_analysis.analytics.risk import (
     RiskMetrics,
     calculate_risk_metrics,
 )
-from mutual_fund_agent_analysis.analytics.series import PricePoint, period_returns
+from mutual_fund_agent_analysis.analytics.series import (
+    FREQUENCY_PERIODS_PER_YEAR,
+    PricePoint,
+    period_returns,
+    resample_prices,
+)
 from mutual_fund_agent_analysis.models.benchmark import BenchmarkObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 
@@ -50,6 +55,7 @@ class FundAnalyticsReport:
     benchmark_source: str | None
     nav_conflict_dates: tuple[date, ...]
     calendar_year_as_of_date: date | None
+    frequency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +68,7 @@ class FundComparisonReport:
     end_date: date
     funds: tuple[FundAnalyticsReport, ...]
     benchmark_code: str | None
+    frequency: str
 
 
 def load_fund_prices(
@@ -127,7 +134,18 @@ def _build_report(
     annual_risk_free_rate: Decimal,
     periods_per_year: int,
     calendar_year_as_of_date: date | None,
+    frequency: str,
 ) -> FundAnalyticsReport:
+    if frequency not in FREQUENCY_PERIODS_PER_YEAR:
+        raise ValueError("Unsupported analysis frequency.")
+    if frequency != "daily":
+        periods_per_year = FREQUENCY_PERIODS_PER_YEAR[frequency]
+    prices = resample_prices(prices, frequency)
+    benchmark_prices = (
+        resample_prices(benchmark_prices, frequency)
+        if benchmark_prices is not None
+        else None
+    )
     if len(prices) < 2:
         raise ValueError("At least two NAV observations are required for fund analytics.")
     if calendar_year_as_of_date is not None and (
@@ -174,6 +192,7 @@ def _build_report(
         benchmark_source=benchmark_source if benchmark_code is not None else None,
         nav_conflict_dates=conflicts,
         calendar_year_as_of_date=calendar_year_as_of_date,
+        frequency=frequency,
     )
 
 
@@ -188,6 +207,7 @@ def analyze_fund(
     benchmark_source: str = "niftyindices",
     allow_nav_conflicts: bool = False,
     calendar_year_as_of_date: date | None = None,
+    frequency: str = "daily",
 ) -> FundAnalyticsReport:
     """Run deterministic analytics and retain explicit calendar-year completion context."""
     prices, conflicts = load_fund_prices(
@@ -210,6 +230,7 @@ def analyze_fund(
         annual_risk_free_rate,
         periods_per_year,
         calendar_year_as_of_date,
+        frequency,
     )
 
 
@@ -224,6 +245,7 @@ def compare_funds(
     benchmark_source: str = "niftyindices",
     allow_nav_conflicts: bool = False,
     calendar_year_as_of_date: date | None = None,
+    frequency: str = "daily",
 ) -> FundComparisonReport:
     """Compare 2–5 schemes using the exact intersection of their available NAV dates.
 
@@ -282,14 +304,16 @@ def compare_funds(
                 annual_risk_free_rate,
                 periods_per_year,
                 calendar_year_as_of_date,
+                frequency,
             )
         )
 
     return FundComparisonReport(
         scheme_codes=codes,
-        observation_count=len(ordered_dates),
-        start_date=ordered_dates[0],
-        end_date=ordered_dates[-1],
+        observation_count=reports[0].observation_count,
+        start_date=reports[0].start_date,
+        end_date=reports[0].end_date,
         funds=tuple(reports),
         benchmark_code=benchmark_code,
+        frequency=frequency,
     )

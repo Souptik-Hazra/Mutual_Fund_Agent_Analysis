@@ -17,6 +17,13 @@ class SchemeSummary(BaseModel):
     scheme_category: str | None = None
     isin_growth: str | None = None
     isin_div_reinvestment: str | None = None
+    lifecycle_type: str | None = None
+    plan_type: str | None = None
+    option_type: str | None = None
+    launch_date: date | None = None
+    closure_date: date | None = None
+    effective_expense_ratio: Decimal | None = None
+    expense_ratio_effective_date: date | None = None
 
 
 class SchemePage(BaseModel):
@@ -65,6 +72,7 @@ class FundAnalyticsResponse(BaseModel):
     benchmark_source: str | None
     nav_conflict_dates: list[date]
     calendar_year_as_of_date: date | None
+    frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"]
 
 
 class FundComparisonRequest(BaseModel):
@@ -77,6 +85,7 @@ class FundComparisonRequest(BaseModel):
     benchmark_source: str = Field(default="niftyindices", min_length=1, max_length=40)
     allow_nav_conflicts: bool = False
     calendar_year_as_of_date: date | None = None
+    frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"] = "daily"
 
     @field_validator("scheme_codes")
     @classmethod
@@ -108,3 +117,4 @@ class FundComparisonResponse(BaseModel):
     end_date: date
     funds: list[FundAnalyticsResponse]
     benchmark_code: str | None
+    frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"] = "daily"

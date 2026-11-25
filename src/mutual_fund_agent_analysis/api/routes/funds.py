@@ -3,7 +3,7 @@
 from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -128,16 +128,15 @@ def list_schemes(
         filters.append(MutualFundScheme.scheme_category.ilike(f"%{category.strip()}%"))
     if scheme_type:
         filters.append(MutualFundScheme.scheme_type.ilike(f"%{scheme_type.strip()}%"))
-    if plan == "direct":
-        filters.append(MutualFundScheme.scheme_name.ilike("%DIRECT%"))
-    elif plan == "regular":
-        filters.append(MutualFundScheme.scheme_name.ilike("%REGULAR%"))
+    if plan:
+        filters.append(MutualFundScheme.plan_type == plan)
     if option == "growth":
-        filters.append(MutualFundScheme.scheme_name.ilike("%GROWTH%"))
+        filters.append(MutualFundScheme.option_type == "growth")
     elif option == "idcw":
         filters.append(
-            (MutualFundScheme.scheme_name.ilike("%IDCW%"))
-            | (MutualFundScheme.scheme_name.ilike("%DIVIDEND%"))
+            MutualFundScheme.option_type.in_(
+                ["idcw_payout", "idcw_reinvestment", "idcw_transfer"]
+            )
         )
     for condition in filters:
         statement = statement.where(condition)
@@ -196,6 +195,7 @@ def get_fund_analytics(
     benchmark_source: Annotated[str, Query(min_length=1, max_length=40)] = "niftyindices",
     allow_nav_conflicts: bool = False,
     calendar_year_as_of_date: date | None = None,
+    frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"] = "daily",
 ) -> FundAnalyticsResponse:
     """Calculate one fund's metrics from reconciled NAV and optional benchmark TRI."""
     _validate_scheme_code(scheme_code)
@@ -218,6 +218,7 @@ def get_fund_analytics(
             benchmark_source,
             allow_nav_conflicts,
             calendar_year_as_of_date,
+            frequency,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -242,6 +243,7 @@ def compare_selected_funds(
             request.benchmark_source,
             request.allow_nav_conflicts,
             request.calendar_year_as_of_date,
+            request.frequency,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

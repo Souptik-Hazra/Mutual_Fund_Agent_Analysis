@@ -29,6 +29,7 @@ mfa-sync-nav = "mutual_fund_agent_analysis.cli.sync_nav:main"
 mfa-sync-benchmark = "mutual_fund_agent_analysis.cli.sync_benchmark:main"
 mfa-purge-expired-social = "mutual_fund_agent_analysis.cli.purge_social:main"
 mfa-evaluate-agent = "mutual_fund_agent_analysis.cli.evaluate_agent:main"
+mfa-audit-local = "mutual_fund_agent_analysis.cli.audit_local:main"
 
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.3,<2"]

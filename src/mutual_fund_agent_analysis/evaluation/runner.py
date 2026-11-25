@@ -96,3 +96,109 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
         and isinstance(results, dict)
         and evidence_present,
     }
+
+def evaluate_evidence_quality(
+    response: dict[str, Any],
+    *,
+    require_citations: bool | None = None,
+) -> dict[str, Any]:
+    """Measure citation provenance, verification and temporal anomalies."""
+    from datetime import datetime, timezone
+
+    citations = response.get("citations") or []
+    if not isinstance(citations, list):
+        citations = []
+    results = response.get("results") or {}
+    required = bool(results) if require_citations is None else require_citations
+    complete = 0
+    verified = 0
+    stale = 0
+    future_publications = 0
+    malformed = 0
+
+    def parse_timestamp(value: Any) -> datetime:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+
+    for citation in citations:
+        if not isinstance(citation, dict):
+            malformed += 1
+            continue
+        has_provenance = all(
+            citation.get(field)
+            for field in ("source_key", "canonical_url", "retrieved_at")
+        )
+        complete += int(has_provenance)
+        verified += int(citation.get("verification_status") == "verified")
+        published = citation.get("published_at")
+        retrieved = citation.get("retrieved_at")
+        if published and retrieved:
+            try:
+                published_at = parse_timestamp(published)
+                retrieved_at = parse_timestamp(retrieved)
+                if published_at > retrieved_at:
+                    future_publications += 1
+                elif (retrieved_at - published_at).days > 365:
+                    stale += 1
+            except (TypeError, ValueError, OverflowError):
+                malformed += 1
+    citation_count = len(citations)
+    provenance_completeness = complete / citation_count if citation_count else 0.0
+    verified_ratio = verified / citation_count if citation_count else 0.0
+    unsupported_claims = response.get("unsupported_claims") or []
+    passed = (
+        (not required or citation_count > 0)
+        and (not required or complete == citation_count)
+        and malformed == 0
+        and future_publications == 0
+        and stale == 0
+        and not unsupported_claims
+    )
+    return {
+        "citation_count": citation_count,
+        "provenance_completeness": provenance_completeness,
+        "verified_citation_ratio": verified_ratio,
+        "stale_citation_count": stale,
+        "future_publication_count": future_publications,
+        "malformed_citation_count": malformed,
+        "unsupported_claim_count": len(unsupported_claims),
+        "evidence_quality_passed": passed,
+    }
+
+
+def evaluate_evidence_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Run a reviewed set of evidence-contract cases and compare expected outcomes."""
+    if not cases:
+        raise ValueError("Evidence evaluation dataset is empty.")
+    rows = []
+    passed = 0
+    for case in cases:
+        metrics = evaluate_evidence_quality(
+            case["response"],
+            require_citations=case.get("require_citations"),
+        )
+        expected = bool(case["expected_pass"])
+        actual = bool(metrics["evidence_quality_passed"])
+        correct = actual == expected
+        passed += int(correct)
+        rows.append(
+            {
+                "name": case["name"],
+                "expected_pass": expected,
+                "actual_pass": actual,
+                "case_passed": correct,
+                "metrics": metrics,
+            }
+        )
+    return {
+        "case_count": len(cases),
+        "correct_outcomes": passed,
+        "accuracy": passed / len(cases),
+        "cases": rows,
+    }
+
+
+def load_and_evaluate_evidence(path: str | Path) -> dict[str, Any]:
+    """Load reviewed evidence-contract cases from JSON."""
+    cases = json.loads(Path(path).read_text(encoding="utf-8"))
+    return evaluate_evidence_cases(cases)

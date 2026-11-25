@@ -5,6 +5,15 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+FREQUENCY_PERIODS_PER_YEAR = {
+    "daily": 252,
+    "weekly": 52,
+    "monthly": 12,
+    "quarterly": 4,
+    "yearly": 1,
+}
+
+
 
 @dataclass(frozen=True, slots=True)
 class PricePoint:
@@ -69,3 +78,43 @@ def normalize_returns(points: Iterable[ReturnPoint]) -> list[ReturnPoint]:
         if current.start_date < previous.date:
             raise ValueError("Return observation intervals must not overlap.")
     return ordered
+
+
+def resample_prices(
+    points: Iterable[PricePoint],
+    frequency: str = "daily",
+) -> list[PricePoint]:
+    """Select the last actual observation in each calendar period, preserving the start.
+
+    No missing NAV is filled or interpolated. The first source observation is
+    retained as the base point; subsequent observations are the last available
+    NAV in each daily, ISO-weekly, monthly, quarterly or yearly bucket.
+    """
+    if frequency not in FREQUENCY_PERIODS_PER_YEAR:
+        raise ValueError(
+            "frequency must be daily, weekly, monthly, quarterly or yearly."
+        )
+    prices = normalize_prices(points)
+    if frequency == "daily":
+        return prices
+
+    def bucket(point: PricePoint) -> tuple[int, ...]:
+        day = point.date
+        if frequency == "weekly":
+            iso = day.isocalendar()
+            return (iso.year, iso.week)
+        if frequency == "monthly":
+            return (day.year, day.month)
+        if frequency == "quarterly":
+            return (day.year, (day.month - 1) // 3 + 1)
+        return (day.year,)
+
+    period_ends: dict[tuple[int, ...], PricePoint] = {}
+    for point in prices:
+        period_ends[bucket(point)] = point
+
+    sampled = [prices[0]]
+    for point in period_ends.values():
+        if point.date > sampled[-1].date:
+            sampled.append(point)
+    return sampled

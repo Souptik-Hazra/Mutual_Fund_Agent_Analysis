@@ -35,10 +35,10 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 **Goal:** Establish the actual working baseline before changing financial behaviour.
 
 - [x] Run the complete CI-equivalent suite against current `main`: Ruff, formatting, pytest with PostgreSQL, Docker Compose validation/build, frontend tests/build, and offline agent evaluation (main commit `eb3804be`, successful run `45623391232`).
-- [ ] Verify the latest Alembic migration chain from an empty database and from the previous supported schema.
+- [x] Verify the latest Alembic migration chain from an empty database and from the previous supported schema in PostgreSQL integration tests (including downgrade/upgrade coverage).
 - [ ] Exercise live MFAPI, AMFI, and Nifty TRI retrieval with bounded date ranges; record provider failures/schema changes without making CI depend on live services.
 - [ ] Audit every API request/response schema against the frontend's actual request bodies and rendered response shapes.
-- [ ] Generate a data-coverage report: schemes, NAV date ranges, reconciliation status, benchmark series, metadata completeness, portfolio snapshots, events, social sources, and document index.
+- [x] Add a local data-coverage report for schemes, NAV date ranges/conflicts, benchmark series, metadata/distributions, portfolio snapshots, events, social sources, and document index (`mfa-audit-local` and `GET /api/v1/audit/coverage`).
 - [ ] Record reproducible baseline metrics and known limitations.
 
 **Exit criteria:** A checked-in audit report identifies each verified capability, missing source, coverage gap, and reproducible defect. No implementation is marked complete solely because its route or model exists.
@@ -52,7 +52,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [x] Implement deterministic dated XIRR with bounded-rate search, multiple-root/no-root failure states, and bounded bisection.
 - [x] Implement exact-date SIP simulation separately from actual transaction-ledger XIRR; simulated SIP output is explicitly labelled.
 - [x] Add invested amount, current value, realized proceeds, unrealized value, absolute gain, XIRR, and missed-installment coverage to reports.
-- [ ] Add test fixtures for irregular dates, missed SIPs, partial redemptions, same-day flows, leap years, zero/invalid flows, and non-convergence.
+- [ ] Add test fixtures for irregular dates, missed SIPs, partial redemptions, same-day flows, leap years, zero/invalid flows, and non-convergence. (Same-day, leap-year, invalid-sign and no-root cases are now covered; SIP/redemption edge fixtures remain to be expanded.)
 - [x] Expose simulated-versus-actual return basis and core assumptions through the API and Investments UI.
 
 **Exit criteria:** Independent known-answer fixtures and property/invariant tests pass; the UI distinguishes fund CAGR from investor XIRR and simulated SIP outcomes.
@@ -62,12 +62,12 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 **Goal:** Avoid understating returns for IDCW/distribution options.
 
 - [ ] Research and register authoritative distribution sources, including ex-date, record/payment date, per-unit amount, applicable option, and source provenance.
-- [ ] Add versioned distribution observations with idempotent ingestion and conflict audit.
-- [ ] Implement a documented reinvested-distribution total-return methodology using the correct ex-date convention and available NAVs.
+- [x] Add versioned distribution observations with idempotent ingestion, supersession revisions, source hashes and conflict audit.
+- [x] Implement a documented reinvested-distribution total-return methodology using the ex-date NAV convention and reconciled NAVs; source coverage attestation is a separate gate.
 - [ ] Keep Growth NAV returns, IDCW payout cash-flow returns, and reinvested IDCW total returns distinct.
-- [ ] Define treatment for taxes, exit loads, reinvestment timing, missing distributions, and revised/cancelled disclosures; do not assume investor-specific tax outcomes.
+- [x] Document taxes/exit loads and investor timing as excluded from the scheme-level index; support revised/cancelled distribution records. Investor-specific tax outcomes are not assumed.
 - [ ] Add fund/benchmark comparison safeguards so a price/NAV-only series is not mislabelled as total return.
-- [ ] Surface missing distribution coverage and reject incomplete total-return claims.
+- [x] Surface missing distribution coverage and reject total-return requests without a stored verified official-source attestation covering the requested interval.
 
 **Exit criteria:** Independently calculated test cases validate ex-date adjustments and reinvestment; all API/UI labels state the return basis.
 
@@ -77,10 +77,10 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 
 - [ ] Add/verify lifecycle-aware scheme-master ingestion, including open-ended, close-ended, and interval schemes where official historical data is available.
 - [ ] Implement bulk/daily refresh with bounded requests, retry/backoff, checkpointing, resumability, and per-scheme outcomes.
-- [ ] Validate direct/regular plan and Growth/IDCW option classification from authoritative source fields; preserve unknown/ambiguous values rather than infer from names.
+- [x] Provide source-attributed, effective-dated plan/option observations; promote only verified official-source values and preserve unknown values. Automatic authoritative bulk classification remains open.
 - [ ] Add source-backed expense-ratio observations with effective dates, plan/option mapping, source, and freshness.
 - [ ] Audit AMC, category, scheme type, benchmark mapping, launch/closure dates, and ISIN coverage.
-- [ ] Add metadata change history rather than overwriting historical values without provenance.
+- [x] Add source-attributed effective-dated metadata history; current scheme fields are promoted only from verified official observations.
 - [ ] Add source-coverage and staleness indicators to scheme details and filters.
 
 **Exit criteria:** Metadata fields are source-backed, effective-dated, auditable, and correctly filtered; no inferred plan labels are presented as verified.
@@ -89,9 +89,9 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 
 **Goal:** Complete the analysis contract without duplicating the existing analytics core.
 
-- [ ] Verify daily, weekly, monthly, quarterly, yearly, and custom date-window calculations against known-answer fixtures and actual observation spacing.
-- [ ] Ensure UI controls map to the existing `start_date`, `end_date`, and `periods_per_year` API contract consistently.
-- [ ] Add explicit comparison duration/frequency controls for 2–5 funds; preserve exact common-date alignment and report the resulting common window.
+- [x] Implement calendar-aware daily, weekly, monthly, quarterly and yearly sampling without filling missing NAVs; add deterministic sampling fixtures. Custom date windows remain supported through start/end dates.
+- [x] Ensure UI controls map to `start_date`, `end_date`, and the explicit `frequency` API contract consistently.
+- [x] Add comparison duration/frequency controls for 2–5 funds; preserve exact common-date alignment and report the resulting common window.
 - [x] Implement tracking error and information ratio using exact aligned fund/benchmark periodic returns and explicit annualization.
 - [ ] Document whether returns are arithmetic or geometric for every annualized metric; avoid mixing methodologies in the same comparison.
 - [ ] Validate risk-free-rate conventions, downside deviation, beta, alpha, volatility, and coverage diagnostics across frequencies.
@@ -107,7 +107,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Build source-specific AMC disclosure adapters only for verified official file formats and publication schedules.
 - [ ] Add schema/version detection and mapping tests for CSV/XLSX/PDF-derived holdings; retain manual import as a supported fallback.
 - [ ] Validate ISIN/security resolution, corporate actions/name changes, cash/debt/derivative/other asset classes, and unresolved holdings.
-- [ ] Add snapshot coverage metrics, unresolved-weight percentage, source freshness, and effective-date confidence.
+- [ ] Add snapshot coverage metrics, unresolved-weight percentage, source freshness, and effective-date confidence. (Unresolved equity weight and resolved-coverage diagnostics are now available; source freshness/effective-date confidence still need independent calibration.)
 - [ ] Verify sector allocation, concentration/HHI, overlap, holdings change, and stock-to-fund exposure against independent fixtures.
 - [ ] Add reconciliation for corrected/reissued portfolio disclosures and audited entity merge workflow before any fuzzy matching.
 - [ ] Add historical AMC/scheme relationship validity review where provider metadata changes over time.
@@ -136,7 +136,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 
 - [ ] Expand the curated evaluation set across single-fund, multi-fund, portfolio, events, social, and document intents.
 - [ ] Add numerical parity tests: agent outputs must match deterministic analytics API results exactly within documented Decimal/serialization tolerances.
-- [ ] Evaluate citation precision/coverage, source authority, evidence freshness, temporal correctness, and unsupported-claim rate.
+- [x] Add offline evaluation for citation provenance completeness, verification ratio, stale/future timestamps, malformed citations, and unsupported claims. Broader labelled agent-response datasets remain open.
 - [ ] Test ambiguity, missing data, conflicting NAVs, stale snapshots, unavailable providers, empty retrieval, and out-of-scope questions.
 - [ ] Add adversarial tests for prompt injection in PDFs/social content and ensure untrusted content cannot alter tool policy.
 - [ ] Measure deterministic fallback behaviour when no LLM key exists or the model provider fails.
@@ -192,3 +192,17 @@ Parallel work is allowed only when it does not change shared financial contracts
 ## Explicitly out of scope
 
 Public hosting, cloud deployment, multi-user accounts, production authentication/authorization, multi-tenant data, automated investment execution, autonomous trading, and public exposure of the local development API.
+
+
+## Phase 0–7 implementation branch status (2026-11-25)
+
+The implementation branch `feat/complete-phases-0-7` adds:
+- Reversible migration `0009_metadata_and_distributions` for effective-dated scheme metadata, versioned IDCW observations and persisted coverage attestations.
+- Deterministic reinvested-IDCW index with explicit completeness/official-source gates; NAV-only series remain separately labelled.
+- Calendar-aware daily/weekly/monthly/quarterly/yearly resampling across single-fund and 2–5-fund APIs and UI.
+- Scheme plan/option filters based on source-backed fields rather than scheme-name substring guesses.
+- Portfolio quality diagnostics for unresolved equity exposure and reported-weight coverage.
+- Local coverage-audit CLI and API endpoint, bounded provider probes, API schema registration tests, and migration graph regression tests.
+- Offline evidence-contract dataset and CI gate for provenance/time/unsupported-claim regressions.
+
+Still gated by real-world source inputs and acceptance evidence: execute `mfa-audit-local --live` against MFAPI/AMFI/Nifty TRI from the user's local installation; register verified AMC distribution sources and attestations backed by their actual notices; build/test AMC-specific portfolio adapters only against actual source files; review current Reddit/X access and attribution terms; and complete independent portfolio/agent numerical parity, scanned-PDF and prompt-injection fixtures. These items are intentionally not marked complete merely because supporting database/API contracts now exist.

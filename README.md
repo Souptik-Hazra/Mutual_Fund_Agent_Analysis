@@ -2,7 +2,7 @@
 
 An AI-powered mutual fund research and market-intelligence platform focused initially on **Indian mutual funds**. The project combines quantitative fund analytics, multi-fund comparison, portfolio intelligence, financial-document research, social sentiment, and upcoming-news monitoring.
 
-> **Project status:** Phases 1–8 are implemented on the preceding feature branch; Phases 9–11 add LangGraph research orchestration, a local React workspace, and offline evaluation. This is designed as a personal local application, not a public deployment. See `docs/phases-5-8-implementation.md` and `docs/phases-9-11-personal.md`.
+> **Project status:** The local-first core (NAV/benchmark ingestion, deterministic analytics, investor ledger, portfolio/evidence foundations, LangGraph and React workspace) is implemented. Financial-reliability extensions for Phases 0–7 are being delivered in a dedicated branch; authoritative IDCW coverage, AMC-specific file adapters and live provider verification remain source-dependent gates. This is a personal local application, not a public deployment. See `docs/roadmap-financial-reliability.md` and `docs/phase-0-7-reliability-implementation.md`.
 
 ## Table of Contents
 
@@ -788,3 +788,21 @@ checksums, retention, Qdrant version compatibility, and the destructive restore 
 
 The restore command requires an explicit interactive confirmation. Backups are not encrypted
 by these scripts; protect or encrypt the resulting archives before moving them off the machine.
+
+
+## Financial reliability audit
+
+After applying database migrations, generate a local coverage report:
+
+```bash
+mfa-audit-local --output artifacts/local-coverage-audit.json
+```
+
+For a bounded read-only MFAPI, AMFI and Nifty TRI provider check (maximum 31 calendar days), pass the exact scheme and benchmark identifiers:
+
+```bash
+mfa-audit-local --live --scheme-code YOUR_SCHEME_CODE --benchmark-code "NIFTY 50" \
+  --start-date 2026-11-01 --end-date 2026-11-25
+```
+
+The added API contracts include `GET /api/v1/audit/coverage`, source-attributed scheme metadata observations, versioned IDCW records and coverage attestations, a guarded reinvested-IDCW index, and portfolio holding-quality diagnostics. Daily, weekly, monthly, quarterly and yearly analytics use actual observed period-end NAVs; missing values are never filled. Read the phase implementation notes before registering an official distribution source.
