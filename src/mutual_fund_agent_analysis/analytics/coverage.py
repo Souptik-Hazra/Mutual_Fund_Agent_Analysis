@@ -22,7 +22,8 @@ _FREQUENCY_BY_PERIODS = {
     52: ("weekly", 5, 14),
     12: ("monthly", 15, 50),
     4: ("quarterly", 46, 150),
-    1: ("yearly", 151, 550),
+    2: ("semiannual", 151, 220),
+    1: ("yearly", 221, 550),
 }
 
 
@@ -60,7 +61,8 @@ def assess_return_coverage(
         ("weekly", 5, 14),
         ("monthly", 15, 50),
         ("quarterly", 46, 150),
-        ("yearly", 151, 550),
+        ("semiannual", 151, 220),
+        ("yearly", 221, 550),
     ):
         if minimum <= median <= maximum:
             inferred = name
