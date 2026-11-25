@@ -1,6 +1,6 @@
 """Tests for the common intelligence foundation."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -8,8 +8,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.data.services.intelligence import (
-    add_entity_alias, add_entity_identifier, create_entity, link_entity_evidence,
-    normalize_identifier, normalize_name, record_evidence, resolve_entity,
+    add_entity_alias,
+    add_entity_identifier,
+    create_entity,
+    link_entity_evidence,
+    normalize_identifier,
+    normalize_name,
+    record_evidence,
+    resolve_entity,
 )
 from mutual_fund_agent_analysis.database.base import Base
 from mutual_fund_agent_analysis.models.intelligence import DataSource
@@ -111,7 +117,7 @@ def test_evidence_is_idempotent_and_linked(session):
     evidence = record_evidence(
         session, "amfi", external_id="nav-report-2026-11-25",
         canonical_url="https://www.amfiindia.com/", title="AMFI NAV report",
-        published_at=datetime(2026, 11, 25, tzinfo=timezone.utc),
+        published_at=datetime(2026, 11, 25, tzinfo=UTC),
         confidence=Decimal("0.990"), verification_status="verified",
     )
     same = record_evidence(
