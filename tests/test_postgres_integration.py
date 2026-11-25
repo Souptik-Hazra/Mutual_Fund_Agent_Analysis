@@ -103,6 +103,13 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "benchmark_indices" in tables
     assert "benchmark_observations" in tables
     assert "benchmark_sync_runs" in tables
+    assert "data_sources" in tables
+    assert "research_entities" in tables
+    assert "entity_aliases" in tables
+    assert "entity_identifiers" in tables
+    assert "evidence_records" in tables
+    assert "entity_evidence_links" in tables
+    assert "entity_relationships" in tables
     assert "alembic_version" in tables
     with Session(migrated_postgres) as session:
         scheme_identifier = session.scalar(
