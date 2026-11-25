@@ -662,7 +662,7 @@ print(calculate_drawdown(navs))
 
 - Inputs must be positive, finite prices with unique dates. They are sorted chronologically; duplicate dates are rejected.
 - Returns are calculated between consecutive available observations. The package does not invent missing trading-day values or forward-fill NAV/benchmark series.
-- Rolling/trailing windows use calendar-year day counts (365.25 days per year) and the closest observed value on or before the anchor date.
+- Rolling/trailing windows use calendar anniversaries (a leap-day anchor maps to February 28) and the closest observed value on or before the anchor date. CAGR uses 365.25 days per year.
 - Volatility uses sample standard deviation. Annualization uses the caller-supplied frequency (252 daily periods by default; use 12 for monthly observations).
 - The risk-free rate is an explicitly supplied nominal annual rate divided by the observation frequency. It defaults to zero and must be disclosed by callers.
 - Sharpe and Sortino are undefined when their respective denominators are zero; these return `None`, not infinity.
