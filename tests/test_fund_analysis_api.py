@@ -127,14 +127,26 @@ def test_comparison_uses_exact_shared_dates() -> None:
     session = Mock()
     session.scalars.return_value.all.side_effect = [
         [
-            SimpleNamespace(nav_date=date(2024, 1, 1), canonical_nav=Decimal("100"), status="matched"),
-            SimpleNamespace(nav_date=date(2024, 1, 2), canonical_nav=Decimal("110"), status="matched"),
-            SimpleNamespace(nav_date=date(2024, 1, 3), canonical_nav=Decimal("121"), status="matched"),
+            SimpleNamespace(
+                nav_date=date(2024, 1, 1), canonical_nav=Decimal("100"), status="matched"
+            ),
+            SimpleNamespace(
+                nav_date=date(2024, 1, 2), canonical_nav=Decimal("110"), status="matched"
+            ),
+            SimpleNamespace(
+                nav_date=date(2024, 1, 3), canonical_nav=Decimal("121"), status="matched"
+            ),
         ],
         [
-            SimpleNamespace(nav_date=date(2024, 1, 1), canonical_nav=Decimal("50"), status="matched"),
-            SimpleNamespace(nav_date=date(2024, 1, 3), canonical_nav=Decimal("55"), status="matched"),
-            SimpleNamespace(nav_date=date(2024, 1, 4), canonical_nav=Decimal("60"), status="matched"),
+            SimpleNamespace(
+                nav_date=date(2024, 1, 1), canonical_nav=Decimal("50"), status="matched"
+            ),
+            SimpleNamespace(
+                nav_date=date(2024, 1, 3), canonical_nav=Decimal("55"), status="matched"
+            ),
+            SimpleNamespace(
+                nav_date=date(2024, 1, 4), canonical_nav=Decimal("60"), status="matched"
+            ),
         ],
     ]
     result = compare_funds(session, [100, 200])

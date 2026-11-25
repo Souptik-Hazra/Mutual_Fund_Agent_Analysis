@@ -42,7 +42,10 @@ def discover_schemes(
     """Search the upstream MFAPI scheme directory without writing to the database."""
     normalized = q.strip()
     if len(normalized) < 2:
-        raise HTTPException(status_code=422, detail="Search query must contain at least two characters.")
+        raise HTTPException(
+            status_code=422,
+            detail="Search query must contain at least two characters.",
+        )
     try:
         with MFAPIClient() as client:
             items = client.search_schemes(normalized)
@@ -170,7 +173,10 @@ def get_fund_analytics(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
     if annual_risk_free_rate <= Decimal("-1"):
-        raise HTTPException(status_code=422, detail="annual_risk_free_rate must be greater than -1.")
+        raise HTTPException(
+            status_code=422,
+            detail="annual_risk_free_rate must be greater than -1.",
+        )
     try:
         report = analyze_fund(
             session,
