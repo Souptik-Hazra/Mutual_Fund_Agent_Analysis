@@ -419,3 +419,43 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
             session.get(EntityEvidenceLink, (benchmark_entity.entity_id, item.evidence_id))
             for item in benchmark_evidence
         )
+
+
+
+def test_postgres_investor_ledger_persists_decimal_entries(
+    migrated_postgres: Engine,
+) -> None:
+    """The personal ledger persists transaction magnitudes and optional NAV exactly."""
+    with Session(migrated_postgres) as session, session.begin():
+        if session.get(MutualFundScheme, 991238) is None:
+            session.add(
+                MutualFundScheme(
+                    scheme_code=991238,
+                    scheme_name="Investor Ledger Integration Fund",
+                    source="amfi",
+                )
+            )
+    with Session(migrated_postgres) as session, session.begin():
+        transaction = InvestorTransaction(
+            scheme_code=991238,
+            transaction_date=date(2026, 11, 25),
+            transaction_type="purchase",
+            amount=Decimal("12500.75"),
+            units=Decimal("100.12345678"),
+            nav=Decimal("124.9575"),
+            currency="INR",
+            folio_reference="LOCAL-TEST-FOLIO",
+            external_reference="LOCAL-TEST-ORDER-001",
+        )
+        session.add(transaction)
+        session.flush()
+        transaction_id = transaction.transaction_id
+
+    with Session(migrated_postgres) as session:
+        saved = session.get(InvestorTransaction, transaction_id)
+        assert saved is not None
+        assert saved.scheme_code == 991238
+        assert saved.amount == Decimal("12500.750000")
+        assert saved.units == Decimal("100.12345678")
+        assert saved.nav == Decimal("124.95750000")
+        assert saved.currency == "INR"
