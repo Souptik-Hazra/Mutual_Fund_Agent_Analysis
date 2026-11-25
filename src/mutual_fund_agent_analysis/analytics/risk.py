@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
-from math import isqrt
 from typing import Iterable
 
 from mutual_fund_agent_analysis.analytics.series import ReturnPoint
@@ -74,7 +73,7 @@ def calculate_risk_metrics(
         else None
     )
     sortino = (
-        mean_excess * Decimal(periods_per_year) / (downside * Decimal(periods_per_year).sqrt())
+        mean_excess * Decimal(periods_per_year) / downside
         if downside != 0
         else None
     )
