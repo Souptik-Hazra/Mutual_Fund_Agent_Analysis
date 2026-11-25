@@ -22,10 +22,10 @@ def align_returns(
     fund_returns: Iterable[ReturnPoint], benchmark_returns: Iterable[ReturnPoint]
 ) -> tuple[list[ReturnPoint], list[ReturnPoint]]:
     """Inner-join return observations on exact dates; never forward-fill."""
-    fund = {point.date: point for point in fund_returns}
-    benchmark = {point.date: point for point in benchmark_returns}
-    dates = sorted(fund.keys() & benchmark.keys())
-    return [fund[day] for day in dates], [benchmark[day] for day in dates]
+    fund = {(point.start_date, point.date): point for point in fund_returns}
+    benchmark = {(point.start_date, point.date): point for point in benchmark_returns}
+    intervals = sorted(fund.keys() & benchmark.keys())
+    return [fund[key] for key in intervals], [benchmark[key] for key in intervals]
 
 
 def calculate_benchmark_metrics(
