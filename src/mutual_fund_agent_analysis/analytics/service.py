@@ -16,6 +16,7 @@ from mutual_fund_agent_analysis.analytics.returns import (
     RollingReturn,
     absolute_return,
     cagr,
+    calendar_year_returns,
     rolling_returns,
 )
 from mutual_fund_agent_analysis.analytics.risk import (
@@ -42,9 +43,14 @@ class FundAnalyticsReport:
     absolute_return: Decimal
     cagr: Decimal
     rolling_returns: tuple[RollingReturn, ...]
+    calendar_year_returns: tuple[tuple[int, Decimal], ...]
     risk: RiskMetrics
     drawdown: DrawdownMetrics
     benchmark: BenchmarkMetrics | None
+    annual_risk_free_rate: Decimal
+    periods_per_year: int
+    benchmark_code: str | None
+    benchmark_source: str | None
     nav_conflict_dates: tuple[date, ...]
 
 
@@ -148,6 +154,7 @@ def analyze_fund(
         absolute_return=absolute_return(prices),
         cagr=cagr(prices),
         rolling_returns=tuple(rolling_returns(prices)),
+        calendar_year_returns=tuple(sorted(calendar_year_returns(prices).items())),
         risk=calculate_risk_metrics(
             fund_returns,
             annual_risk_free_rate,
@@ -155,5 +162,9 @@ def analyze_fund(
         ),
         drawdown=calculate_drawdown(prices),
         benchmark=benchmark_metrics,
+        annual_risk_free_rate=annual_risk_free_rate,
+        periods_per_year=periods_per_year,
+        benchmark_code=benchmark_code,
+        benchmark_source=benchmark_source if benchmark_code is not None else None,
         nav_conflict_dates=conflicts,
     )
