@@ -150,8 +150,19 @@ def sync_twelvedata_quote(
 class SecurityCorporateEvent(BaseModel):
     title: str = Field(min_length=3, max_length=500)
     event_type: Literal[
-        "results", "board_meeting", "dividend", "record_date", "split", "bonus",
-        "merger", "acquisition", "fundraising", "management", "regulatory", "filing", "other",
+        "results",
+        "board_meeting",
+        "dividend",
+        "record_date",
+        "split",
+        "bonus",
+        "merger",
+        "acquisition",
+        "fundraising",
+        "management",
+        "regulatory",
+        "filing",
+        "other",
     ] = "other"
     event_date: date | None = None
     status: Literal[
@@ -183,9 +194,20 @@ class SecurityObservationInput(BaseModel):
     @classmethod
     def validate_fundamentals(cls, values: dict[str, Decimal | None]) -> dict[str, Decimal | None]:
         allowed = {
-            "market_cap", "pe_ratio", "pb_ratio", "roe_pct", "debt_to_equity",
-            "dividend_yield_pct", "eps", "book_value", "revenue", "net_profit",
-            "total_debt", "total_equity", "operating_margin_pct", "profit_margin_pct",
+            "market_cap",
+            "pe_ratio",
+            "pb_ratio",
+            "roe_pct",
+            "debt_to_equity",
+            "dividend_yield_pct",
+            "eps",
+            "book_value",
+            "revenue",
+            "net_profit",
+            "total_debt",
+            "total_equity",
+            "operating_margin_pct",
+            "profit_margin_pct",
         }
         unknown = set(values) - allowed
         if unknown:
