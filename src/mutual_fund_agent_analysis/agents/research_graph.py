@@ -14,6 +14,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
+from mutual_fund_agent_analysis.analytics.security_intelligence import securities_for_funds
 from mutual_fund_agent_analysis.analytics.service import analyze_fund, compare_funds
 from mutual_fund_agent_analysis.api.schemas.assistant import ResearchAssistantRequest
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
@@ -25,7 +26,6 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     search_documents,
     social_analytics,
 )
-from mutual_fund_agent_analysis.analytics.security_intelligence import securities_for_funds
 from mutual_fund_agent_analysis.llm.providers import create_chat_model
 
 logger = logging.getLogger(__name__)
