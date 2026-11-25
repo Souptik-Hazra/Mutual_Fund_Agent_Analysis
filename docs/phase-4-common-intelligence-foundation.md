@@ -12,7 +12,8 @@ Create one canonical identity and provenance layer shared by fund, portfolio, ma
 - Source registry with source type, authority tier (1 is highest), official status, base URL, attribution requirement, enabled state, and metadata. AMFI, MFAPI, Nifty Indices, SEBI, NSE, BSE, RBI, and MOSPI are seeded. Reddit and X are registered but disabled until access, terms, and retention are configured.
 - Evidence records with external ID, canonical URL, title, publication/retrieval times, effective date range, content hash, verification status, confidence, and metadata.
 - Entity-evidence links with relation type, confidence, resolution method, and verification timestamp.
-- Deterministic resolver: exact identifier first, then exact alias; temporal validity is honored; ambiguous aliases return candidates and are never auto-selected.
+- Deterministic resolver: exact identifier first, then exact alias; temporal validity and optional source scope are honored; ambiguous aliases return candidates and are never auto-selected.
+- NAV and benchmark ingestion now creates or updates matching canonical entities, provider aliases, and AMFI scheme-code / benchmark-code identifiers; migration backfills identities for already-ingested scheme and benchmark masters.
 - REST API for source listing, entity creation/read, alias and identifier registration, evidence creation, entity-evidence linking, evidence listing, and identity resolution.
 
 ## API
@@ -42,7 +43,7 @@ All endpoints are under /api/v1/intelligence.
 7. Social sources are disabled by default; registration does not imply permission to collect or retain content.
 8. Evidence stores source references and metadata, not unrestricted copies of copyrighted articles or platform content.
 9. Services do not commit transactions; API boundaries own commits and rollbacks.
-10. Existing NAV and benchmark schemas remain unchanged; provider sync audit remains their lineage source until ingestion services are migrated to evidence links.
+10. Existing NAV and benchmark schemas remain unchanged; provider sync audit remains their raw-response lineage while new ingestion writes also maintain canonical entity identity. Evidence links to individual sync runs remain a follow-up.
 
 ## Validation
 
