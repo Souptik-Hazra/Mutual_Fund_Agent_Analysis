@@ -94,6 +94,40 @@ def create_entity_endpoint(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@router.get("/entities", response_model=list[EntityResponse])
+def list_entities(
+    session: Annotated[Session, Depends(get_db)],
+    entity_type: str | None = Query(default=None, min_length=1, max_length=30),
+    q: str | None = Query(default=None, min_length=1, max_length=300),
+    entity_status: str = Query(default="active", alias="status", pattern="^(active|inactive|merged|all)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    statement = select(ResearchEntity)
+    if entity_type:
+        normalized_type = entity_type.strip().lower()
+        if normalized_type not in {
+            "amc", "scheme", "company", "security", "sector", "benchmark",
+            "index", "person", "event", "regulator", "other",
+        }:
+            raise HTTPException(status_code=422, detail="Unsupported entity_type.")
+        statement = statement.where(ResearchEntity.entity_type == normalized_type)
+    if entity_status != "all":
+        statement = statement.where(ResearchEntity.status == entity_status)
+    if q:
+        normalized_query = " ".join(q.split()).casefold()
+        escaped_query = normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        statement = statement.where(
+            ResearchEntity.normalized_name.ilike(f"%{escaped_query}%", escape="\\")
+        )
+    rows = session.scalars(
+        statement.order_by(ResearchEntity.entity_type, ResearchEntity.normalized_name)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return [EntityResponse.model_validate(row) for row in rows]
+
+
 @router.get("/entities/{entity_id}", response_model=EntityResponse)
 def get_entity(entity_id: int, session: Annotated[Session, Depends(get_db)]):
     return EntityResponse.model_validate(_entity_or_404(session, entity_id))
