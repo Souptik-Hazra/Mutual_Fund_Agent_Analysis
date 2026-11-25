@@ -189,6 +189,64 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_entity_evidence_links_evidence", "entity_evidence_links", ["evidence_id"])
+    op.create_table(
+        "entity_relationships",
+        Column("relationship_id", BigInteger(), Identity(), primary_key=True),
+        Column(
+            "from_entity_id", BigInteger(),
+            ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column(
+            "to_entity_id", BigInteger(),
+            ForeignKey("research_entities.entity_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("relation_type", String(50), nullable=False),
+        Column(
+            "source_key", String(60),
+            ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
+        ),
+        Column(
+            "evidence_id", BigInteger(),
+            ForeignKey("evidence_records.evidence_id", ondelete="RESTRICT"),
+        ),
+        Column("valid_from", Date()),
+        Column("valid_to", Date()),
+        Column("confidence", Numeric(4, 3)),
+        Column("verification_status", String(20), nullable=False, server_default="unverified"),
+        Column("metadata", JSONB(), nullable=False, server_default="{}"),
+        Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+        Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+        CheckConstraint(
+            "from_entity_id <> to_entity_id", name="ck_entity_relationships_not_self"
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from",
+            name="ck_entity_relationships_valid_range",
+        ),
+        CheckConstraint(
+            "verification_status IN ('unverified', 'corroborated', 'verified', "
+            "'disputed', 'retracted')",
+            name="ck_entity_relationships_verification_status",
+        ),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+            name="ck_entity_relationships_confidence",
+        ),
+        UniqueConstraint(
+            "from_entity_id", "to_entity_id", "relation_type", "valid_from",
+            name="uq_entity_relationship_identity",
+        ),
+    )
+    op.create_index(
+        "ix_entity_relationships_from", "entity_relationships",
+        ["from_entity_id", "relation_type"],
+    )
+    op.create_index(
+        "ix_entity_relationships_to", "entity_relationships",
+        ["to_entity_id", "relation_type"],
+    )
 
     source_table = Table(
         "data_sources", MetaData(),
@@ -327,6 +385,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index("ix_entity_relationships_to", table_name="entity_relationships")
+    op.drop_index("ix_entity_relationships_from", table_name="entity_relationships")
+    op.drop_table("entity_relationships")
     op.drop_index("ix_entity_evidence_links_evidence", table_name="entity_evidence_links")
     op.drop_table("entity_evidence_links")
     op.drop_index("ix_evidence_content_hash", table_name="evidence_records")
