@@ -99,6 +99,16 @@ def classify_intents(question: str, scheme_codes: list[int] | None = None) -> li
         for intent, words in KEYWORDS.items()
         if any(re.search(rf"\b{re.escape(word)}\b", normalized) for word in words)
     ]
+    if (
+        "events" in selected
+        and "portfolio" in selected
+        and "exposure" in normalized
+        and not any(
+            term in normalized
+            for term in ("holding", "holdings", "portfolio", "sector", "allocation", "overlap")
+        )
+    ):
+        selected.remove("portfolio")
     if not selected:
         selected = ["fund"] if scheme_codes else ["documents"]
     if (
