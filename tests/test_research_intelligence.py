@@ -642,7 +642,6 @@ def test_portfolio_upload_rejects_more_than_5000_rows_before_persistence():
     assert error.value.status_code == 413
 
 
-
 def test_portfolio_upload_rejects_xlsx_with_rows_beyond_bounded_scan():
     from openpyxl import Workbook
 
@@ -666,7 +665,6 @@ def test_portfolio_upload_rejects_xlsx_with_rows_beyond_bounded_scan():
         )
 
     assert error.value.status_code == 413
-
 
 
 def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypatch):
