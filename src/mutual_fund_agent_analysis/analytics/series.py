@@ -91,9 +91,7 @@ def resample_prices(
     NAV in each daily, ISO-weekly, monthly, quarterly or yearly bucket.
     """
     if frequency not in FREQUENCY_PERIODS_PER_YEAR:
-        raise ValueError(
-            "frequency must be daily, weekly, monthly, quarterly or yearly."
-        )
+        raise ValueError("frequency must be daily, weekly, monthly, quarterly or yearly.")
     prices = normalize_prices(points)
     if frequency == "daily":
         return prices
