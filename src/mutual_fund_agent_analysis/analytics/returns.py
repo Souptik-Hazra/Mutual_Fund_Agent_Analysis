@@ -1,9 +1,9 @@
 """Point-to-point, annualized, rolling, and calendar-year returns."""
 
+from bisect import bisect_right
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
-from bisect import bisect_right
 from typing import Iterable
 
 from mutual_fund_agent_analysis.analytics.series import PricePoint, normalize_prices
@@ -31,7 +31,8 @@ def cagr(points: Iterable[PricePoint]) -> Decimal:
     days = (prices[-1].date - prices[0].date).days
     if days <= 0:
         raise ValueError("CAGR requires observations on at least two distinct dates.")
-    return (prices[-1].value / prices[0].value) ** (DAYS_PER_YEAR / Decimal(days)) - Decimal("1")
+    exponent = DAYS_PER_YEAR / Decimal(days)
+    return (prices[-1].value / prices[0].value) ** exponent - Decimal("1")
 
 
 def trailing_return(points: Iterable[PricePoint], years: int) -> Decimal:
