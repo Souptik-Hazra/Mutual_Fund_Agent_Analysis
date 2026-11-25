@@ -1,8 +1,8 @@
 """Portfolio, event, social, and document intelligence APIs."""
-from datetime import date, datetime, timedelta, timezone
 import csv
 import hashlib
 import io
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated
 
@@ -14,13 +14,13 @@ from mutual_fund_agent_analysis.api.schemas.research import (
     DocumentAskRequest, EventInput, PortfolioCompareRequest, PortfolioImportRequest,
     SocialPostInput,
 )
+from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.social import SocialProviderError, search_reddit, search_x
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     collect_rss_events, compare_portfolios, create_market_event, create_social_post, extract_pdf_text,
     import_portfolio_snapshot, latest_snapshot, portfolio_history, portfolio_payload,
     search_documents, security_fund_exposure, social_analytics, store_document,
 )
-from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models import DataSource, MarketEvent, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.research import ResearchDocument
@@ -103,7 +103,6 @@ async def import_portfolio_file(
             })
         published = None
         if published_at:
-            from datetime import datetime
             published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
         payload = PortfolioImportRequest(
             scheme_code=scheme_code, source_key="amc_disclosures",
@@ -236,7 +235,7 @@ def collect_official_events(
         return collect_rss_events(session, source_key, feed_url)
     except ValueError as exc:
         raise _domain_error(exc) from exc
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=502, detail="Official event feed could not be retrieved.") from exc
 
 
@@ -288,7 +287,7 @@ def collect_social_posts(
     session: Annotated[Session, Depends(get_db)],
     limit: int = Query(default=25, ge=1, le=100),
 ) -> dict:
-    """Fetch recent public posts using configured official APIs and persist minimal excerpts."""
+    """Fetch recent public posts using configured official APIs and persist minimal post metadata."""
     if source not in {"reddit", "x"}:
         raise HTTPException(status_code=422, detail="source must be reddit or x.")
     registry = session.get(DataSource, source)
@@ -315,7 +314,7 @@ def collect_social_posts(
                 "note": "Posts are stored without inferred sentiment; attach an evaluated finance sentiment model before using sentiment analytics."}
     except SocialProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=502, detail="Social provider request failed.") from exc
 
 
