@@ -9,8 +9,8 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import String, cast, func, or_, select
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.active_risk import calculate_active_risk_metrics
 from mutual_fund_agent_analysis.analytics.investor import (
