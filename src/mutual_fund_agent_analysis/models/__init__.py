@@ -33,6 +33,7 @@ from mutual_fund_agent_analysis.models.research import (
     SocialPost,
 )
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
+from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
 __all__ = [
     "BenchmarkIndex",
@@ -60,4 +61,5 @@ __all__ = [
     "ResearchDocument",
     "DocumentChunk",
     "SchemeMetadataObservation",
+    "SecurityMarketObservation",
 ]
