@@ -8,6 +8,8 @@ import httpx
 import pytest
 from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from mutual_fund_agent_analysis.api.routes import research as research_routes
 from mutual_fund_agent_analysis.api.routes.market_data import (
@@ -26,7 +28,8 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     source_social_retention_days,
     split_document,
 )
-from mutual_fund_agent_analysis.models import DataSource
+from mutual_fund_agent_analysis.database.base import Base
+from mutual_fund_agent_analysis.models import DataSource, DocumentChunk, ResearchDocument
 
 
 def test_document_split_preserves_page_markers_and_overlap():
@@ -663,3 +666,55 @@ def test_portfolio_upload_rejects_xlsx_with_rows_beyond_bounded_scan():
         )
 
     assert error.value.status_code == 413
+
+
+
+def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypatch):
+    from mutual_fund_agent_analysis.data.services import document_vectors
+    from mutual_fund_agent_analysis.data.services.research_intelligence import search_documents
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine, expire_on_commit=False)()
+    session.add(
+        DataSource(
+            source_key="test_source",
+            display_name="Test source",
+            source_type="internal",
+            authority_tier=5,
+            is_official=False,
+            enabled=True,
+        )
+    )
+    session.flush()
+
+    for index in range(205):
+        text = "bank " if index < 204 else " ".join(["bank"] * 20)
+        document = ResearchDocument(
+            source_key="test_source",
+            title="Older high-relevance document" if index == 204 else f"Document {index}",
+            media_type="text/plain",
+            content_hash=f"{index:064x}",
+            extracted_text=text,
+            page_count=1,
+        )
+        session.add(document)
+        session.flush()
+        session.add(
+            DocumentChunk(
+                document_id=document.document_id,
+                chunk_index=0,
+                chunk_text=text,
+                token_estimate=max(1, len(text) // 4),
+                metadata_json={},
+            )
+        )
+    session.commit()
+    monkeypatch.setattr(document_vectors, "search_chunks", lambda *args, **kwargs: None)
+
+    try:
+        result = search_documents(session, "bank", None, limit=1)
+        assert result["results"][0]["title"] == "Older high-relevance document"
+    finally:
+        session.close()
+        engine.dispose()
