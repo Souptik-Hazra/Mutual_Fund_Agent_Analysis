@@ -144,6 +144,13 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
         )
         assert scheme_identifier is not None
         assert benchmark_identifier is not None
+        benchmark_alias = session.scalar(
+            select(EntityAlias).where(
+                EntityAlias.entity_id == benchmark_identifier.entity_id,
+                EntityAlias.normalized_alias == "migration test index",
+            )
+        )
+        assert benchmark_alias is not None
         scheme_entity = session.get(ResearchEntity, scheme_identifier.entity_id)
         assert scheme_entity is not None
         amc_entity = session.scalar(
