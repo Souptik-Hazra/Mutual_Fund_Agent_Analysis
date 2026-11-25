@@ -1,6 +1,6 @@
 # Next Roadmap — Financial Correctness and Research Reliability
 
-**Status:** Planning baseline  
+**Status:** Active delivery; baseline CI verified on 2026-11-25  
 **Target branch:** `main`  
 **Scope:** Local-first, single-user Indian mutual-fund research application. No public hosting, multi-user accounts, cloud deployment, autonomous trading, or public API exposure.
 
@@ -34,7 +34,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 
 **Goal:** Establish the actual working baseline before changing financial behaviour.
 
-- [ ] Run the complete CI-equivalent suite against current `main`: Ruff, formatting, pytest with PostgreSQL, Docker Compose validation/build, frontend tests/build, and offline agent evaluation.
+- [x] Run the complete CI-equivalent suite against current `main`: Ruff, formatting, pytest with PostgreSQL, Docker Compose validation/build, frontend tests/build, and offline agent evaluation (main commit `eb3804be`, successful run `45623391232`).
 - [ ] Verify the latest Alembic migration chain from an empty database and from the previous supported schema.
 - [ ] Exercise live MFAPI, AMFI, and Nifty TRI retrieval with bounded date ranges; record provider failures/schema changes without making CI depend on live services.
 - [ ] Audit every API request/response schema against the frontend's actual request bodies and rendered response shapes.
@@ -47,13 +47,13 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 
 **Goal:** Calculate the investor's realized experience separately from fund NAV performance.
 
-- [ ] Define a typed cash-flow contract with date, signed amount, currency, transaction type, scheme/folio reference where available, and optional units/NAV.
-- [ ] Support SIP, lump-sum purchases, additional purchases, redemptions, switches, and applicable charges/taxes only where supplied and clearly modelled.
-- [ ] Implement deterministic XIRR using dated cash flows, multiple-root/no-root handling, convergence limits, and explicit failure states.
-- [ ] Implement SIP schedule simulation separately from actual transaction-ledger XIRR; do not label a simulated SIP as an investor's actual return.
-- [ ] Add invested amount, current value, realized proceeds, unrealized value, absolute gain, XIRR, and cash-flow coverage to reports.
+- [x] Define a typed cash-flow and transaction contract with dates, explicit transaction types/cash-flow signs, INR currency, optional folio reference, units, and NAV.
+- [x] Support SIP, lump-sum purchases, additional purchases, redemptions, switches, dividend payouts, and supplied charges/taxes with explicit transaction types.
+- [x] Implement deterministic dated XIRR with bounded-rate search, multiple-root/no-root failure states, and bounded bisection.
+- [x] Implement exact-date SIP simulation separately from actual transaction-ledger XIRR; simulated SIP output is explicitly labelled.
+- [x] Add invested amount, current value, realized proceeds, unrealized value, absolute gain, XIRR, and missed-installment coverage to reports.
 - [ ] Add test fixtures for irregular dates, missed SIPs, partial redemptions, same-day flows, leap years, zero/invalid flows, and non-convergence.
-- [ ] Expose calculation method and assumptions through API and UI.
+- [x] Expose simulated-versus-actual return basis and core assumptions through the API and Investments UI.
 
 **Exit criteria:** Independent known-answer fixtures and property/invariant tests pass; the UI distinguishes fund CAGR from investor XIRR and simulated SIP outcomes.
 
@@ -92,7 +92,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Verify daily, weekly, monthly, quarterly, yearly, and custom date-window calculations against known-answer fixtures and actual observation spacing.
 - [ ] Ensure UI controls map to the existing `start_date`, `end_date`, and `periods_per_year` API contract consistently.
 - [ ] Add explicit comparison duration/frequency controls for 2–5 funds; preserve exact common-date alignment and report the resulting common window.
-- [ ] Implement tracking error and information ratio using exact aligned fund/benchmark periodic returns and explicit annualization.
+- [x] Implement tracking error and information ratio using exact aligned fund/benchmark periodic returns and explicit annualization.
 - [ ] Document whether returns are arithmetic or geometric for every annualized metric; avoid mixing methodologies in the same comparison.
 - [ ] Validate risk-free-rate conventions, downside deviation, beta, alpha, volatility, and coverage diagnostics across frequencies.
 - [ ] Add base-100 indexed performance series for visual comparison, clearly labelled as normalized growth rather than absolute return.
@@ -118,7 +118,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 
 **Goal:** Make all research claims traceable, rights-aware, and time-aware.
 
-- [ ] Add source-specific retention enforcement and purge verification before enabling Reddit/X collection.
+- [x] Add source-specific retention enforcement and PostgreSQL purge verification before enabling Reddit/X collection. Provider terms/access review still gates enabling either source.
 - [ ] Review current provider access, attribution, terms, and rate limits; keep unsupported or unapproved connectors disabled.
 - [ ] Distinguish official disclosure, reputable reporting, reported/unverified event, confirmed event, opinion, rumour, and speculation in schemas and UI.
 - [ ] Add publication-time versus retrieval-time versus effective-time handling, source freshness, duplicate detection, and correction/retraction tracking.
@@ -153,7 +153,8 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [ ] Review cache keys and invalidation for NAV, benchmark, metadata, event, social, and document retrieval data.
 - [ ] Add structured logs with request/run IDs while avoiding API keys, personal transaction data, and unnecessary social/document content.
 - [ ] Verify localhost-only binding defaults and safe CORS; do not add public deployment/authentication.
-- [ ] Document PostgreSQL/Qdrant backup, restore, migration rollback, and recovery procedures; test restore from backup.
+- [x] Document PostgreSQL/Qdrant backup, restore, migration, and recovery procedures; add checksum-protected scripts and CI shell validation.
+- [ ] Execute and verify a full restore against a disposable local PostgreSQL/Qdrant copy before relying on backups for recovery.
 - [ ] Add database constraints/index review and query plans for large NAV/holdings histories.
 - [ ] Define local audit-data retention and purge controls, including raw provider sync payloads.
 - [ ] Add dependency/security scanning and a documented upgrade process.
