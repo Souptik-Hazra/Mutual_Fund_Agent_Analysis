@@ -9,8 +9,7 @@ import pytest
 from mutual_fund_agent_analysis.data.providers.amfi import AMFIClient
 
 HISTORY_ROW = (
-    "125497;HDFC Top 100 Fund - Direct Plan - Growth;"
-    "INF179K01BE2;-;892.4560;0;0;26-Oct-2024"
+    "125497;HDFC Top 100 Fund - Direct Plan - Growth;INF179K01BE2;-;892.4560;0;0;26-Oct-2024"
 )
 
 
@@ -101,10 +100,7 @@ def test_amfi_default_chunk_is_seven_days() -> None:
         requests.append(request)
         chunk_start = datetime.strptime(request.url.params["frmdt"], "%d-%b-%Y").date()
         chunk_end = datetime.strptime(request.url.params["todt"], "%d-%b-%Y").date()
-        row = (
-            f"125497;HDFC Test Fund;ISIN;-;10.2500;0;0;"
-            f"{chunk_start.strftime('%d-%b-%Y')}"
-        )
+        row = f"125497;HDFC Test Fund;ISIN;-;10.2500;0;0;{chunk_start.strftime('%d-%b-%Y')}"
         assert (chunk_end - chunk_start).days <= 6
         return httpx.Response(200, text=row)
 
