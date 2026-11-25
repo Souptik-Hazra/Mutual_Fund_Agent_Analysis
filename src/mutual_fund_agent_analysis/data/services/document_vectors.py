@@ -71,11 +71,27 @@ def search_chunks(
             api_key=settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None,
             collection_name=settings.qdrant_collection,
         )
-        matches = store.similarity_search_with_score(query, k=min(max(limit * 4, limit), 100))
+        search_kwargs: dict[str, Any] = {}
+        if scheme_code is not None:
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+            search_kwargs["filter"] = Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.scheme_code",
+                        match=MatchValue(value=scheme_code),
+                    )
+                ]
+            )
+        matches = store.similarity_search_with_score(
+            query,
+            k=min(max(limit, 1), 100),
+            **search_kwargs,
+        )
         results = []
         for document, score in matches:
             metadata = document.metadata
-            if scheme_code and metadata.get("scheme_code") != scheme_code:
+            if scheme_code is not None and metadata.get("scheme_code") != scheme_code:
                 continue
             results.append({
                 "score": float(score),
