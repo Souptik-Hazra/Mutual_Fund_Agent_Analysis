@@ -57,6 +57,11 @@ def _validate_date_range(valid_from: date | None, valid_to: date | None) -> None
         raise ValueError("valid_to must be on or after valid_from.")
 
 
+def _validate_aware_datetime(value: datetime | None, field_name: str) -> None:
+    if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+        raise ValueError(f"{field_name} must include a timezone offset.")
+
+
 def _require_entity(session: Session, entity_id: int) -> ResearchEntity:
     entity = session.get(ResearchEntity, entity_id)
     if entity is None:
@@ -222,6 +227,10 @@ def record_evidence(
         raise ValueError(f"Source {source_key!r} is disabled.")
     if verification_status not in VERIFICATION_STATUSES:
         raise ValueError("Unsupported verification_status.")
+    _validate_aware_datetime(published_at, "published_at")
+    _validate_aware_datetime(retrieved_at, "retrieved_at")
+    if external_id is not None and not external_id.strip():
+        raise ValueError("external_id cannot be blank.")
     if effective_from and effective_to and effective_to < effective_from:
         raise ValueError("effective_to must be on or after effective_from.")
     if confidence is not None and (
@@ -281,6 +290,7 @@ def link_entity_evidence(
         raise ValueError(f"Evidence {evidence_id} does not exist.")
     if resolution_method not in RESOLUTION_METHODS:
         raise ValueError("Unsupported resolution_method.")
+    _validate_aware_datetime(verified_at, "verified_at")
     normalized_relation = relation_type.strip().lower()
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,39}", normalized_relation):
         raise ValueError("relation_type must be a 1–40 character lowercase identifier.")
