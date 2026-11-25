@@ -18,6 +18,9 @@ from mutual_fund_agent_analysis.models.nav import NavObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.provider_sync_run import ProviderSyncRun
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
+from mutual_fund_agent_analysis.models.research import (
+    DocumentChunk, MarketEvent, PortfolioHolding, PortfolioSnapshot, ResearchDocument, SocialPost,
+)
 
 __all__ = [
     "BenchmarkIndex",
@@ -34,4 +37,10 @@ __all__ = [
     "NavReconciliation",
     "ProviderSyncRun",
     "ResearchEntity",
+    "PortfolioSnapshot",
+    "PortfolioHolding",
+    "MarketEvent",
+    "SocialPost",
+    "ResearchDocument",
+    "DocumentChunk",
 ]
