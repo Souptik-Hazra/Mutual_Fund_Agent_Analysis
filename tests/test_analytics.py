@@ -2,6 +2,8 @@
 
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -16,6 +18,7 @@ from mutual_fund_agent_analysis.analytics import (
     calendar_year_returns,
     cagr,
     period_returns,
+    load_fund_prices,
     rolling_returns,
     trailing_return,
 )
@@ -150,3 +153,42 @@ def test_benchmark_alignment_requires_identical_observation_intervals() -> None:
     aligned_fund, aligned_benchmark = align_returns(fund, benchmark)
     assert aligned_fund == []
     assert aligned_benchmark == []
+
+
+
+def test_database_loader_rejects_nav_reconciliation_conflicts_by_default() -> None:
+    session = Mock()
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(
+            nav_date=date(2024, 1, 1),
+            canonical_nav=Decimal("100"),
+            status="matched",
+        ),
+        SimpleNamespace(
+            nav_date=date(2024, 1, 2),
+            canonical_nav=Decimal("101"),
+            status="conflict",
+        ),
+    ]
+    with pytest.raises(ValueError, match="reconciliation conflict"):
+        load_fund_prices(session, 12345)
+
+
+def test_database_loader_can_explicitly_include_and_report_nav_conflicts() -> None:
+    session = Mock()
+    conflict_date = date(2024, 1, 2)
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(
+            nav_date=date(2024, 1, 1),
+            canonical_nav=Decimal("100"),
+            status="matched",
+        ),
+        SimpleNamespace(
+            nav_date=conflict_date,
+            canonical_nav=Decimal("101"),
+            status="conflict",
+        ),
+    ]
+    prices, conflicts = load_fund_prices(session, 12345, allow_nav_conflicts=True)
+    assert [point.value for point in prices] == [Decimal("100"), Decimal("101")]
+    assert conflicts == (conflict_date,)
