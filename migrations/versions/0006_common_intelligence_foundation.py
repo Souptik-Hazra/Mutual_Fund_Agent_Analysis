@@ -7,9 +7,22 @@ Create Date: 2026-11-25
 
 from alembic import op
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey,
-    Identity, Index, Integer, MetaData, Numeric, String, Table, Text,
-    UniqueConstraint, func,
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Integer,
+    MetaData,
+    Numeric,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -63,7 +76,9 @@ def upgrade() -> None:
         ),
         UniqueConstraint("entity_type", "normalized_name", name="uq_entity_type_normalized_name"),
     )
-    op.create_index("ix_research_entities_type_status", "research_entities", ["entity_type", "status"])
+    op.create_index(
+        "ix_research_entities_type_status", "research_entities", ["entity_type", "status"]
+    )
     op.create_table(
         "entity_aliases",
         Column("alias_id", BigInteger(), Identity(), primary_key=True),
@@ -73,7 +88,10 @@ def upgrade() -> None:
         Column("alias", String(300), nullable=False),
         Column("normalized_alias", String(300), nullable=False),
         Column("alias_type", String(30), nullable=False, server_default="common"),
-        Column("source_key", String(60), ForeignKey("data_sources.source_key", ondelete="RESTRICT")),
+        Column(
+            "source_key", String(60),
+            ForeignKey("data_sources.source_key", ondelete="RESTRICT"),
+        ),
         Column("valid_from", Date()),
         Column("valid_to", Date()),
         Column("is_primary", Boolean(), nullable=False, server_default="false"),
@@ -82,7 +100,9 @@ def upgrade() -> None:
             "valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from",
             name="ck_entity_aliases_valid_range",
         ),
-        UniqueConstraint("entity_id", "normalized_alias", "valid_from", name="uq_entity_alias_identity"),
+        UniqueConstraint(
+            "entity_id", "normalized_alias", "valid_from", name="uq_entity_alias_identity"
+        ),
     )
     op.create_index("ix_entity_aliases_normalized", "entity_aliases", ["normalized_alias"])
     op.create_table(
@@ -139,7 +159,9 @@ def upgrade() -> None:
         ),
         UniqueConstraint("source_key", "external_id", name="uq_evidence_source_external_id"),
     )
-    op.create_index("ix_evidence_source_published", "evidence_records", ["source_key", "published_at"])
+    op.create_index(
+        "ix_evidence_source_published", "evidence_records", ["source_key", "published_at"]
+    )
     op.create_index("ix_evidence_content_hash", "evidence_records", ["content_hash"])
     op.create_table(
         "entity_evidence_links",
@@ -202,7 +224,9 @@ def upgrade() -> None:
          "authority_tier": 1, "is_official": True, "base_url": "https://www.rbi.org.in/",
          "attribution_required": False, "enabled": True,
          "metadata": {"domain": "macro", "role": "central_bank"}},
-        {"source_key": "mospi", "display_name": "Ministry of Statistics and Programme Implementation",
+        {
+            "source_key": "mospi",
+            "display_name": "Ministry of Statistics and Programme Implementation",
          "source_type": "official", "authority_tier": 1, "is_official": True,
          "base_url": "https://www.mospi.gov.in/", "attribution_required": False, "enabled": True,
          "metadata": {"domain": "macro", "role": "statistics_publisher"}},
