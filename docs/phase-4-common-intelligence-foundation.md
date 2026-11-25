@@ -16,8 +16,8 @@ Create one canonical identity and provenance layer shared by fund, portfolio, ma
 - Deterministic resolver: exact identifier first, then exact alias; temporal validity and optional source scope are honored; ambiguous aliases return candidates and are never auto-selected.
 - NAV and benchmark ingestion creates or updates canonical entities and stable identifiers; NAV ingestion also registers AMC entities and an explicitly unverified managed_by relationship from provider fund-house metadata.
 - Each new NAV and benchmark sync run is hashed, recorded as evidence metadata, and linked to its canonical scheme or benchmark entity. The original raw provider response remains in the existing append-only sync audit table; evidence records do not duplicate full provider payloads.
-- Migration backfills identities for already-ingested scheme and benchmark masters.
-- REST API for source listing, entity creation/read, alias and identifier registration, evidence creation, entity-evidence linking, evidence listing, and identity resolution.
+- Migration backfills identities for already-ingested schemes, AMCs, and benchmarks, including unverified scheme-to-AMC relationships.
+- REST API for source listing, entity creation/read, alias and identifier registration/listing, evidence creation, entity-evidence linking, paginated evidence listing, relationship management, and identity resolution.
 
 ## API
 
@@ -29,10 +29,12 @@ All endpoints are under /api/v1/intelligence.
 | POST | /entities | Create or retrieve a canonical entity |
 | GET | /entities/{entity_id} | Read one entity |
 | POST | /entities/{entity_id}/aliases | Add or update a temporal alias |
+| GET | /entities/{entity_id}/aliases | List aliases for an entity |
 | POST | /entities/{entity_id}/identifiers | Register a namespaced identifier |
+| GET | /entities/{entity_id}/identifiers | List identifiers for an entity |
 | POST | /evidence | Create/update a source evidence reference |
 | POST | /entities/{entity_id}/evidence/{evidence_id} | Link evidence to an entity |
-| GET | /entities/{entity_id}/evidence | List evidence linked to an entity |
+| GET | /entities/{entity_id}/evidence?limit=50&offset=0 | List evidence linked to an entity (bounded pagination) |
 | POST | /entities/{entity_id}/relationships | Create or update a typed temporal relationship |
 | GET | /entities/{entity_id}/relationships | List relationships where the entity is either endpoint |
 | POST | /resolve | Resolve by exact identifier and/or exact alias |
@@ -52,7 +54,7 @@ All endpoints are under /api/v1/intelligence.
 
 ## Validation
 
-Unit tests cover normalization, idempotent entity creation, identifier-first resolution, source-aware and ambiguous aliases, temporal validity, identifier uniqueness, evidence idempotency/linking, relationship validation/idempotency, invalid URLs/confidence, and disabled sources. API contract tests cover route registration and request validation.
+Unit tests cover normalization, idempotent entity creation, identifier-first resolution, source-aware and ambiguous aliases, temporal validity, identifier uniqueness, evidence idempotency/linking, relationship validation/idempotency, invalid URLs/confidence, and disabled sources. API contract tests cover route registration, request validation, and bounded pagination.
 
 Run:
 
@@ -64,6 +66,5 @@ Run:
 ## Deliberate follow-up
 
 - Add reviewed historical validity intervals and conflict-resolution workflow for provider-reported AMC changes.
-- Add evidence links to NAV and benchmark sync runs after validating provider-specific record identity.
 - Add audited entity merge/reconciliation workflow before automatic fuzzy matching.
 - Add source-specific retention enforcement and rights-aware ingestion policies before enabling social connectors.
