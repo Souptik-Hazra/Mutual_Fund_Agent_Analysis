@@ -747,3 +747,29 @@ See [Phase 4 implementation notes](docs/phase-4-common-intelligence-foundation.m
 ## Phases 9–11 — Personal research workspace
 
 Phase 9 adds a LangGraph supervisor that routes questions to deterministic fund, portfolio, event, social and document research services, with optional LLM synthesis. Phase 10 adds the React/Vite workspace in `frontend/`. Phase 11 adds an offline routing benchmark and local operating guidance. Start with `docs/phases-9-11-personal.md` for setup and API usage. The optional LangGraph dependency is installed with `pip install -e ".[agents]"`; the Docker development image includes it automatically.
+
+
+## Personal SIP and investor transaction workflows
+
+The local **Investments** workspace separates simulated contributions from the actual personal
+transaction ledger.
+
+- `POST /api/v1/schemes/{scheme_code}/sip-simulation` runs a hypothetical monthly SIP using
+  exact-date reconciled NAVs. Missing scheduled dates are reported as missed; no NAV is filled.
+  The output identifies its return basis as `simulated_sip`.
+- `POST /api/v1/schemes/{scheme_code}/transactions` appends a purchase, SIP, additional purchase,
+  redemption, switch-in/out, dividend payout, charge, or tax entry.
+- `GET /api/v1/schemes/{scheme_code}/transactions` lists the stored ledger with date filters
+  and bounded pagination. `DELETE /api/v1/transactions/{transaction_id}` removes an incorrect
+  manually entered entry.
+- `GET /api/v1/schemes/{scheme_code}/investor-returns` calculates actual-ledger XIRR and
+  realized/unrealized gain. Open units require an exact, reconciled, non-conflicted NAV.
+  The response identifies its basis as `actual_ledger`.
+- `GET /api/v1/schemes/{scheme_code}/active-risk` calculates tracking error and information ratio
+  on exact fund/benchmark return intervals.
+
+Transaction amounts and units are stored as positive magnitudes; the transaction type defines
+the cash-flow sign. SIP simulation is never mixed into actual investor returns unless the user
+also enters those transactions into the ledger. IDCW payouts entered manually are included as
+cash inflows, but historical IDCW total-return series are not yet available until official
+distribution disclosures, corrections, option mapping, and effective dates are ingested.

@@ -14,6 +14,7 @@ from mutual_fund_agent_analysis.models.intelligence import (
     EvidenceRecord,
     ResearchEntity,
 )
+from mutual_fund_agent_analysis.models.investor import InvestorTransaction
 from mutual_fund_agent_analysis.models.nav import NavObservation
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.provider_sync_run import ProviderSyncRun
@@ -38,6 +39,7 @@ __all__ = [
     "EntityRelationship",
     "EvidenceRecord",
     "MutualFundScheme",
+    "InvestorTransaction",
     "NavObservation",
     "NavReconciliation",
     "ProviderSyncRun",
