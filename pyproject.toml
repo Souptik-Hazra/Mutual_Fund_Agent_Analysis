@@ -32,6 +32,7 @@ mfa-evaluate-agent = "mutual_fund_agent_analysis.cli.evaluate_agent:main"
 mfa-audit-local = "mutual_fund_agent_analysis.cli.audit_local:main"
 mfa-import-scheme-metadata = "mutual_fund_agent_analysis.cli.import_financial_csv:import_scheme_metadata_main"
 mfa-import-idcw = "mutual_fund_agent_analysis.cli.import_financial_csv:import_idcw_distributions_main"
+mfa-register-source = "mutual_fund_agent_analysis.cli.register_source:main"
 
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.3,<2"]
