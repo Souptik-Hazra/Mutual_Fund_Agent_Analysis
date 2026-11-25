@@ -1,5 +1,6 @@
 """Portfolio, event, social, and document intelligence APIs."""
 from datetime import date
+import hashlib
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -10,13 +11,14 @@ from mutual_fund_agent_analysis.api.schemas.research import (
     DocumentMetadata, EventInput, PortfolioCompareRequest, PortfolioImportRequest,
     SocialPostInput,
 )
+from mutual_fund_agent_analysis.data.providers.social import SocialProviderError, search_reddit, search_x
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     compare_portfolios, create_market_event, create_social_post, extract_pdf_text,
     import_portfolio_snapshot, latest_snapshot, portfolio_history, portfolio_payload,
     search_documents, security_fund_exposure, social_analytics, store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models import MarketEvent, PortfolioSnapshot
+from mutual_fund_agent_analysis.models import DataSource, MarketEvent, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.research import ResearchDocument
 
 router = APIRouter(tags=["research-intelligence"])
@@ -182,6 +184,43 @@ def ingest_social_post(payload: SocialPostInput, session: Annotated[Session, Dep
     return {"post_id": row.post_id, "source_key": row.source_key, "external_id": row.external_id,
             "sentiment_label": row.sentiment_label, "sentiment_score": row.sentiment_score,
             "published_at": row.published_at}
+
+
+@router.get("/social/collect")
+def collect_social_posts(
+    source: str,
+    q: Annotated[str, Query(min_length=3, max_length=300)],
+    session: Annotated[Session, Depends(get_db)],
+    limit: int = Query(default=25, ge=1, le=100),
+) -> dict:
+    """Fetch recent public posts using configured official APIs and persist minimal excerpts."""
+    if source not in {"reddit", "x"}:
+        raise HTTPException(status_code=422, detail="source must be reddit or x.")
+    registry = session.get(DataSource, source)
+    if registry is None or not registry.enabled:
+        raise HTTPException(status_code=403, detail="Social source is disabled. Review API terms and enable it explicitly.")
+    try:
+        posts = search_reddit(q, limit) if source == "reddit" else search_x(q, limit)
+        saved = 0
+        for item in posts:
+            excerpt = item.get("text_excerpt") or ""
+            payload = SocialPostInput(
+                source_key=source, external_id=item["external_id"],
+                canonical_url=item.get("canonical_url"), text_excerpt=excerpt[:2000],
+                content_hash=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
+                published_at=item.get("published_at"),
+                engagement_count=item.get("engagement_count", 0),
+                metadata=item.get("metadata", {}),
+            )
+            create_social_post(session, payload)
+            saved += 1
+        return {"source": source, "query": q, "fetched": len(posts), "persisted": saved,
+                "sentiment_status": "not_scored",
+                "note": "Posts are stored without inferred sentiment; attach an evaluated finance sentiment model before using sentiment analytics."}
+    except SocialProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Social provider request failed.") from exc
 
 
 @router.get("/social/analytics")
