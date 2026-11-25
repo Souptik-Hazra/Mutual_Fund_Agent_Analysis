@@ -279,7 +279,7 @@ export default function App() {
               <div className="metric"><small>Market observations</small><strong>{data.market_data_available_count}</strong></div>
             </div>
             <div className="table-wrap"><table><thead><tr><th>Security</th><th>Fund weight</th><th>Last price</th><th>Day change</th><th>Market status</th><th>Freshness</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.security_key}><td>{item.security_name}<small>{item.isin || item.security_key}</small></td><td>{item.disclosed_weight_pct == null ? "—" : `${money(item.disclosed_weight_pct)}%`}</td><td>{item.market_data ? money(item.market_data.last_price) : "Unavailable"}</td><td>{item.market_data?.change_pct == null ? "—" : `${money(item.market_data.change_pct)}%`}</td><td>{item.market_data?.market_status || "—"}</td><td>{item.freshness || "—"}</td></tr>)}</tbody></table></div>
-            {data.items.filter((item) => item.health_signals?.length).map((item) => <p className="muted" key={item.security_key}><strong>{item.security_name}:</strong> {item.health_signals.map((signal) => signal.message).join(" ")}</p>)}
+            {data.items.filter((item) => item.market_data?.health_signals?.length).map((item) => <p className="muted" key={item.security_key}><strong>{item.security_name}:</strong> {item.market_data.health_signals.map((signal) => signal.message).join(" ")}</p>)}
             <p className="muted">{data.warning} Market status is based on the latest stored provider observation, not a live exchange connection.</p>
           </Panel>}
           {data?.pairwise_overlap && <Panel title="Multi-fund equity overlap">
