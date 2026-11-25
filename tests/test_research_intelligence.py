@@ -467,8 +467,55 @@ def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(mon
         content_hash="b" * 64,
         text_excerpt="Do not persist this post text",
         expires_at=datetime.now(UTC) + __import__("datetime").timedelta(days=2),
-        metadata={"subreddit": "investing", "text": "raw text", "content": "raw body"},
+        metadata={"subreddit": "investing", "text": "raw text", "content": "raw body", "nested": {"body": "raw nested body"}},
     )
     row = create_social_post(session, payload)
     assert row.text_excerpt is None
     assert row.metadata_json == {"subreddit": "investing"}
+
+
+
+def test_rss_entity_resolution_requires_one_unique_exact_company_alias():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services.research_intelligence import (
+        _resolve_rss_entity_exact,
+    )
+
+    entity = SimpleNamespace(entity_id=42)
+    alias = SimpleNamespace(normalized_alias="example industries")
+
+    class StubResult:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
+
+    class StubSession:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def execute(self, _statement):
+            return StubResult(self.rows)
+
+    assert _resolve_rss_entity_exact(
+        StubSession([(alias, entity)]),
+        "nse",
+        "Example Industries announces quarterly results",
+        date(2026, 11, 1),
+    ) == 42
+    assert _resolve_rss_entity_exact(
+        StubSession([(alias, entity)]),
+        "nse",
+        "Example Industries Ltd competitor results",
+        None,
+    ) is None
+
+    other = SimpleNamespace(entity_id=43)
+    assert _resolve_rss_entity_exact(
+        StubSession([(alias, entity), (alias, other)]),
+        "nse",
+        "Example Industries announces quarterly results",
+        date(2026, 11, 1),
+    ) is None
