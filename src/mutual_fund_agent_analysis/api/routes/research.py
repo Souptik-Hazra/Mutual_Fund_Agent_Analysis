@@ -43,6 +43,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     security_fund_exposure,
     social_analytics,
     source_social_retention_days,
+    split_document,
     store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
@@ -742,7 +743,7 @@ async def upload_research_document(
         "title": document.title,
         "content_hash": document.content_hash,
         "page_count": document.page_count,
-        "chunk_count": len(document.extracted_text) // 1200 + 1,
+        "chunk_count": len(split_document(document.extracted_text)),
         "effective_date": document.effective_date,
         "source_key": document.source_key,
     }
