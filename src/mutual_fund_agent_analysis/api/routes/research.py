@@ -470,8 +470,14 @@ def list_events(
         alias="status",
         pattern="^(confirmed|scheduled|reported|unverified|speculative|disproved|outdated)$",
     ),
+    event_type: str | None = Query(
+        default=None,
+        pattern="^(results|board_meeting|dividend|record_date|split|bonus|merger|acquisition|fundraising|management|regulatory|macro|filing|other)$",
+    ),
+    source_key: str | None = Query(default=None, min_length=1, max_length=60),
     entity_id: int | None = Query(default=None, gt=0),
     limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=10000),
 ) -> dict:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be <= end_date.")
@@ -482,34 +488,50 @@ def list_events(
         stmt = stmt.where(MarketEvent.event_date <= end_date)
     if status_filter:
         stmt = stmt.where(MarketEvent.status == status_filter)
+    if event_type:
+        stmt = stmt.where(MarketEvent.event_type == event_type)
+    if source_key:
+        stmt = stmt.where(MarketEvent.source_key == source_key)
     if entity_id:
         stmt = stmt.where(MarketEvent.related_entity_id == entity_id)
     rows = session.scalars(
         stmt.order_by(
             MarketEvent.event_date.desc().nullslast(), MarketEvent.published_at.desc().nullslast()
-        ).limit(limit)
+        ).offset(offset).limit(limit)
     ).all()
-    return {
-        "count": len(rows),
-        "items": [
-            {
-                "event_id": r.event_id,
-                "title": r.title,
-                "summary": r.summary,
-                "event_type": r.event_type,
-                "status": r.status,
-                "event_date": r.event_date,
-                "published_at": r.published_at,
-                "source_key": r.source_key,
-                "related_entity_id": r.related_entity_id,
-                "evidence_id": r.evidence_id,
-                "canonical_url": r.canonical_url,
-                "confidence": r.confidence,
-            }
-            for r in rows
-        ],
-    }
-
+    items = []
+    for row in rows:
+        source_record = session.get(DataSource, row.source_key)
+        evidence_record = (
+            session.get(EvidenceRecord, row.evidence_id) if row.evidence_id is not None else None
+        )
+        items.append({
+            "event_id": row.event_id,
+            "title": row.title,
+            "summary": row.summary,
+            "event_type": row.event_type,
+            "status": row.status,
+            "event_date": row.event_date,
+            "published_at": row.published_at,
+            "source_key": row.source_key,
+            "source": {
+                "source_type": source_record.source_type,
+                "authority_tier": source_record.authority_tier,
+                "is_official": source_record.is_official,
+                "attribution_required": source_record.attribution_required,
+            } if source_record else None,
+            "related_entity_id": row.related_entity_id,
+            "evidence_id": row.evidence_id,
+            "evidence": {
+                "verification_status": evidence_record.verification_status,
+                "published_at": evidence_record.published_at,
+                "retrieved_at": evidence_record.retrieved_at,
+                "content_hash": evidence_record.content_hash,
+            } if evidence_record else None,
+            "canonical_url": row.canonical_url,
+            "confidence": row.confidence,
+        })
+    return {"count": len(items), "offset": offset, "limit": limit, "items": items}
 
 @router.post("/social/posts", status_code=status.HTTP_201_CREATED)
 def ingest_social_post(
@@ -609,10 +631,11 @@ def get_social_analytics(
     entity_id: int | None = Query(default=None, gt=0),
     start_date: date | None = None,
     end_date: date | None = None,
+    source_key: str | None = Query(default=None, pattern="^(reddit|x)$"),
 ) -> dict:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be <= end_date.")
-    return social_analytics(session, entity_id, start_date, end_date)
+    return social_analytics(session, entity_id, start_date, end_date, source_key)
 
 
 @router.get("/events/fund-exposure/{scheme_code}")
