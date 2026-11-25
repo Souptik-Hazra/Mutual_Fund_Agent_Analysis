@@ -25,6 +25,7 @@ from mutual_fund_agent_analysis.models import (
     BenchmarkIndex,
     BenchmarkObservation,
     BenchmarkSyncRun,
+    EntityAlias,
     EntityIdentifier,
     MutualFundScheme,
     NavObservation,
@@ -154,6 +155,39 @@ def test_postgres_upsert_is_idempotent_and_preserves_provider_observations(
         )
         assert scheme_identifier is not None
         assert scheme_identifier.entity_id == scheme_entity.entity_id
+
+
+def test_scheme_identity_survives_provider_name_changes(migrated_postgres: Engine) -> None:
+    first = MFAPINavResponse.model_validate(
+        {
+            "meta": {"scheme_code": 991237, "scheme_name": "Old Scheme Name"},
+            "data": [{"date": "25-11-2026", "nav": "10.0"}],
+            "status": "SUCCESS",
+        }
+    )
+    renamed = MFAPINavResponse.model_validate(
+        {
+            "meta": {"scheme_code": 991237, "scheme_name": "New Scheme Name"},
+            "data": [{"date": "26-11-2026", "nav": "10.1"}],
+            "status": "SUCCESS",
+        }
+    )
+    with Session(migrated_postgres) as session, session.begin():
+        upsert_nav_response(session, first, source="mfapi")
+        upsert_nav_response(session, renamed, source="amfi")
+
+    with Session(migrated_postgres) as session:
+        identifier = session.scalar(
+            select(EntityIdentifier).where(
+                EntityIdentifier.namespace == "AMFI_SCHEME_CODE",
+                EntityIdentifier.normalized_value == "991237",
+            )
+        )
+        assert identifier is not None
+        aliases = session.scalars(
+            select(EntityAlias).where(EntityAlias.entity_id == identifier.entity_id)
+        ).all()
+        assert {alias.alias for alias in aliases} >= {"Old Scheme Name", "New Scheme Name"}
 
 
 def test_postgres_upsert_does_not_erase_optional_scheme_metadata(
