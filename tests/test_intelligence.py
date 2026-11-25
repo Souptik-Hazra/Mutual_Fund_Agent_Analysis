@@ -122,6 +122,28 @@ def test_alias_and_evidence_relationship_types_are_validated(session):
         link_entity_evidence(session, entity.entity_id, evidence.evidence_id, relation_type=" ")
 
 
+def test_primary_alias_is_unique_per_entity(session):
+    entity = create_entity(session, "company", "Example Limited")
+    first = add_entity_alias(session, entity.entity_id, "Example")
+    second = add_entity_alias(session, entity.entity_id, "Example Ltd")
+    add_entity_alias(session, entity.entity_id, "Example", is_primary=True)
+    add_entity_alias(session, entity.entity_id, "Example Ltd", is_primary=True)
+    assert first.is_primary is False
+    assert second.is_primary is True
+
+
+def test_primary_identifier_is_unique_per_namespace(session):
+    entity = create_entity(session, "scheme", "Example Equity Fund")
+    first = add_entity_identifier(
+        session, entity.entity_id, "AMFI_SCHEME_CODE", "12345", is_primary=True
+    )
+    second = add_entity_identifier(
+        session, entity.entity_id, "AMFI_SCHEME_CODE", "12346", is_primary=True
+    )
+    assert first.is_primary is False
+    assert second.is_primary is True
+
+
 def test_identifier_cannot_be_reassigned(session):
     first = create_entity(session, "company", "ABC Limited")
     second = create_entity(session, "company", "XYZ Limited")
@@ -178,6 +200,16 @@ def test_entity_relationship_is_validated_and_idempotent(session):
     )
     assert relationship.relationship_id == repeated.relationship_id
     assert repeated.source_key == "amfi"
+    assert repeated.verification_status == "verified"
+    changed = create_entity_relationship(
+        session,
+        scheme.entity_id,
+        amc.entity_id,
+        "managed_by",
+        evidence_id=evidence.evidence_id,
+        verification_status="disputed",
+    )
+    assert changed.verification_status == "disputed"
 
 
 def test_entity_relationship_rejects_self_links_and_invalid_dates(session):
