@@ -274,18 +274,21 @@ export default function App() {
             <p className="muted">{data.excluded_peer_count} peer(s) excluded for insufficient NAV history. Rankings are descriptive, not recommendations.</p>
           </Panel>}
           {data?.items && <Panel title={`Underlying equity status · holdings as of ${data.holdings_as_of}`}>
+            <p className="muted">Disclosure status: {data.snapshot_status || "unknown"} · This is the latest available AMC disclosure, not a live fund portfolio.</p>
             <div className="analysis-grid">
               <div className="metric"><small>Equity securities</small><strong>{data.equity_security_count}</strong></div>
               <div className="metric"><small>Market observations</small><strong>{data.market_data_available_count}</strong></div>
             </div>
             <div className="table-wrap"><table><thead><tr><th>Security</th><th>Fund weight</th><th>Last price</th><th>Day change</th><th>Market status</th><th>Freshness</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.security_key}><td>{item.security_name}<small>{item.isin || item.security_key}</small></td><td>{item.disclosed_weight_pct == null ? "—" : `${money(item.disclosed_weight_pct)}%`}</td><td>{item.market_data ? money(item.market_data.last_price) : "Unavailable"}</td><td>{item.market_data?.change_pct == null ? "—" : `${money(item.market_data.change_pct)}%`}</td><td>{item.market_data?.market_status || "—"}</td><td>{item.freshness || "—"}</td></tr>)}</tbody></table></div>
             {data.items.filter((item) => item.market_data?.health_signals?.length).map((item) => <p className="muted" key={item.security_key}><strong>{item.security_name}:</strong> {item.market_data.health_signals.map((signal) => signal.message).join(" ")}</p>)}
+            {data.items.filter((item) => item.market_data).map((item) => <details key={item.security_key}><summary>{item.security_name} · source, fundamentals and corporate events</summary><p className="muted">Source: {item.market_data.source_key || "unknown"} · Observed: {item.market_data.observed_at || "unknown"} · Fundamentals effective: {item.market_data.fundamentals_as_of || "unknown"} · Freshness: {item.freshness || "unknown"}</p>{item.market_data.source_url && <a href={item.market_data.source_url} target="_blank" rel="noreferrer">Open provider source</a>}<h4>Available fundamentals</h4><pre className="json-evidence">{JSON.stringify(item.market_data.fundamentals || {}, null, 2)}</pre><h4>Corporate events</h4><pre className="json-evidence">{JSON.stringify(item.market_data.corporate_events || [], null, 2)}</pre></details>)}
             <p className="muted">{data.warning} Market status is based on the latest stored provider observation, not a live exchange connection.</p>
           </Panel>}
           {data?.pairwise_overlap && <Panel title="Multi-fund equity overlap">
-            <div className="table-wrap"><table><thead><tr><th>Fund A</th><th>Fund B</th><th>Overlap</th><th>Common shares</th></tr></thead><tbody>{data.pairwise_overlap.map((pair) => <tr key={`${pair.scheme_a}-${pair.scheme_b}`}><td>{pair.scheme_a}</td><td>{pair.scheme_b}</td><td>{money(pair.overlap_pct)}%</td><td>{pair.common_security_count}</td></tr>)}</tbody></table></div>
+            <div className="table-wrap"><table><thead><tr><th>Fund A</th><th>Fund B</th><th>Overlap</th><th>Common shares</th></tr></thead><tbody>{data.pairwise_overlap.map((pair) => <tr key={`${pair.scheme_a}-${pair.scheme_b}`}><td>{pair.scheme_a}</td><td>{pair.scheme_b}</td><td>{money(pair.overlap_pct)}% {pair.overlap_is_lower_bound ? "(lower bound)" : ""}</td><td>{pair.common_security_count}</td></tr>)}</tbody></table></div>
             <h3>Equal-weighted combined exposure</h3>
             <div className="table-wrap"><table><thead><tr><th>Underlying share</th><th>Funds present</th><th>Combined exposure</th></tr></thead><tbody>{data.aggregated_equity_exposure?.slice(0, 30).map((item) => <tr key={item.security_key}><td>{item.name}<small>{item.security_key}</small></td><td>{item.funds_present}</td><td>{money(item.equal_weight_exposure_pct)}%</td></tr>)}</tbody></table></div>
+            {data.has_partial_disclosures && <p className="muted">Warning: at least one fund has a partial holdings disclosure. Overlap and combined exposure may be understated.</p>}
             <p className="muted">{data.aggregation_basis} {data.disclosure_warning}</p>
           </Panel>}
         </>}
