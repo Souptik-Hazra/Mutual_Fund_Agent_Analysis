@@ -50,7 +50,9 @@ def index_chunks(document_id: int, title: str, chunks: list[dict[str, Any]]) -> 
         return False
 
 
-def search_chunks(query: str, limit: int, scheme_code: int | None = None) -> list[dict[str, Any]] | None:
+def search_chunks(
+    query: str, limit: int, scheme_code: int | None = None
+) -> list[dict[str, Any]] | None:
     """Return semantic matches, or None when semantic retrieval is not configured."""
     settings = get_settings()
     if not settings.qdrant_url or not settings.gemini_api_key:
