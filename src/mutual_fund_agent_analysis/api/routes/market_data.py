@@ -213,7 +213,9 @@ class SecurityObservationInput(BaseModel):
         if self.observed_at > datetime.now(UTC) + timedelta(minutes=5):
             raise ValueError("observed_at cannot be more than five minutes in the future.")
         if self.fundamentals and self.fundamentals_as_of is None:
-            raise ValueError("fundamentals_as_of is required when fundamental metrics are supplied.")
+            raise ValueError(
+                "fundamentals_as_of is required when fundamental metrics are supplied."
+            )
         if self.fundamentals_as_of and self.fundamentals_as_of > self.observed_at.date():
             raise ValueError("fundamentals_as_of cannot be after observed_at.")
         return self
