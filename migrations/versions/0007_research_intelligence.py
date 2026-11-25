@@ -19,7 +19,6 @@ def upgrade() -> None:
         "research_documents",
         "document_chunks",
     )
-    op.get_bind()
     Base.metadata.create_all(
         bind=op.get_bind(),
         tables=[Base.metadata.tables[name] for name in names],
