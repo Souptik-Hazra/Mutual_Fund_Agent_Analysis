@@ -22,6 +22,7 @@ from mutual_fund_agent_analysis.analytics.series import (
     PricePoint,
     ReturnPoint,
     normalize_prices,
+    normalize_returns,
     period_returns,
 )
 from mutual_fund_agent_analysis.analytics.service import (
@@ -50,6 +51,7 @@ __all__ = [
     "load_benchmark_prices",
     "load_fund_prices",
     "normalize_prices",
+    "normalize_returns",
     "period_returns",
     "rolling_returns",
     "trailing_return",
