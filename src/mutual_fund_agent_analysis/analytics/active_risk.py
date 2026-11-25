@@ -53,10 +53,6 @@ def calculate_active_risk_metrics(
     annualization = Decimal(periods_per_year).sqrt()
     tracking_error = periodic_tracking_error * annualization
     information_ratio = (
-        mean_active / periodic_tracking_error * annualization
-        if periodic_tracking_error
-        else None
+        mean_active / periodic_tracking_error * annualization if periodic_tracking_error else None
     )
-    return ActiveRiskMetrics(
-        count, tracking_error, information_ratio, mean_active, coverage
-    )
+    return ActiveRiskMetrics(count, tracking_error, information_ratio, mean_active, coverage)
