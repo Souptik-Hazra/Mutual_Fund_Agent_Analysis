@@ -371,6 +371,9 @@ The platform should maintain a clear separation between source ingestion, normal
 
 ## Development Roadmap
 
+The current roadmap's **Phase 5 (Event & News Intelligence)** and **Phase 6 (Social Intelligence)** implementation details and operator gates are documented in [Phase 5–6 Event and Social Intelligence](docs/phase-5-6-event-social-implementation.md).
+
+
 Implementation should proceed in working milestones rather than creating all agents and modules at once.
 
 | Phase | Scope | Deliverable |
