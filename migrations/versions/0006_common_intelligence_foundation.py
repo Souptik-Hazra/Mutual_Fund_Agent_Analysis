@@ -492,7 +492,8 @@ def upgrade() -> None:
             entity_id, namespace, identifier_value, normalized_value, source_key, is_primary
         )
         SELECT e.entity_id, 'BENCHMARK_CODE', b.benchmark_code,
-               upper(btrim(b.benchmark_code)), b.provider, true
+               regexp_replace(upper(btrim(b.benchmark_code)), '\\s+', '', 'g'),
+               b.provider, true
         FROM benchmark_indices b
         JOIN research_entities e
           ON e.entity_type = 'benchmark'
