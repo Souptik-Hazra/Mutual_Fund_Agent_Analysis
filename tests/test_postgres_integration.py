@@ -21,6 +21,9 @@ from mutual_fund_agent_analysis.database.session import (
     get_session_factory,
 )
 from mutual_fund_agent_analysis.models import (
+    BenchmarkIndex,
+    BenchmarkObservation,
+    BenchmarkSyncRun,
     MutualFundScheme,
     NavObservation,
     NavReconciliation,
@@ -93,6 +96,9 @@ def test_00_postgres_migration_upgrade_downgrade_upgrade(migrated_postgres: Engi
     assert "nav_observations" in tables
     assert "provider_sync_runs" in tables
     assert "nav_reconciliations" in tables
+    assert "benchmark_indices" in tables
+    assert "benchmark_observations" in tables
+    assert "benchmark_sync_runs" in tables
     assert "benchmark_indices" in tables
     assert "benchmark_observations" in tables
     assert "benchmark_sync_runs" in tables
@@ -245,6 +251,55 @@ def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) 
         assert len(rows) == 2
         assert {row.source for row in rows} == {"niftyindices"}
         assert rows[0].tri_value > 0
+        runs = session.scalars(
+            select(BenchmarkSyncRun).where(BenchmarkSyncRun.benchmark_code == "NIFTY 50")
+        ).all()
+        assert len(runs) == 2
+        assert runs[0].response_payload["fixture"] is True
+
+
+
+def test_postgres_benchmark_tri_upsert_is_idempotent(migrated_postgres: Engine) -> None:
+    from mutual_fund_agent_analysis.data.providers.niftyindices import (
+        BenchmarkPoint,
+        BenchmarkResponse,
+    )
+    from mutual_fund_agent_analysis.data.repositories.benchmark_repository import (
+        upsert_benchmark_response,
+    )
+
+    response = BenchmarkResponse(
+        benchmark_code="NIFTY 50",
+        benchmark_name="Nifty 50",
+        data=[
+            BenchmarkPoint(
+                date=date(2026, 11, 24),
+                tri="35600.00",
+                ntr="31000.00",
+            ),
+            BenchmarkPoint(
+                date=date(2026, 11, 25),
+                tri="35793.78",
+                ntr="31169.30",
+            ),
+        ],
+        raw_payload={"provider": "niftyindices", "fixture": True},
+    )
+    with Session(migrated_postgres) as session, session.begin():
+        assert upsert_benchmark_response(session, response) == 2
+        assert upsert_benchmark_response(session, response) == 2
+
+    with Session(migrated_postgres) as session:
+        benchmark = session.get(BenchmarkIndex, "NIFTY 50")
+        assert benchmark is not None
+        rows = session.scalars(
+            select(BenchmarkObservation).where(
+                BenchmarkObservation.benchmark_code == "NIFTY 50"
+            )
+        ).all()
+        assert len(rows) == 2
+        assert {row.source for row in rows} == {"niftyindices"}
+        assert all(row.tri_value > 0 for row in rows)
         runs = session.scalars(
             select(BenchmarkSyncRun).where(BenchmarkSyncRun.benchmark_code == "NIFTY 50")
         ).all()
