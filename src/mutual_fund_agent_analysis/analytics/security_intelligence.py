@@ -258,7 +258,7 @@ def security_profile(
                 "last_price": row.last_price,
                 "change_pct": row.change_pct,
                 "fundamentals": row.fundamentals_json or {},
-                "fundamentals_as_of": row.fundamentals_as_of,
+                "fundamentals_as_of": getattr(row, "fundamentals_as_of", None),
                 "corporate_events": row.corporate_events_json or [],
                 "source_key": row.source_key,
                 "source_url": row.source_url,
