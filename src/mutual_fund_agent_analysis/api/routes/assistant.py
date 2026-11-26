@@ -133,7 +133,6 @@ def stream_research(
 def run_research(
     request: ResearchAssistantRequest,
     session: Annotated[Session, Depends(get_db)],
-    http_request: Request,
 ) -> dict[str, Any]:
     research_run_id = uuid4().hex
     try:
