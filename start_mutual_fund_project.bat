@@ -63,8 +63,8 @@ echo ERROR: Could not resolve the repository path inside WSL.
 goto :fail
 
 :launch
-REM Each terminal uses a starting directory; no nested cmd.exe cd quoting.
-start "Docker - WSL" wt.exe -w new --title "Docker - WSL" --startingDirectory "%WSL_PROJECT%" wsl.exe --cd "%WSL_PROJECT%" --exec bash scripts/start_docker_wsl.sh
+REM WSL path contains no spaces in the current project location; avoid quoted --cd arguments because wt.exe can preserve the quotes.
+start "Docker - WSL" wt.exe -w new --title "Docker - WSL" wsl.exe --cd %WSL_PROJECT% --exec bash scripts/start_docker_wsl.sh
 start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_backend.ps1"
 start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" --startingDirectory "%FRONTEND_DIR%" cmd.exe /k npm run dev
 
