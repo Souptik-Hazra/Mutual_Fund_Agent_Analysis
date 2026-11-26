@@ -104,7 +104,9 @@ def test_idcw_nav_only_does_not_calculate_benchmark_relative_metrics(monkeypatch
     )
 
     def unexpected_benchmark_load(*_args, **_kwargs):
-        pytest.fail("Benchmark observations must not be loaded for unverified IDCW NAV-only returns.")
+        pytest.fail(
+            "Benchmark observations must not be loaded for unverified IDCW NAV-only returns."
+        )
 
     monkeypatch.setattr(service, "load_benchmark_prices", unexpected_benchmark_load)
     report = service.analyze_fund(
