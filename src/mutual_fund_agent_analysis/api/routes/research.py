@@ -767,7 +767,9 @@ def get_social_provider_status(session: Annotated[Session, Depends(get_db)]) -> 
     providers = {}
     for source_key in ("reddit", "x"):
         registry = session.get(DataSource, source_key)
-        metadata = (\n            registry.metadata_json if registry and isinstance(registry.metadata_json, dict) else {}\n        )
+        metadata = (
+            registry.metadata_json if registry and isinstance(registry.metadata_json, dict) else {}
+        )
         reviewed = bool(
             registry
             and registry.terms_url
