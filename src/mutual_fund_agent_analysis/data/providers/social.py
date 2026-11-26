@@ -84,3 +84,17 @@ def search_x(query: str, limit: int = 50) -> list[dict[str, Any]]:
             "metadata": {"lang": item.get("lang"), "public_metrics": metrics},
         })
     return rows
+
+
+def social_provider_credentials() -> dict[str, bool]:
+    """Return credential readiness only; never expose configured secret values."""
+    settings = get_settings()
+    return {
+        "reddit": bool(
+            settings.reddit_client_id
+            and settings.reddit_client_id.get_secret_value().strip()
+            and settings.reddit_client_secret
+            and settings.reddit_client_secret.get_secret_value().strip()
+        ),
+        "x": bool(settings.x_bearer_token and settings.x_bearer_token.get_secret_value().strip()),
+    }

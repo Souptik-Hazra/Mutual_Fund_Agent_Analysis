@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import io
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -181,6 +182,11 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
             return source
 
     captured = []
+    monkeypatch.setattr(
+        research_routes,
+        "social_provider_credentials",
+        lambda: {"reddit": True, "x": False},
+    )
     monkeypatch.setattr(
         research_routes,
         "search_reddit",
@@ -907,3 +913,217 @@ def test_portfolio_import_accepts_server_generated_content_hash():
     )
     assert payload.content_hash is None
     assert len(_portfolio_content_hash(payload)) == 64
+
+
+def _approved_social_source(source_key="reddit", enabled=True):
+    return DataSource(
+        source_key=source_key,
+        display_name=source_key.title(),
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=enabled,
+        terms_url=f"https://terms.example/{source_key}",
+        metadata_json={
+            "terms_reviewed": True,
+            "access_confirmed": True,
+            "reviewed_at": "2026-11-25",
+            "retention_days": 14,
+        },
+    )
+
+
+def test_social_provider_status_never_exposes_credentials(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def get(self, _model, key):
+            return source if key == "reddit" else None
+
+    monkeypatch.setattr(
+        research_routes, "social_provider_credentials", lambda: {"reddit": False, "x": False}
+    )
+    result = research_routes.get_social_provider_status(StubSession())
+    assert result["providers"]["reddit"]["status"] == "not_configured"
+    assert result["providers"]["reddit"]["can_collect"] is False
+    assert result["providers"]["reddit"]["can_import"] is True
+    assert result["providers"]["x"]["status"] == "disabled"
+    assert result["providers"]["x"]["can_import"] is False
+    assert "client_secret" not in str(result).lower()
+
+
+def test_social_collection_returns_actionable_status_when_credentials_missing(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def get(self, _model, _key):
+            return source
+
+    monkeypatch.setattr(
+        research_routes, "social_provider_credentials", lambda: {"reddit": False, "x": False}
+    )
+    with pytest.raises(HTTPException) as exc:
+        research_routes.collect_social_posts(
+            source="reddit", q="mutual funds", session=StubSession(), limit=1
+        )
+    assert exc.value.status_code == 409
+    assert "authorized CSV/JSON export" in exc.value.detail
+
+
+def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def __init__(self):
+            self.committed = False
+            self.rolled_back = False
+
+        def get(self, _model, _key):
+            return source
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            self.rolled_back = True
+
+    captured = []
+    monkeypatch.setattr(
+        research_routes,
+        "create_social_post",
+        lambda _session, payload, **kwargs: captured.append(payload),
+    )
+    monkeypatch.setattr(
+        research_routes, "get_settings", lambda: SimpleNamespace(social_retention_days=30)
+    )
+    session = StubSession()
+    upload = UploadFile(
+        filename="reddit-export.csv",
+        file=io.BytesIO(
+            b"external_id,text_excerpt,canonical_url\n"
+            b"post-1,Market discussion,https://www.reddit.com/r/example/comments/post-1/\n"
+        ),
+    )
+    result = asyncio.run(
+        research_routes.import_social_dataset(session=session, source="reddit", file=upload)
+    )
+    assert result["imported"] == 1
+    assert result["retention_days"] == 14
+    assert session.committed is True
+    expected_hash = hashlib.sha256(b"Market discussion").hexdigest()
+    assert captured[0].content_hash == expected_hash
+    remaining = captured[0].expires_at - datetime.now(UTC)
+    assert timedelta(days=14) - timedelta(seconds=2) < remaining <= timedelta(days=14)
+    assert captured[0].text_excerpt == "Market discussion"
+
+
+def test_social_import_rolls_back_all_records_when_a_later_record_fails(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def __init__(self):
+            self.committed = False
+            self.rolled_back = False
+
+        def get(self, _model, _key):
+            return source
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            self.rolled_back = True
+
+    calls = []
+
+    def persist(_session, payload, *, commit=True):
+        calls.append((payload.external_id, commit))
+        if payload.external_id == "post-2":
+            raise ValueError("simulated invalid second record")
+
+    monkeypatch.setattr(research_routes, "create_social_post", persist)
+    monkeypatch.setattr(
+        research_routes,
+        "get_settings",
+        lambda: SimpleNamespace(social_retention_days=30),
+    )
+    upload = UploadFile(
+        filename="reddit-export.csv",
+        file=io.BytesIO(
+            b"external_id,text_excerpt\npost-1,First discussion\npost-2,Second discussion\n"
+        ),
+    )
+    session = StubSession()
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_social_dataset(
+                session=session,
+                source="reddit",
+                file=upload,
+            )
+        )
+
+    assert error.value.status_code == 422
+    assert calls == [("post-1", False), ("post-2", False)]
+    assert session.committed is False
+    assert session.rolled_back is True
+
+
+def test_social_csv_import_rejects_excessive_columns():
+    headers = ",".join(f"column_{index}" for index in range(51))
+    upload = UploadFile(
+        filename="wide-export.csv",
+        file=io.BytesIO((headers + "\n").encode("utf-8")),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_social_dataset(
+                session=SimpleNamespace(rollback=lambda: None),
+                source="reddit",
+                file=upload,
+            )
+        )
+
+    assert error.value.status_code == 413
+
+
+def test_social_import_rejects_unreviewed_or_disabled_source():
+    source = _approved_social_source(enabled=False)
+
+    class StubSession:
+        def get(self, _model, _key):
+            return source
+
+        def rollback(self):
+            self.rolled_back = True
+
+    upload = UploadFile(
+        filename="reddit-export.json",
+        file=io.BytesIO(b'[{"external_id":"post-1","text":"discussion"}]'),
+    )
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            research_routes.import_social_dataset(
+                session=StubSession(), source="reddit", file=upload
+            )
+        )
+    assert exc.value.status_code == 403
+
+
+def test_empty_secret_values_are_treated_as_missing_credentials(monkeypatch):
+    from pydantic import SecretStr
+
+    from mutual_fund_agent_analysis.data.providers import social
+
+    monkeypatch.setattr(
+        social,
+        "get_settings",
+        lambda: SimpleNamespace(
+            reddit_client_id=SecretStr(""),
+            reddit_client_secret=SecretStr(""),
+            x_bearer_token=SecretStr(""),
+        ),
+    )
+    assert social.social_provider_credentials() == {"reddit": False, "x": False}
