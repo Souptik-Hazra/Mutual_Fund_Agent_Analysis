@@ -105,7 +105,7 @@ class MFAPIClient:
 
     def _get_json(self, path: str, params: dict[str, str] | None = None) -> Any:
         last_error: Exception | None = None
-        for attempt in range(3):
+        for attempt in range(6):
             try:
                 response = self._client.get(path, params=params)
                 if response.status_code == 429 or response.status_code >= 500:
@@ -117,7 +117,7 @@ class MFAPIClient:
                 retryable = not isinstance(exc, httpx.HTTPStatusError) or (
                     exc.response.status_code == 429 or exc.response.status_code >= 500
                 )
-                if not retryable or attempt == 2:
+                if not retryable or attempt == 5:
                     raise
                 retry_after = None
                 if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
@@ -133,8 +133,8 @@ class MFAPIClient:
                                 retry_after = (retry_date - datetime.now(UTC)).total_seconds()
                             except (TypeError, ValueError, OverflowError):
                                 retry_after = None
-                delay = retry_after if retry_after is not None else 0.5 * (2**attempt)
-                time.sleep(min(max(delay, 0.0), 30.0))
+                delay = retry_after if retry_after is not None else 5.0 * (2**attempt)
+                time.sleep(min(max(delay, 1.0), 120.0))
         if last_error is not None:
             raise last_error
         raise RuntimeError("MFAPI request failed without an exception.")
