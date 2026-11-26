@@ -861,7 +861,7 @@ async def import_social_dataset(
                 "published_at": item.get("published_at") or None,
                 "engagement_count": item.get("engagement_count") or 0,
                 "sentiment_label": item.get("sentiment_label") or None,
-                "sentiment_score": item.get("sentiment_score") or None,
+                "sentiment_score": item.get("sentiment_score") if item.get("sentiment_score") not in (None, "") else None,
                 "sentiment_model": item.get("sentiment_model") or None,
                 "is_spam": item.get("is_spam") or False,
                 "expires_at": datetime.now(UTC) + timedelta(days=retention_days),
