@@ -870,10 +870,6 @@ def test_portfolio_content_hash_ignores_caller_hash_and_holding_order():
     assert _portfolio_content_hash(left) == _portfolio_content_hash(right)
 
 
-
-
-
-
 def test_portfolio_import_accepts_server_generated_content_hash():
     payload = PortfolioImportRequest(
         scheme_code=100,
