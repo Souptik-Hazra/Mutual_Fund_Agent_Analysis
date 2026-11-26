@@ -284,6 +284,7 @@ def test_research_run_id_flows_through_graph_nodes():
 
 
 def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
+    from datetime import UTC, date, datetime
     from decimal import Decimal
     from types import SimpleNamespace
 
@@ -304,7 +305,23 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
         return expected_report
 
     monkeypatch.setattr(research_graph, "analyze_fund", deterministic_analysis)
-    session = object()
+
+    class Session:
+        def scalar(self, _statement):
+            return SimpleNamespace(
+                canonical_source="amfi",
+                evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
+                nav_date=date(2026, 11, 25),
+                canonical_nav="123.45",
+                source_values={"amfi": "123.45"},
+            )
+
+        def get(self, model, _key):
+            if model.__name__ == "DataSource":
+                return SimpleNamespace(base_url="https://www.amfiindia.com")
+            return None
+
+    session = Session()
     request = SimpleNamespace(
         question="Show fund CAGR and risk",
         scheme_codes=[125497],
