@@ -93,3 +93,14 @@ test("event research sends the selected end date as a timezone-aware as_of insta
     /params\.set\("as_of", new Date\(\x60\$\{dateTo\}T23:59:59\+05:30\x60\)\.toISOString\(\)\)/,
   );
 });
+
+
+test("benchmark retry is restricted to explicit missing TRI observations", async () => {
+  const { isBenchmarkObservationUnavailable } = await import("../src/research.js");
+  const missing = new Error("No TRI observations returned for NIFTY 50 TRI between 2025-01-01 and 2025-12-31. Check the canonical index name and published history coverage.");
+  missing.status = 422;
+  assert.equal(isBenchmarkObservationUnavailable(missing), true);
+  assert.equal(isBenchmarkObservationUnavailable(Object.assign(new Error("Scheme not found"), { status: 404 })), false);
+  assert.equal(isBenchmarkObservationUnavailable(Object.assign(new Error("Internal server error"), { status: 500 })), false);
+  assert.equal(isBenchmarkObservationUnavailable(Object.assign(new Error("Request validation failed"), { status: 422 })), false);
+});
