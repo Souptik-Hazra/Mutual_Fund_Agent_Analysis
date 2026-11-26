@@ -18,11 +18,6 @@ echo ==========================================
 echo Project: "%PROJECT_DIR%"
 echo.
 
-if exist "%PROJECT_DIR%\docker-compose.yml" goto :check_backend
-echo ERROR: docker-compose.yml was not found.
-goto :fail
-
-:check_backend
 if exist "%VENV_ACTIVATE%" goto :check_frontend
 echo ERROR: Windows virtual environment was not found: "%VENV_ACTIVATE%"
 goto :fail
@@ -33,14 +28,8 @@ echo ERROR: Frontend package.json was not found.
 goto :fail
 
 :check_modules
-if exist "%FRONTEND_DIR%\node_modules\vite\bin\vite.js" goto :check_docker
+if exist "%FRONTEND_DIR%\node_modules\vite\bin\vite.js" goto :check_npm
 echo ERROR: Frontend dependencies are missing. Run npm ci in frontend.
-goto :fail
-
-:check_docker
-where docker.exe >nul 2>nul
-if not errorlevel 1 goto :check_npm
-echo ERROR: Docker CLI was not found. Install Docker Desktop for Windows.
 goto :fail
 
 :check_npm
@@ -56,18 +45,17 @@ echo ERROR: Windows Terminal (wt.exe) is required.
 goto :fail
 
 :launch
-REM Docker Desktop runs natively on Windows; no WSL commands are used by this launcher.
-start "Docker - Windows" wt.exe -w new --title "Docker - Windows" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_docker_desktop.ps1"
+REM Start only the Windows-hosted backend and frontend. Docker must be started separately.
 start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_backend.ps1"
 start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" --startingDirectory "%FRONTEND_DIR%" cmd.exe /k npm run dev
 
 echo.
-echo Startup terminals have been launched.
-echo Docker:    PostgreSQL :5432 and Qdrant :6333 (Docker Desktop)
-echo Backend:   http://127.0.0.1:8000
-echo Frontend:  http://127.0.0.1:5173
+echo Backend and frontend terminals have been launched.
+echo Backend:  http://127.0.0.1:8000
+echo Frontend: http://127.0.0.1:5173
 echo.
-echo Keep all three terminals open while developing.
+echo Ensure PostgreSQL and Qdrant are already running before using backend features.
+echo Keep both terminals open while developing.
 pause
 exit /b 0
 
