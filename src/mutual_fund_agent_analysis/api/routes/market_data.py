@@ -28,8 +28,8 @@ class QuoteSyncRequest(BaseModel):
     security_key: str = Field(min_length=2, max_length=160)
     security_name: str = Field(min_length=1, max_length=300)
     symbol: str = Field(min_length=1, max_length=40)
-    exchange: Literal["NSE", "BSE"]
-    isin: str = Field(min_length=12, max_length=12, pattern="^IN[A-Z0-9]{10}$")
+    exchange: str = Field(min_length=2, max_length=12)
+    isin: str = Field(min_length=12, max_length=12)
 
     @model_validator(mode="after")
     def normalize_identity(self) -> "QuoteSyncRequest":
@@ -37,6 +37,10 @@ class QuoteSyncRequest(BaseModel):
         self.symbol = self.symbol.strip().upper()
         self.exchange = self.exchange.strip().upper()
         self.isin = self.isin.strip().upper()
+        if self.exchange not in {"NSE", "BSE"}:
+            raise ValueError("exchange must be NSE or BSE.")
+        if len(self.isin) != 12 or not self.isin.startswith("IN") or not self.isin[2:].isalnum():
+            raise ValueError("A valid 12-character Indian ISIN is required.")
         if self.security_key not in {self.isin, self.symbol}:
             raise ValueError("security_key must exactly match the supplied ISIN or exchange symbol.")
         if not self.symbol or not self.security_name.strip():
@@ -48,7 +52,7 @@ def _verified_identity_source(session: Session, source_key: str | None) -> bool:
     if not source_key:
         return False
     source = session.get(DataSource, source_key)
-    return bool(source and source.enabled and source.is_official)
+    return bool(source and source.enabled and source.is_official and source.source_type == "official")
 
 
 def _resolve_security_identity(
