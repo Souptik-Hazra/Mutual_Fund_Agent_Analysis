@@ -497,6 +497,38 @@ def ingest_event(payload: EventInput, session: Annotated[Session, Depends(get_db
     }
 
 
+@router.get("/events/sources")
+def list_event_sources(session: Annotated[Session, Depends(get_db)]) -> dict:
+    """Report official event-source readiness without exposing credentials or assuming feed URLs."""
+    rows = session.scalars(
+        select(DataSource).where(DataSource.source_type == "official").order_by(DataSource.source_key)
+    ).all()
+    items = []
+    for source in rows:
+        metadata = source.metadata_json if isinstance(source.metadata_json, dict) else {}
+        checks = {
+            "enabled": bool(source.enabled),
+            "official": bool(source.is_official),
+            "https_base_url": bool(source.base_url and source.base_url.startswith("https://")),
+            "terms_url": bool(source.terms_url),
+            "terms_reviewed": metadata.get("terms_reviewed") is True,
+            "access_confirmed": metadata.get("access_confirmed") is True,
+            "reviewed_at": bool(metadata.get("reviewed_at")),
+        }
+        items.append({
+            "source_key": source.source_key,
+            "display_name": source.display_name,
+            "enabled": source.enabled,
+            "base_url": source.base_url,
+            "terms_url": source.terms_url,
+            "feed_url": metadata.get("event_feed_url"),
+            "checks": checks,
+            "ready": all(checks.values()),
+            "readiness_reason": None if all(checks.values()) else "Source approval, HTTPS host, terms URL, and access-review metadata must all be configured.",
+        })
+    return {"count": len(items), "items": items}
+
+
 @router.post("/events/collect/{source_key}")
 def collect_official_events(
     source_key: str,
