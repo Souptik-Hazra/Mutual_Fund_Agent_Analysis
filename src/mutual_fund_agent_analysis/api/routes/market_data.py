@@ -19,7 +19,11 @@ from mutual_fund_agent_analysis.analytics.security_intelligence import security_
 from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models.intelligence import DataSource, EntityIdentifier, ResearchEntity
+from mutual_fund_agent_analysis.models.intelligence import (
+    DataSource,
+    EntityIdentifier,
+    ResearchEntity,
+)
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
@@ -43,7 +47,9 @@ class QuoteSyncRequest(BaseModel):
         if len(self.isin) != 12 or not self.isin.startswith("IN") or not self.isin[2:].isalnum():
             raise ValueError("A valid 12-character Indian ISIN is required.")
         if self.security_key not in {self.isin, self.symbol}:
-            raise ValueError("security_key must exactly match the supplied ISIN or exchange symbol.")
+            raise ValueError(
+                "security_key must exactly match the supplied ISIN or exchange symbol."
+            )
         if not self.symbol or not self.security_name.strip():
             raise ValueError("Security symbol and name cannot be blank.")
         return self
@@ -53,7 +59,12 @@ def _verified_identity_source(session: Session, source_key: str | None) -> bool:
     if not source_key:
         return False
     source = session.get(DataSource, source_key)
-    return bool(source and source.enabled and source.is_official and source.source_type == "official")
+    return bool(
+        source
+        and source.enabled
+        and source.is_official
+        and source.source_type == "official"
+    )
 
 
 def _resolve_security_identity(
@@ -83,7 +94,10 @@ def _resolve_security_identity(
     ):
         raise HTTPException(
             status_code=422,
-            detail="The ISIN mapping is not backed by an enabled official source and active security entity.",
+            detail=(
+                "The ISIN mapping is not backed by an enabled official source "
+                "and active security entity."
+            ),
         )
 
     namespace = f"{payload.exchange}_SYMBOL"
@@ -145,7 +159,10 @@ def sync_twelvedata_quote(
         session.add(source)
         session.flush()
     elif not source.enabled or source.source_type != "provider":
-        raise HTTPException(status_code=409, detail="The Twelve Data provider source is disabled or misregistered.")
+        raise HTTPException(
+            status_code=409,
+            detail="The Twelve Data provider source is disabled or misregistered.",
+        )
     client = TwelveDataClient(settings.twelve_data_api_key.get_secret_value())
     try:
         quote = client.get_quote(payload.symbol, payload.exchange)
