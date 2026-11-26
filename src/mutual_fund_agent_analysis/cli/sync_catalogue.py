@@ -2,6 +2,8 @@
 
 import argparse
 import logging
+import time
+from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -11,6 +13,7 @@ from mutual_fund_agent_analysis.database.session import get_session_factory
 from mutual_fund_agent_analysis.models import MutualFundScheme
 
 logger = logging.getLogger(__name__)
+CHECKPOINT = Path("data/cache/scheme_catalogue_offset.txt")
 
 
 def main() -> None:
@@ -20,7 +23,7 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Refresh the catalogue even when schemes already exist.",
+        help="Refresh the catalogue from the beginning.",
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -32,15 +35,19 @@ def main() -> None:
             logger.info("Scheme catalogue already contains %s schemes; skipping import.", existing)
             return
 
+        CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
+        if args.force:
+            CHECKPOINT.unlink(missing_ok=True)
+        offset = int(CHECKPOINT.read_text().strip()) if CHECKPOINT.exists() else 0
         imported = 0
-        page_size = 1000
+        page_size = 250
+
         with MFAPIClient() as client:
-            offset = 0
             while True:
                 page = client.list_schemes(limit=page_size, offset=offset)
                 if not page:
                     break
-                now_values = [
+                values = [
                     {
                         "scheme_code": item.scheme_code,
                         "scheme_name": item.scheme_name,
@@ -50,7 +57,7 @@ def main() -> None:
                     }
                     for item in page
                 ]
-                statement = insert(MutualFundScheme).values(now_values)
+                statement = insert(MutualFundScheme).values(values)
                 statement = statement.on_conflict_do_update(
                     index_elements=[MutualFundScheme.scheme_code],
                     set_={
@@ -67,17 +74,24 @@ def main() -> None:
                     },
                 )
                 session.execute(statement)
-                imported += len(page)
+                session.commit()
                 offset += len(page)
-                logger.info("Imported %s scheme records...", imported)
+                imported += len(page)
+                CHECKPOINT.write_text(str(offset), encoding="utf-8")
+                logger.info("Imported %s additional schemes (next offset: %s).", imported, offset)
                 if len(page) < page_size:
                     break
+                time.sleep(1.0)
 
-        session.commit()
-        logger.info("Scheme catalogue ready: %s records processed.", imported)
+        CHECKPOINT.unlink(missing_ok=True)
+        total = session.scalar(select(func.count()).select_from(MutualFundScheme)) or 0
+        logger.info("Scheme catalogue ready: %s schemes available.", total)
     except Exception:
         session.rollback()
-        logger.exception("Scheme catalogue import failed.")
+        logger.exception(
+            "Scheme catalogue import paused. Successfully imported pages are saved; "
+            "run the same command again to resume."
+        )
         raise
     finally:
         session.close()
