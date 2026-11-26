@@ -928,7 +928,7 @@ def _approved_social_source(source_key="reddit", enabled=True):
 
 
 def test_social_provider_status_never_exposes_credentials(monkeypatch):
-    source = _approved_social_source(enabled=False)
+    source = _approved_social_source(enabled=True)
 
     class StubSession:
         def get(self, _model, key):
@@ -940,7 +940,7 @@ def test_social_provider_status_never_exposes_credentials(monkeypatch):
     result = research_routes.get_social_provider_status(StubSession())
     assert result["providers"]["reddit"]["status"] == "not_configured"
     assert result["providers"]["reddit"]["can_collect"] is False
-    assert result["providers"]["reddit"]["can_import"] is False
+    assert result["providers"]["reddit"]["can_import"] is True
     assert result["providers"]["x"]["status"] == "not_configured"
     assert "client_secret" not in str(result).lower()
 
@@ -1027,3 +1027,20 @@ def test_social_import_rejects_unreviewed_or_disabled_source():
             )
         )
     assert exc.value.status_code == 403
+
+
+def test_empty_secret_values_are_treated_as_missing_credentials(monkeypatch):
+    from pydantic import SecretStr
+
+    from mutual_fund_agent_analysis.data.providers import social
+
+    monkeypatch.setattr(
+        social,
+        "get_settings",
+        lambda: SimpleNamespace(
+            reddit_client_id=SecretStr(""),
+            reddit_client_secret=SecretStr(""),
+            x_bearer_token=SecretStr(""),
+        ),
+    )
+    assert social.social_provider_credentials() == {"reddit": False, "x": False}
