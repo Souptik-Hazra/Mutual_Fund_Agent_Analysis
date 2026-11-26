@@ -22,4 +22,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Database migration failed."
 }
 
+python -m mutual_fund_agent_analysis.cli.sync_catalogue
+if ($LASTEXITCODE -ne 0) {
+    throw "Mutual fund scheme catalogue initialization failed."
+}
+
 uvicorn mutual_fund_agent_analysis.main:app --reload
