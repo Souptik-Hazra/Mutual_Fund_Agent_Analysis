@@ -101,13 +101,15 @@ def _resolve_security_identity(
 
     namespace = f"{payload.exchange}_SYMBOL"
     symbol_rows = session.scalars(
-        select(EntityIdentifier).where(
+        select(EntityIdentifier)
+        .where(
             EntityIdentifier.entity_id == entity.entity_id,
             EntityIdentifier.namespace == namespace,
             EntityIdentifier.normalized_value == payload.symbol,
             (EntityIdentifier.valid_from.is_(None) | (EntityIdentifier.valid_from <= observed_on)),
             (EntityIdentifier.valid_to.is_(None) | (EntityIdentifier.valid_to >= observed_on)),
-        ).limit(2)
+        )
+        .limit(2)
     ).all()
     if len(symbol_rows) != 1 or symbol_rows[0].entity_id != entity.entity_id:
         raise HTTPException(
