@@ -42,11 +42,11 @@ Financial calculations remain deterministic backend operations. LLMs may route, 
 | ID | Priority | Current status | Verified scope / remaining acceptance gate |
 |---|---|---|---|
 | P3-01 | Documentation reconciliation | **Partial** | README project status now points to the actual P2/P3 acceptance gates. Continue reconciling feature descriptions against merged implementation and remove any remaining stale claims. |
-| P3-02 | Authoritative roadmap | **In progress** | This document is the single P2/P3 delivery ledger. Historical phase notes remain supporting records, not competing current roadmaps. |
+| P3-02 | Authoritative roadmap | **Implemented** | This document is the single P2/P3 delivery ledger with explicit statuses and acceptance gates. Historical phase notes remain supporting implementation records, not competing current roadmaps. |
 | P3-03 | Assistant capability registry | **Implemented; CI verification pending** | `/assistant/capabilities` and frontend Overview expose the eight routed capabilities: fund, category, portfolio, actual exposure, security, events, social and documents. Registry IDs match the LangGraph intent names. |
 | P3-04 | Reproducible frontend installation | **Implemented** | `frontend/package-lock.json` is committed, CI installs with `npm ci`, and Node.js 22 is pinned in the frontend workflow. The npm cache key now uses the lockfile so dependency changes invalidate the cache correctly. |
 | P3-05 | Code cleanup | **Partial** | Cleanup has been limited to the Qdrant lifecycle and directly touched request/route logic. A broader unused-code/dead-component review remains open and must preserve API contracts. |
-| P3-06 | Observability and integration limitations | **Partial** | API requests now receive a validated/generated `X-Request-ID`; structured completion logs include request ID, method, path, status and duration without query strings. Propagating research-run IDs through LangGraph nodes and specialist outputs remains open. |
+| P3-06 | Observability and integration limitations | **Implemented; CI verification pending** | API requests receive a validated/generated `X-Request-ID`; assistant runs generate a separate `research_run_id` returned in streaming/non-streaming responses, included in SSE progress frames, propagated through LangGraph nodes and attached to specialist completion/limited logs. HTTP logs retain request ID, method, path, status and duration without query strings. Provider entitlements, freshness and access limitations remain documented in the relevant source/phase notes. |
 
 ## CI and Git workflow contract
 
