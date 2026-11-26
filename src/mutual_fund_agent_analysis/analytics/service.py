@@ -369,16 +369,10 @@ def compare_funds(
     calendar_year_as_of_date: date | None = None,
     frequency: str = "daily",
 ) -> FundComparisonReport:
-    """Compare 2–5 schemes using the exact intersection of their available NAV dates.
-
-    When a benchmark is selected, its available TRI dates are also intersected.
-    No price or benchmark series is forward-filled or interpolated.
-    """
+    """Compare schemes on exact common dates and compatible total-return bases."""
     codes = tuple(scheme_codes)
-    if not 2 <= len(codes) <= 5:
+    if not 2 <= len(codes) <= 5 or len(codes) != len(set(codes)):
         raise ValueError("Comparison requires between two and five distinct schemes.")
-    if len(codes) != len(set(codes)):
-        raise ValueError("Comparison scheme codes must be unique.")
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be on or before end_date.")
 
@@ -386,49 +380,48 @@ def compare_funds(
         select(MutualFundScheme).where(MutualFundScheme.scheme_code.in_(codes))
     ).all()
     option_by_code = {row.scheme_code: row.option_type for row in scheme_rows}
-    unclassified_codes = [code for code in codes if option_by_code.get(code) in {None, "unknown"}]
-    known_options = {
-        option_by_code[code] for code in codes if option_by_code.get(code) not in {None, "unknown"}
-    }
-    if len(known_options) > 1:
+    if set(option_by_code) != set(codes):
+        raise ValueError("One or more selected schemes are missing from the local catalogue.")
+    options = set(option_by_code.values())
+    if len(options) > 1:
         raise ValueError(
-            "Fund comparison requires like-for-like scheme options. "
-            "Growth and IDCW options cannot be compared using NAV-only returns."
-        )
-    if known_options and unclassified_codes:
-        raise ValueError(
-            "Cannot confirm comparable scheme options because one or more selected schemes "
-            "have unclassified plan/option metadata."
-        )
-    comparability_warnings = []
-    if not known_options:
-        comparability_warnings.append(
-            "Scheme options are unclassified. Results are NAV-only and IDCW distributions "
-            "are excluded; this is not a verified total-return comparison."
-        )
-    elif next(iter(known_options)) != "growth":
-        comparability_warnings.append(
-            "Selected schemes share an IDCW option classification, but these comparison "
-            "metrics are still NAV-only and exclude IDCW distributions. Use verified "
-            "IDCW total-return series for distribution-aware comparison."
+            "Mixed Growth and IDCW options are not ranked together. Select schemes with the same option type."
         )
 
-    loaded: dict[int, tuple[list[PricePoint], tuple[date, ...]]] = {
-        code: load_fund_prices(session, code, start_date, end_date, allow_nav_conflicts)
+    loaded = {
+        code: load_fund_return_prices(
+            session, code, start_date, end_date, allow_nav_conflicts
+        )
         for code in codes
     }
+    bases = {item[2] for item in loaded.values()}
+    coverage_states = {item[3] for item in loaded.values()}
+    warnings = []
+    effective_benchmark = benchmark_code
+    if "nav_only_excludes_idcw" in bases and benchmark_code is not None:
+        effective_benchmark = None
+        warnings.append(
+            "Benchmark-relative metrics (including alpha, beta, tracking error and information ratio) "
+            "are unavailable because verified complete IDCW distribution coverage is missing."
+        )
+    if any(option in {None, "unknown"} for option in options):
+        effective_benchmark = None
+        warnings.append("Scheme option metadata is unclassified; benchmark-relative comparison is suppressed.")
+    if "nav_only_excludes_idcw" in bases:
+        warnings.append("Fund returns are NAV-only and exclude IDCW distributions; do not interpret them as total returns.")
+
     common_dates = set(point.date for point in loaded[codes[0]][0])
     for code in codes[1:]:
         common_dates.intersection_update(point.date for point in loaded[code][0])
 
-    benchmark_prices: list[PricePoint] | None = None
-    if benchmark_code is not None:
-        earliest = max(points[0].date for points, _ in loaded.values())
-        latest = min(points[-1].date for points, _ in loaded.values())
+    benchmark_prices = None
+    if effective_benchmark is not None:
+        earliest = max(item[0][0].date for item in loaded.values())
+        latest = min(item[0][-1].date for item in loaded.values())
         if earliest > latest:
             raise ValueError("Selected funds have no overlapping date range.")
         benchmark_prices = load_benchmark_prices(
-            session, benchmark_code, earliest, latest, benchmark_source
+            session, effective_benchmark, earliest, latest, benchmark_source
         )
         common_dates.intersection_update(point.date for point in benchmark_prices)
 
@@ -438,28 +431,19 @@ def compare_funds(
     date_set = set(ordered_dates)
     aligned_benchmark = (
         [point for point in benchmark_prices if point.date in date_set]
-        if benchmark_prices is not None
-        else None
+        if benchmark_prices is not None else None
     )
     reports = []
     for code in codes:
-        source_prices, conflicts = loaded[code]
+        source_prices, conflicts, basis, coverage_status, coverage_reason = loaded[code]
         aligned_prices = [point for point in source_prices if point.date in date_set]
         aligned_conflicts = tuple(day for day in conflicts if day in date_set)
-        reports.append(
-            _build_report(
-                code,
-                aligned_prices,
-                aligned_conflicts,
-                benchmark_code,
-                benchmark_source,
-                aligned_benchmark,
-                annual_risk_free_rate,
-                periods_per_year,
-                calendar_year_as_of_date,
-                frequency,
-            )
-        )
+        reports.append(_build_report(
+            code, aligned_prices, aligned_conflicts, effective_benchmark,
+            benchmark_source, aligned_benchmark, annual_risk_free_rate,
+            periods_per_year, calendar_year_as_of_date, frequency,
+            basis, coverage_status, coverage_reason,
+        ))
 
     return FundComparisonReport(
         scheme_codes=codes,
@@ -467,7 +451,7 @@ def compare_funds(
         start_date=reports[0].start_date,
         end_date=reports[0].end_date,
         funds=tuple(reports),
-        benchmark_code=benchmark_code,
+        benchmark_code=effective_benchmark,
         frequency=frequency,
-        comparability_warnings=tuple(comparability_warnings),
+        comparability_warnings=tuple(warnings),
     )
