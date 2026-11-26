@@ -49,7 +49,7 @@ class DistributionSession:
         if model is MutualFundScheme:
             return self.scheme
         if model is DataSource:
-            return SimpleNamespace(enabled=True, is_official=True)
+            return SimpleNamespace(enabled=True, is_official=True, source_type="official")
         return None
 
     def scalars(self, statement):
