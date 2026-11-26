@@ -96,13 +96,41 @@ export default function App() {
   async function run(fn) { setBusy(true); setError(""); setData(null); try { setData(await fn()); } catch (e) { setError(e.message); } finally { setBusy(false); } }
   function json(method, body) { return { method, body: JSON.stringify(body) }; }
   const runFunds = () => run(() => request(query.trim() ? `/schemes?q=${encodeURIComponent(query.trim())}&limit=30` : "/schemes?limit=30"));
-  const runFundAnalysis = (code) => { setCodes(String(code)); run(() => request(`/schemes/${code}/analytics?benchmark_code=${encodeURIComponent(benchmark)}&start_date=${dateFrom}&end_date=${dateTo}&frequency=${analysisFrequency}`)); };
-  const runCompare = () => run(() => request("/schemes/compare", json("POST", { scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo, frequency: analysisFrequency })));
+  const runFundAnalysis = (code) => {
+    setCodes(String(code));
+    return run(async () => {
+      const selection = await resolveBenchmarkForCodes([code], dateTo, benchmark);
+      const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo, frequency: analysisFrequency });
+      if (selection.benchmark) {
+        params.set("benchmark_code", selection.benchmark.code);
+        params.set("benchmark_source", selection.benchmark.source);
+      }
+      const report = await request("/schemes/" + code + "/analytics?" + params.toString());
+      return { ...report, benchmark_selection: selection };
+    });
+  };
+  const runCompare = () => run(async () => {
+    const selection = await resolveBenchmarkForCodes(schemeCodes, dateTo, benchmark);
+    const result = await request("/schemes/compare", json("POST", {
+      scheme_codes: schemeCodes,
+      benchmark_code: selection.benchmark?.code || null,
+      benchmark_source: selection.benchmark?.source || "niftyindices",
+      start_date: dateFrom, end_date: dateTo, frequency: analysisFrequency,
+    }));
+    return { ...result, benchmark_selection: selection };
+  });
   const runCategoryAnalysis = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
-    const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo });
-    if (categoryBenchmark.trim()) params.set("benchmark_code", categoryBenchmark.trim());
-    return run(() => request(`/fund-intelligence/schemes/${schemeCodes[0]}/category?${params.toString()}`));
+    return run(async () => {
+      const selection = await resolveBenchmarkForCodes([schemeCodes[0]], dateTo, categoryBenchmark);
+      const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo });
+      if (selection.benchmark) {
+        params.set("benchmark_code", selection.benchmark.code);
+        params.set("benchmark_source", selection.benchmark.source);
+      }
+      const result = await request("/fund-intelligence/schemes/" + schemeCodes[0] + "/category?" + params.toString());
+      return { ...result, benchmark_selection: selection };
+    });
   };
   const runEquityStatus = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
