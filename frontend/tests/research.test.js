@@ -67,10 +67,19 @@ test("workspace does not assume NIFTY 50 and resolves effective benchmark mappin
 });
 
 
-test("historical security requests preserve the selected end date as as_of", async () => {
+test("historical equity status passes the selected end date as as_of", async () => {
   const { readFile } = await import("node:fs/promises");
-  const component = await readFile(new URL("../src/AdvancedIntelligence.jsx", import.meta.url), "utf8");
-  assert.ok(component.includes('params.set(tab === "Fund Profile" ? "end_date" : "as_of", dateTo)'));
-  assert.ok(component.includes('/market-data/securities/'));
-  assert.ok(component.includes('params.set("as_of", dateTo)') === false);
+  const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const component = await readFile(
+    new URL("../src/AdvancedIntelligence.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.ok(
+    app.includes(
+      '`/fund-intelligence/schemes/${schemeCodes[0]}/equity-status?as_of=${encodeURIComponent(dateTo)}`',
+    ),
+  );
+  assert.ok(
+    component.includes('params.set(tab === "Fund Profile" ? "end_date" : "as_of", dateTo)'),
+  );
 });
