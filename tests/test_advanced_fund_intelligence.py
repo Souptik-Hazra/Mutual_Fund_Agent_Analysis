@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -203,3 +204,66 @@ def test_security_history_rejects_unbounded_or_unknown_filters():
         security_profile(None, "EX", history_limit=501)
     with pytest.raises(ValueError, match="history_type"):
         security_profile(None, "EX", history_type="everything")
+
+
+def test_indian_as_of_day_includes_late_evening_exchange_observation(monkeypatch):
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
+    from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
+
+    india_late = datetime(2026, 11, 25, 23, 45, tzinfo=ZoneInfo("Asia/Kolkata"))
+    expected_cutoff = datetime(2026, 11, 25, 23, 59, 59, 999999, tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(timezone.utc)
+    observed = SimpleNamespace(
+        observed_at=india_late,
+        observation_id=1,
+        last_price=10,
+        change_pct=0,
+        source_key="provider",
+        source_url=None,
+        retrieved_at=india_late,
+        content_hash="late-india-observation",
+        fundamentals_json={},
+        fundamentals_as_of=None,
+        corporate_events_json=[],
+        security_name="Example Co",
+        isin=None,
+        symbol="EX",
+        exchange="NSE",
+        day_high=10,
+        day_low=10,
+        volume=1,
+        market_status="closed",
+    )
+
+    class ScalarRows:
+        def first(self):
+            return observed
+
+        def all(self):
+            return [observed]
+
+    class Session:
+        def scalars(self, query):
+            rendered = str(query)
+            if "security_market_observations" in rendered:
+                # SQL bind parameters carry the date cutoff for all quote/history selectors.
+                params = query.compile().params
+                cutoff_values = [
+                    value for value in params.values()
+                    if isinstance(value, datetime)
+                ]
+                assert expected_cutoff in cutoff_values
+                return ScalarRows()
+            return ScalarRowsEmpty()
+
+    class ScalarRowsEmpty:
+        def first(self):
+            return None
+
+        def all(self):
+            return []
+
+    payload = security_profile(Session(), "EX", as_of=date(2026, 11, 25))
+    assert payload["availability"] == "available"
+    assert payload["observation_history"][0]["content_hash"] == "late-india-observation"
