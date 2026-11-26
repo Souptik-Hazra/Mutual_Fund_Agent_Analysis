@@ -39,10 +39,14 @@ def analyze_category_peers(
         MutualFundScheme.option_type == selected.option_type,
     ]
     peer_rows = session.scalars(
-        select(MutualFundScheme).where(*filters).order_by(
+        select(MutualFundScheme)
+        .where(*filters)
+        .order_by(
             case((MutualFundScheme.scheme_code == scheme_code, 0), else_=1),
-            MutualFundScheme.scheme_name, MutualFundScheme.scheme_code,
-        ).limit(max_peers + 1)
+            MutualFundScheme.scheme_name,
+            MutualFundScheme.scheme_code,
+        )
+        .limit(max_peers + 1)
     ).all()
     cohort_truncated = len(peer_rows) > max_peers
     peers = peer_rows[:max_peers]
@@ -51,8 +55,12 @@ def analyze_category_peers(
     for peer in peers:
         try:
             initial_reports[peer.scheme_code] = analyze_fund(
-                session, peer.scheme_code, benchmark_code=benchmark_code,
-                start_date=start_date, end_date=end_date, benchmark_source=benchmark_source,
+                session,
+                peer.scheme_code,
+                benchmark_code=benchmark_code,
+                start_date=start_date,
+                end_date=end_date,
+                benchmark_source=benchmark_source,
             )
         except ValueError as exc:
             excluded.append({"scheme_code": peer.scheme_code, "reason": str(exc)})
@@ -68,21 +76,26 @@ def analyze_category_peers(
     for code in initial_reports:
         try:
             report = analyze_fund(
-                session, code, benchmark_code=benchmark_code,
-                start_date=common_start, end_date=common_end,
+                session,
+                code,
+                benchmark_code=benchmark_code,
+                start_date=common_start,
+                end_date=common_end,
                 benchmark_source=benchmark_source,
             )
         except ValueError as exc:
             excluded.append({"scheme_code": code, "reason": str(exc)})
             continue
         if report.start_date != common_start or report.end_date != common_end:
-            excluded.append({
-                "scheme_code": code,
-                "reason": (
-                    f"Actual observations {report.start_date} to {report.end_date} do not "
-                    f"cover the common window {common_start} to {common_end}."
-                ),
-            })
+            excluded.append(
+                {
+                    "scheme_code": code,
+                    "reason": (
+                        f"Actual observations {report.start_date} to {report.end_date} do not "
+                        f"cover the common window {common_start} to {common_end}."
+                    ),
+                }
+            )
             continue
         aligned_reports[code] = report
 
@@ -91,13 +104,15 @@ def analyze_category_peers(
     selected_basis = aligned_reports[scheme_code].return_basis
     for code, report in list(aligned_reports.items()):
         if report.return_basis != selected_basis:
-            excluded.append({
-                "scheme_code": code,
-                "reason": (
-                    f"Return basis {report.return_basis} differs from selected scheme basis "
-                    f"{selected_basis}; category rankings require one common basis."
-                ),
-            })
+            excluded.append(
+                {
+                    "scheme_code": code,
+                    "reason": (
+                        f"Return basis {report.return_basis} differs from selected scheme basis "
+                        f"{selected_basis}; category rankings require one common basis."
+                    ),
+                }
+            )
             del aligned_reports[code]
     if scheme_code not in aligned_reports:
         raise ValueError("Selected scheme has no eligible peer with the same return basis.")
@@ -106,42 +121,49 @@ def analyze_category_peers(
     for code, report in aligned_reports.items():
         dates = tuple(day for day, _ in report.base100_series)
         if dates != reference_dates:
-            excluded.append({
-                "scheme_code": code,
-                "reason": (
-                    "Observation dates differ from the selected fund; exact-date category "
-                    "ranking requires identical observations."
-                ),
-            })
+            excluded.append(
+                {
+                    "scheme_code": code,
+                    "reason": (
+                        "Observation dates differ from the selected fund; exact-date category "
+                        "ranking requires identical observations."
+                    ),
+                }
+            )
             continue
         peer = next(item for item in peers if item.scheme_code == code)
-        ranked.append({
-            "scheme_code": code,
-            "scheme_name": peer.scheme_name,
-            "fund_house": peer.fund_house,
-            "category": peer.scheme_category,
-            "cagr": report.cagr,
-            "absolute_return": report.absolute_return,
-            "annualized_volatility": report.risk.annualized_volatility,
-            "sharpe_ratio": report.risk.sharpe_ratio,
-            "maximum_drawdown": report.drawdown.maximum_drawdown,
-            "benchmark": asdict(report.benchmark) if report.benchmark else None,
-            "benchmark_unavailable_reason": getattr(report, "benchmark_unavailable_reason", None),
-            "return_basis": getattr(report, "return_basis", "unknown"),
-            "distribution_coverage_status": getattr(
-                report, "distribution_coverage_status", "unknown"
-            ),
-            "observation_count": report.observation_count,
-            "start_date": report.start_date,
-            "end_date": report.end_date,
-        })
+        ranked.append(
+            {
+                "scheme_code": code,
+                "scheme_name": peer.scheme_name,
+                "fund_house": peer.fund_house,
+                "category": peer.scheme_category,
+                "cagr": report.cagr,
+                "absolute_return": report.absolute_return,
+                "annualized_volatility": report.risk.annualized_volatility,
+                "sharpe_ratio": report.risk.sharpe_ratio,
+                "maximum_drawdown": report.drawdown.maximum_drawdown,
+                "benchmark": asdict(report.benchmark) if report.benchmark else None,
+                "benchmark_unavailable_reason": getattr(
+                    report, "benchmark_unavailable_reason", None
+                ),
+                "return_basis": getattr(report, "return_basis", "unknown"),
+                "distribution_coverage_status": getattr(
+                    report, "distribution_coverage_status", "unknown"
+                ),
+                "observation_count": report.observation_count,
+                "start_date": report.start_date,
+                "end_date": report.end_date,
+            }
+        )
     if not any(row["scheme_code"] == scheme_code for row in ranked):
         raise ValueError("Selected scheme has no eligible peers with identical observation dates.")
 
     for metric in ("cagr", "sharpe_ratio"):
         valid = sorted(
             (row for row in ranked if row[metric] is not None),
-            key=lambda row: row[metric], reverse=True,
+            key=lambda row: row[metric],
+            reverse=True,
         )
         for rank, row in enumerate(valid, start=1):
             row[f"{metric}_rank"] = rank
