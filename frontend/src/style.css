@@ -26,3 +26,22 @@
 .stat-card small{line-height:1.5;overflow-wrap:anywhere}
 .table-wrap{max-width:100%;overscroll-behavior-x:contain}
 @media(max-width:900px){.sidebar{padding:20px 14px}.brand{padding-bottom:22px}.nav-item{padding:10px 11px}}
+
+/* Responsive interactive performance chart */
+.performance-chart{width:100%;margin:22px 0 4px;min-width:0}
+.performance-svg{display:block;width:100%;height:auto;min-height:180px;max-height:340px;overflow:visible;touch-action:pan-y;cursor:crosshair}
+.chart-gridline{stroke:#344650;stroke-width:1;stroke-dasharray:4 7;opacity:.72}
+.chart-segment{stroke-width:3.2;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.chart-segment.gain{stroke:#39c982}
+.chart-segment.loss{stroke:#f06470}
+.chart-crosshair{stroke:#9aaab2;stroke-width:1.2;stroke-dasharray:5 5;opacity:.8;vector-effect:non-scaling-stroke}
+.chart-active-point{fill:#eaf2f4;stroke:#101b23;stroke-width:3;vector-effect:non-scaling-stroke}
+.chart-legend{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 10px;font-size:10px;color:#9aabb3}
+.chart-legend span{display:flex;align-items:center;gap:6px}
+.chart-legend i{display:inline-block;width:17px;height:3px;border-radius:5px}
+.legend-up{background:#39c982}.legend-down{background:#f06470}
+.chart-readout{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-height:35px;margin:4px 0 8px;color:#aebdc4;font-size:11px}
+.chart-readout strong{font:700 17px Manrope;color:#e8f1f3;font-variant-numeric:tabular-nums}
+.chart-readout small{color:#8fa1aa}
+.chart-axis{display:flex;justify-content:space-between;margin:0 0 10px;color:#81939c;font-size:10px}
+@media(max-width:650px){.performance-svg{min-height:150px}.chart-legend{gap:10px}.chart-readout{gap:8px}}
