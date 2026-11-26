@@ -1,8 +1,11 @@
 """Regression tests for advanced fund intelligence foundations."""
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
+
+import pytest
 
 import mutual_fund_agent_analysis.analytics.portfolio_intelligence as portfolio_module
 from mutual_fund_agent_analysis.analytics.category_benchmarks import resolve_category_benchmark
@@ -10,7 +13,6 @@ from mutual_fund_agent_analysis.analytics.portfolio_intelligence import actual_p
 from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
-import pytest
 
 
 def test_quote_parser_requires_timestamp():
@@ -91,8 +93,6 @@ def test_benchmark_resolver_accepts_effective_mapping_with_official_registry_sou
 
 
 def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypatch):
-    from decimal import Decimal
-
     class Rows:
         def __init__(self, rows):
             self.rows = rows
@@ -140,9 +140,9 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
     class Session:
         def scalars(self, query):
             entity = query.column_descriptions[0]["entity"]
-            if entity is module.MutualFundScheme:
+            if entity is portfolio_module.MutualFundScheme:
                 return Rows([SimpleNamespace(scheme_code=102, scheme_name="Partial")])
-            if entity is module.InvestorTransaction:
+            if entity is portfolio_module.InvestorTransaction:
                 return Rows([
                     SimpleNamespace(
                         transaction_type="purchase",
@@ -163,7 +163,7 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
             assert query.column_descriptions[0]["entity"] is portfolio_module.NavReconciliation
             return SimpleNamespace(canonical_nav=Decimal("20"), nav_date=date(2026, 11, 25))
 
-    result = module.actual_portfolio_exposure(Session(), [102])
+    result = portfolio_module.actual_portfolio_exposure(Session(), [102])
     assert result["total_valued_portfolio_inr"] == Decimal("120")
     assert result["coverage"]["valued_fund_count"] == 1
     assert result["valued_funds"][0]["units"] == Decimal("6")
@@ -194,7 +194,7 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
     newer = SimpleNamespace(
         **{
             **older.__dict__,
-            "observed_at": datetime(2026, 2, 1, tzinfo=timezone.utc),
+            "observed_at": datetime(2026, 2, 1, tzinfo=UTC),
             "observation_id": 2,
             "content_hash": "b",
         }
@@ -221,7 +221,6 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
 
 
 def test_security_history_rejects_unbounded_or_unknown_filters():
-    from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
     with pytest.raises(ValueError, match="history_limit"):
         security_profile(None, "EX", history_limit=501)
     with pytest.raises(ValueError, match="history_type"):
