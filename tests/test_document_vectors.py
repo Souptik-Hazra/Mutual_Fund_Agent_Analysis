@@ -93,14 +93,37 @@ def test_indexing_replaces_previous_chunks_and_removes_stale_trailing_chunks(mon
     fake_qdrant_module = ModuleType("langchain_qdrant")
     fake_qdrant_module.QdrantVectorStore = FakeStore
     fake_client_module = ModuleType("qdrant_client")
+    fake_client_models = ModuleType("qdrant_client.models")
 
     class FakeQdrantClient:
         def __init__(self, **_kwargs):
             pass
 
+    class FakeFilter:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeCondition:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeMatchValue:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeFilterSelector:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
     fake_client_module.QdrantClient = FakeQdrantClient
+    fake_client_models.FieldCondition = FakeCondition
+    fake_client_models.Filter = FakeFilter
+    fake_client_models.FilterSelector = FakeFilterSelector
+    fake_client_models.MatchValue = FakeMatchValue
+    fake_client_module.models = fake_client_models
     monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
     monkeypatch.setitem(sys.modules, "qdrant_client", fake_client_module)
+    monkeypatch.setitem(sys.modules, "qdrant_client.models", fake_client_models)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
 
     original = [
@@ -166,14 +189,37 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
     fake_qdrant_module = ModuleType("langchain_qdrant")
     fake_qdrant_module.QdrantVectorStore = FailingStore
     fake_client_module = ModuleType("qdrant_client")
+    fake_client_models = ModuleType("qdrant_client.models")
 
     class FakeQdrantClient:
         def __init__(self, **_kwargs):
             pass
 
+    class FakeFilter:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeCondition:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeMatchValue:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeFilterSelector:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
     fake_client_module.QdrantClient = FakeQdrantClient
+    fake_client_models.FieldCondition = FakeCondition
+    fake_client_models.Filter = FakeFilter
+    fake_client_models.FilterSelector = FakeFilterSelector
+    fake_client_models.MatchValue = FakeMatchValue
+    fake_client_module.models = fake_client_models
     monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
     monkeypatch.setitem(sys.modules, "qdrant_client", fake_client_module)
+    monkeypatch.setitem(sys.modules, "qdrant_client.models", fake_client_models)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
 
     assert (
