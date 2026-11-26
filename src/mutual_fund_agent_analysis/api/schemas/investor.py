@@ -150,3 +150,5 @@ class ActiveRiskResponse(BaseModel):
     information_ratio: Decimal | None
     mean_active_return: Decimal | None
     coverage_ratio: Decimal
+    fund_return_basis: str = "growth_nav_total_return"
+    benchmark_return_basis: str = "tri"

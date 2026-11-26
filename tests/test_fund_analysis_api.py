@@ -120,38 +120,38 @@ def test_comparison_request_rejects_reversed_date_range() -> None:
     assert response.status_code == 422
 
 
-def test_comparison_uses_exact_shared_dates() -> None:
+def test_comparison_uses_exact_shared_dates(monkeypatch) -> None:
+    from mutual_fund_agent_analysis.analytics import service as analytics_service
     from mutual_fund_agent_analysis.analytics.service import compare_funds
 
     session = Mock()
-    session.scalars.return_value.all.side_effect = [
-        [
-            SimpleNamespace(scheme_code=100, option_type="growth"),
-            SimpleNamespace(scheme_code=200, option_type="growth"),
-        ],
-        [
-            SimpleNamespace(
-                nav_date=date(2024, 1, 1), canonical_nav=Decimal("100"), status="matched"
-            ),
-            SimpleNamespace(
-                nav_date=date(2024, 1, 2), canonical_nav=Decimal("110"), status="matched"
-            ),
-            SimpleNamespace(
-                nav_date=date(2024, 1, 3), canonical_nav=Decimal("121"), status="matched"
-            ),
-        ],
-        [
-            SimpleNamespace(
-                nav_date=date(2024, 1, 1), canonical_nav=Decimal("50"), status="matched"
-            ),
-            SimpleNamespace(
-                nav_date=date(2024, 1, 3), canonical_nav=Decimal("55"), status="matched"
-            ),
-            SimpleNamespace(
-                nav_date=date(2024, 1, 4), canonical_nav=Decimal("60"), status="matched"
-            ),
-        ],
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(scheme_code=100, option_type="growth"),
+        SimpleNamespace(scheme_code=200, option_type="growth"),
     ]
+    points = {
+        100: [
+            analytics_service.PricePoint(date(2024, 1, 1), Decimal("100")),
+            analytics_service.PricePoint(date(2024, 1, 2), Decimal("110")),
+            analytics_service.PricePoint(date(2024, 1, 3), Decimal("121")),
+        ],
+        200: [
+            analytics_service.PricePoint(date(2024, 1, 1), Decimal("50")),
+            analytics_service.PricePoint(date(2024, 1, 3), Decimal("55")),
+            analytics_service.PricePoint(date(2024, 1, 4), Decimal("60")),
+        ],
+    }
+    monkeypatch.setattr(
+        analytics_service,
+        "load_fund_return_prices",
+        lambda _session, code, *_args, **_kwargs: (
+            points[code],
+            (),
+            "growth_nav_total_return",
+            "not_required",
+            None,
+        ),
+    )
     result = compare_funds(session, [100, 200])
     assert result.observation_count == 2
     assert result.start_date == date(2024, 1, 1)
@@ -233,13 +233,9 @@ def test_idcw_same_option_comparison_warns_nav_only_distributions_excluded(monke
     from mutual_fund_agent_analysis.analytics import service as analytics_service
 
     session = Mock()
-    session.scalars.return_value.all.side_effect = [
-        [
-            SimpleNamespace(scheme_code=100, option_type="idcw_reinvestment"),
-            SimpleNamespace(scheme_code=200, option_type="idcw_reinvestment"),
-        ],
-        [],
-        [],
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(scheme_code=100, option_type="idcw_reinvestment"),
+        SimpleNamespace(scheme_code=200, option_type="idcw_reinvestment"),
     ]
     points = [
         analytics_service.PricePoint(date(2024, 1, 1), Decimal("100")),
@@ -247,8 +243,14 @@ def test_idcw_same_option_comparison_warns_nav_only_distributions_excluded(monke
     ]
     monkeypatch.setattr(
         analytics_service,
-        "load_fund_prices",
-        lambda *_args, **_kwargs: (points, ()),
+        "load_fund_return_prices",
+        lambda _session, _code, *_args, **_kwargs: (
+            points,
+            (),
+            "nav_only_excludes_idcw",
+            "incomplete",
+            "No official coverage.",
+        ),
     )
     result = analytics_service.compare_funds(session, [100, 200])
     assert result.comparability_warnings

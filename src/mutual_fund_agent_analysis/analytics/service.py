@@ -11,6 +11,10 @@ from mutual_fund_agent_analysis.analytics.benchmark import (
     BenchmarkMetrics,
     calculate_benchmark_metrics,
 )
+from mutual_fund_agent_analysis.analytics.distributions import (
+    payout_distribution_index,
+    reinvested_distribution_index,
+)
 from mutual_fund_agent_analysis.analytics.drawdown import DrawdownMetrics, calculate_drawdown
 from mutual_fund_agent_analysis.analytics.returns import (
     RollingReturn,
@@ -31,6 +35,11 @@ from mutual_fund_agent_analysis.analytics.series import (
     resample_prices,
 )
 from mutual_fund_agent_analysis.models.benchmark import BenchmarkObservation
+from mutual_fund_agent_analysis.models.financial import (
+    DistributionCoverageAttestation,
+    DistributionObservation,
+)
+from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
@@ -61,6 +70,8 @@ class FundAnalyticsReport:
     benchmark_return_basis: str | None = None
     base100_series: tuple[tuple[date, Decimal], ...] = ()
     methodology: dict[str, str] = field(default_factory=dict)
+    distribution_coverage_status: str = "not_required"
+    benchmark_unavailable_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +117,130 @@ def load_fund_prices(
     return prices, conflicts
 
 
+def load_fund_return_prices(
+    session: Session,
+    scheme_code: int,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    allow_nav_conflicts: bool = False,
+) -> tuple[list[PricePoint], tuple[date, ...], str, str, str | None]:
+    """Use IDCW total returns only when an official verified attestation covers the window."""
+    prices, conflicts = load_fund_prices(
+        session, scheme_code, start_date, end_date, allow_nav_conflicts
+    )
+    scheme = session.get(MutualFundScheme, scheme_code)
+    if scheme is None:
+        raise ValueError(f"Scheme {scheme_code} is not present in the local scheme catalogue.")
+    if scheme.option_type == "growth":
+        return prices, conflicts, "growth_nav_total_return", "not_required", None
+    if scheme.option_type not in {"idcw_payout", "idcw_reinvestment"}:
+        return (
+            prices,
+            conflicts,
+            "nav_only_excludes_idcw",
+            "unavailable",
+            (
+                "Scheme option is not explicitly classified as Growth, IDCW payout "
+                "or IDCW reinvestment."
+            ),
+        )
+
+    attestations = session.scalars(
+        select(DistributionCoverageAttestation)
+        .where(
+            DistributionCoverageAttestation.scheme_code == scheme_code,
+            DistributionCoverageAttestation.coverage_complete.is_(True),
+            DistributionCoverageAttestation.verification_status == "verified",
+            DistributionCoverageAttestation.start_date <= prices[0].date,
+            DistributionCoverageAttestation.end_date >= prices[-1].date,
+        )
+        .order_by(DistributionCoverageAttestation.attested_at.desc())
+    ).all()
+    attestation = None
+    for item in attestations:
+        source = session.get(DataSource, item.source_key)
+        if (
+            source is not None
+            and source.enabled
+            and source.is_official
+            and source.source_type == "official"
+        ):
+            attestation = item
+            break
+    if attestation is None:
+        return (
+            prices,
+            conflicts,
+            "nav_only_excludes_idcw",
+            "incomplete",
+            (
+                "No verified, complete, enabled official-source attestation covers "
+                "the full observed NAV window."
+            ),
+        )
+
+    rows = session.scalars(
+        select(DistributionObservation)
+        .where(
+            DistributionObservation.scheme_code == scheme_code,
+            DistributionObservation.source_key == attestation.source_key,
+            DistributionObservation.option_type == scheme.option_type,
+            DistributionObservation.status == "active",
+            DistributionObservation.ex_date > prices[0].date,
+            DistributionObservation.ex_date <= prices[-1].date,
+        )
+        .order_by(DistributionObservation.ex_date, DistributionObservation.revision)
+    ).all()
+    distributions: dict[date, Decimal] = {}
+    for item in rows:
+        source = session.get(DataSource, item.source_key)
+        if (
+            item.verification_status != "verified"
+            or source is None
+            or not source.enabled
+            or not source.is_official
+            or source.source_type != "official"
+        ):
+            return (
+                prices,
+                conflicts,
+                "nav_only_excludes_idcw",
+                "incomplete",
+                "An in-range distribution is not verified against an enabled official source.",
+            )
+        distributions[item.ex_date] = distributions.get(item.ex_date, Decimal("0")) + Decimal(
+            item.amount_per_unit
+        )
+
+    builder = (
+        payout_distribution_index
+        if scheme.option_type == "idcw_payout"
+        else reinvested_distribution_index
+    )
+    try:
+        index = builder([(point.date, point.value) for point in prices], distributions)
+    except ValueError as exc:
+        return (
+            prices,
+            conflicts,
+            "nav_only_excludes_idcw",
+            "incomplete",
+            f"IDCW total-return series could not be constructed: {exc}",
+        )
+    basis = (
+        "idcw_payout_total_return"
+        if scheme.option_type == "idcw_payout"
+        else "idcw_reinvested_total_return"
+    )
+    return (
+        [PricePoint(point.date, point.total_return_index) for point in index],
+        conflicts,
+        basis,
+        "verified_complete",
+        None,
+    )
+
+
 def load_benchmark_prices(
     session: Session,
     benchmark_code: str,
@@ -141,7 +276,18 @@ def _build_report(
     periods_per_year: int,
     calendar_year_as_of_date: date | None,
     frequency: str,
+    return_basis: str = "growth_nav_total_return",
+    distribution_coverage_status: str = "not_required",
+    distribution_unavailable_reason: str | None = None,
 ) -> FundAnalyticsReport:
+    benchmark_unavailable_reason = None
+    if return_basis == "nav_only_excludes_idcw" and benchmark_code is not None:
+        benchmark_unavailable_reason = distribution_unavailable_reason or (
+            "Benchmark-relative metrics are suppressed because verified IDCW "
+            "total-return coverage is unavailable."
+        )
+        benchmark_code = None
+        benchmark_prices = None
     if frequency not in FREQUENCY_PERIODS_PER_YEAR:
         raise ValueError("Unsupported analysis frequency.")
     if frequency != "daily":
@@ -197,17 +343,23 @@ def _build_report(
         nav_conflict_dates=conflicts,
         calendar_year_as_of_date=calendar_year_as_of_date,
         frequency=frequency,
-        return_basis="nav_only_excludes_idcw",
+        return_basis=return_basis,
         benchmark_return_basis="tri" if benchmark_code is not None else None,
+        distribution_coverage_status=distribution_coverage_status,
+        benchmark_unavailable_reason=benchmark_unavailable_reason,
         base100_series=tuple(
             (point.date, Decimal("100") * point.value / prices[0].value) for point in prices
         ),
         methodology={
-            "nav_return_basis": "NAV-only price return; IDCW distributions are excluded.",
-            "absolute_return": "(ending NAV / starting NAV) - 1.",
+            "fund_return_basis": return_basis,
+            "distribution_coverage_status": distribution_coverage_status,
+            "distribution_coverage_limitation": (
+                distribution_unavailable_reason or "Not applicable."
+            ),
+            "absolute_return": "(ending fund return index / starting fund return index) - 1.",
             "cagr": "Geometric annualization using 365.25 calendar days.",
             "annualized_volatility": (
-                "Sample standard deviation of periodic simple NAV returns multiplied by "
+                "Sample standard deviation of periodic simple fund returns multiplied by "
                 "sqrt(periods_per_year)."
             ),
             "annualized_downside_deviation": (
@@ -244,7 +396,7 @@ def analyze_fund(
     frequency: str = "daily",
 ) -> FundAnalyticsReport:
     """Run deterministic analytics and retain explicit calendar-year completion context."""
-    prices, conflicts = load_fund_prices(
+    prices, conflicts, return_basis, coverage_status, coverage_reason = load_fund_return_prices(
         session, scheme_code, start_date, end_date, allow_nav_conflicts
     )
     benchmark_prices = (
@@ -252,6 +404,9 @@ def analyze_fund(
             session, benchmark_code, prices[0].date, prices[-1].date, benchmark_source
         )
         if benchmark_code is not None
+        and not (
+            return_basis == "nav_only_excludes_idcw" and coverage_status != "verified_complete"
+        )
         else None
     )
     return _build_report(
@@ -265,6 +420,9 @@ def analyze_fund(
         periods_per_year,
         calendar_year_as_of_date,
         frequency,
+        return_basis,
+        coverage_status,
+        coverage_reason,
     )
 
 
@@ -281,16 +439,10 @@ def compare_funds(
     calendar_year_as_of_date: date | None = None,
     frequency: str = "daily",
 ) -> FundComparisonReport:
-    """Compare 2–5 schemes using the exact intersection of their available NAV dates.
-
-    When a benchmark is selected, its available TRI dates are also intersected.
-    No price or benchmark series is forward-filled or interpolated.
-    """
+    """Compare schemes on exact common dates and compatible total-return bases."""
     codes = tuple(scheme_codes)
-    if not 2 <= len(codes) <= 5:
+    if not 2 <= len(codes) <= 5 or len(codes) != len(set(codes)):
         raise ValueError("Comparison requires between two and five distinct schemes.")
-    if len(codes) != len(set(codes)):
-        raise ValueError("Comparison scheme codes must be unique.")
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be on or before end_date.")
 
@@ -298,49 +450,57 @@ def compare_funds(
         select(MutualFundScheme).where(MutualFundScheme.scheme_code.in_(codes))
     ).all()
     option_by_code = {row.scheme_code: row.option_type for row in scheme_rows}
-    unclassified_codes = [code for code in codes if option_by_code.get(code) in {None, "unknown"}]
-    known_options = {
-        option_by_code[code] for code in codes if option_by_code.get(code) not in {None, "unknown"}
-    }
-    if len(known_options) > 1:
+    if set(option_by_code) != set(codes):
+        raise ValueError("One or more selected schemes are missing from the local catalogue.")
+    options = set(option_by_code.values())
+    if len(options) > 1:
         raise ValueError(
-            "Fund comparison requires like-for-like scheme options. "
-            "Growth and IDCW options cannot be compared using NAV-only returns."
-        )
-    if known_options and unclassified_codes:
-        raise ValueError(
-            "Cannot confirm comparable scheme options because one or more selected schemes "
-            "have unclassified plan/option metadata."
-        )
-    comparability_warnings = []
-    if not known_options:
-        comparability_warnings.append(
-            "Scheme options are unclassified. Results are NAV-only and IDCW distributions "
-            "are excluded; this is not a verified total-return comparison."
-        )
-    elif next(iter(known_options)) != "growth":
-        comparability_warnings.append(
-            "Selected schemes share an IDCW option classification, but these comparison "
-            "metrics are still NAV-only and exclude IDCW distributions. Use verified "
-            "IDCW total-return series for distribution-aware comparison."
+            "Mixed Growth and IDCW options are not ranked together; select "
+            "like-for-like scheme options with the same option type."
         )
 
-    loaded: dict[int, tuple[list[PricePoint], tuple[date, ...]]] = {
-        code: load_fund_prices(session, code, start_date, end_date, allow_nav_conflicts)
+    loaded = {
+        code: load_fund_return_prices(session, code, start_date, end_date, allow_nav_conflicts)
         for code in codes
     }
+    bases = {item[2] for item in loaded.values()}
+    if len(bases) > 1:
+        raise ValueError(
+            "Selected IDCW schemes do not share one verified return basis; "
+            "comparison is unavailable."
+        )
+    warnings = []
+    effective_benchmark = benchmark_code
+    if "nav_only_excludes_idcw" in bases and benchmark_code is not None:
+        effective_benchmark = None
+        warnings.append(
+            "Benchmark-relative metrics (including alpha, beta, tracking error "
+            "and information ratio) "
+            "are unavailable because verified complete IDCW distribution coverage is missing."
+        )
+    if any(option in {None, "unknown"} for option in options):
+        effective_benchmark = None
+        warnings.append(
+            "Scheme option metadata is unclassified; benchmark-relative comparison is suppressed."
+        )
+    if "nav_only_excludes_idcw" in bases:
+        warnings.append(
+            "Fund returns are NAV-only and exclude IDCW distributions; "
+            "do not interpret them as total returns."
+        )
+
     common_dates = set(point.date for point in loaded[codes[0]][0])
     for code in codes[1:]:
         common_dates.intersection_update(point.date for point in loaded[code][0])
 
-    benchmark_prices: list[PricePoint] | None = None
-    if benchmark_code is not None:
-        earliest = max(points[0].date for points, _ in loaded.values())
-        latest = min(points[-1].date for points, _ in loaded.values())
+    benchmark_prices = None
+    if effective_benchmark is not None:
+        earliest = max(item[0][0].date for item in loaded.values())
+        latest = min(item[0][-1].date for item in loaded.values())
         if earliest > latest:
             raise ValueError("Selected funds have no overlapping date range.")
         benchmark_prices = load_benchmark_prices(
-            session, benchmark_code, earliest, latest, benchmark_source
+            session, effective_benchmark, earliest, latest, benchmark_source
         )
         common_dates.intersection_update(point.date for point in benchmark_prices)
 
@@ -355,7 +515,7 @@ def compare_funds(
     )
     reports = []
     for code in codes:
-        source_prices, conflicts = loaded[code]
+        source_prices, conflicts, basis, coverage_status, coverage_reason = loaded[code]
         aligned_prices = [point for point in source_prices if point.date in date_set]
         aligned_conflicts = tuple(day for day in conflicts if day in date_set)
         reports.append(
@@ -363,13 +523,16 @@ def compare_funds(
                 code,
                 aligned_prices,
                 aligned_conflicts,
-                benchmark_code,
+                effective_benchmark,
                 benchmark_source,
                 aligned_benchmark,
                 annual_risk_free_rate,
                 periods_per_year,
                 calendar_year_as_of_date,
                 frequency,
+                basis,
+                coverage_status,
+                coverage_reason,
             )
         )
 
@@ -379,7 +542,7 @@ def compare_funds(
         start_date=reports[0].start_date,
         end_date=reports[0].end_date,
         funds=tuple(reports),
-        benchmark_code=benchmark_code,
+        benchmark_code=effective_benchmark,
         frequency=frequency,
-        comparability_warnings=tuple(comparability_warnings),
+        comparability_warnings=tuple(warnings),
     )
