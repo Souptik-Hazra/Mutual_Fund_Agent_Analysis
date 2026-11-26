@@ -145,3 +145,54 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav(monkeyp
     assert result["coverage"]["valued_fund_count"] == 1
     assert result["valued_funds"][0]["units"] == Decimal("6")
     assert result["valued_funds"][0]["market_value_inr"] == Decimal("120")
+
+def test_security_history_contract_is_bounded_typed_and_chronological():
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
+    from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
+
+    older = SimpleNamespace(
+        observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        observation_id=1,
+        last_price=10,
+        change_pct=1,
+        source_key="provider",
+        source_url="https://provider.example/old",
+        retrieved_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        content_hash="a",
+        fundamentals_json={"pe_ratio": 10},
+        fundamentals_as_of=date(2025, 12, 31),
+        corporate_events_json=[],
+        security_name="Example Co",
+        isin=None,
+        symbol="EX",
+        exchange="NSE",
+        day_high=11,
+        day_low=9,
+        volume=100,
+        market_status="closed",
+    )
+    newer = SimpleNamespace(**{**older.__dict__, "observed_at": datetime(2026, 2, 1, tzinfo=timezone.utc), "observation_id": 2, "content_hash": "b"})
+    class ScalarRows:
+        def __init__(self, rows): self.rows = rows
+        def first(self): return self.rows[0] if self.rows else None
+        def all(self): return self.rows
+    class Session:
+        def scalars(self, query):
+            if query.column_descriptions[0]["entity"] is SecurityMarketObservation:
+                return ScalarRows([newer, older])
+            return ScalarRows([])
+    payload = security_profile(Session(), "EX", history_limit=2, history_type="all")
+    assert [item["content_hash"] for item in payload["observation_history"]] == ["a", "b"]
+    assert payload["observation_history_order"] == "ascending"
+    assert payload["observation_history_type"] == "all"
+    assert payload["observation_history"][0]["fundamentals"]["pe_ratio"] == 10
+
+
+def test_security_history_rejects_unbounded_or_unknown_filters():
+    from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
+    with pytest.raises(ValueError, match="history_limit"):
+        security_profile(None, "EX", history_limit=501)
+    with pytest.raises(ValueError, match="history_type"):
+        security_profile(None, "EX", history_type="everything")
