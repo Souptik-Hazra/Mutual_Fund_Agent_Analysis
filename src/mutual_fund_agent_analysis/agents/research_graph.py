@@ -14,6 +14,8 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
+from mutual_fund_agent_analysis.analytics.fund_intelligence import analyze_category_peers
+from mutual_fund_agent_analysis.analytics.portfolio_intelligence import actual_portfolio_exposure
 from mutual_fund_agent_analysis.analytics.security_intelligence import securities_for_funds
 from mutual_fund_agent_analysis.analytics.service import analyze_fund, compare_funds
 from mutual_fund_agent_analysis.api.schemas.assistant import ResearchAssistantRequest
@@ -31,6 +33,8 @@ from mutual_fund_agent_analysis.llm.providers import create_chat_model
 logger = logging.getLogger(__name__)
 
 KEYWORDS = {
+    "category": ("category", "peer", "peers", "ranking", "rankings", "category position"),
+    "actual_exposure": ("actual exposure", "my exposure", "my portfolio exposure", "investor exposure", "ledger exposure"),
     "fund": (
         "return",
         "returns",
@@ -122,6 +126,13 @@ def classify_intents(question: str, scheme_codes: list[int] | None = None) -> li
         for intent, words in KEYWORDS.items()
         if any(re.search(rf"\b{re.escape(word)}\b", normalized) for word in words)
     ]
+    # The word "exposure" is shared with hypothetical fund holdings analysis.
+    # Prefer the ledger specialist only when the question explicitly refers to
+    # the investor's own units, ledger or actual allocation.
+    if "actual_exposure" in selected:
+        selected = [intent for intent in selected if intent != "portfolio"]
+    if "category" in selected and "fund" not in selected:
+        selected.insert(0, "category")
     if (
         "events" in selected
         and "portfolio" in selected
@@ -215,6 +226,59 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "start_date": request.start_date,
                         "end_date": request.end_date,
                         "source": "canonical reconciled NAV and benchmark TRI tables",
+                    }
+                )
+            elif intent == "category":
+                if not codes or len(codes) != 1:
+                    raise ValueError("Category analysis requires exactly one selected scheme_code.")
+                report = analyze_category_peers(
+                    session,
+                    codes[0],
+                    request.start_date,
+                    request.end_date,
+                    max_peers=min(request.top_k * 10, 100),
+                    benchmark_code=request.benchmark_code,
+                    benchmark_source=request.benchmark_source or "niftyindices",
+                )
+                results[intent] = _jsonable(report)
+                citations.append(
+                    {
+                        "type": "category_peer_analysis",
+                        "scheme_code": codes[0],
+                        "category": report.get("category"),
+                        "start_date": report.get("start_date"),
+                        "end_date": report.get("end_date"),
+                        "observation_dates": report.get("observation_dates"),
+                        "return_basis": report.get("return_basis"),
+                        "peer_count": report.get("peer_count"),
+                        "excluded_peer_count": len(report.get("excluded_peers", [])),
+                        "source": "canonical reconciled NAV and applicable distribution methodology",
+                    }
+                )
+            elif intent == "actual_exposure":
+                if not codes:
+                    raise ValueError("Actual investor exposure requires one or more scheme_codes.")
+                exposure = actual_portfolio_exposure(session, codes)
+                results[intent] = _jsonable(exposure)
+                citations.append(
+                    {
+                        "type": "actual_investor_exposure",
+                        "scheme_codes": codes,
+                        "valuation_basis": exposure.get("valuation_basis"),
+                        "valued_fund_count": exposure.get("coverage", {}).get("valued_fund_count"),
+                        "selected_fund_count": exposure.get("coverage", {}).get("selected_fund_count"),
+                        "valuation_dates": [
+                            {"scheme_code": item.get("scheme_code"), "nav_date": item.get("nav_date")}
+                            for item in exposure.get("valued_funds", [])
+                        ],
+                        "holdings_effective_dates": sorted({
+                            item.get("holdings_as_of")
+                            for security in exposure.get("equity_exposure", [])
+                            for item in security.get("fund_exposures", [])
+                            if item.get("holdings_as_of") is not None
+                        }),
+                        "excluded_funds": exposure.get("excluded_funds", []),
+                        "limitations": exposure.get("warning"),
                     }
                 )
             elif intent == "portfolio":
