@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 import mutual_fund_agent_analysis.agents.research_graph as research_graph
