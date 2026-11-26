@@ -404,7 +404,8 @@ def analyze_fund(
         load_benchmark_prices(
             session, benchmark_code, prices[0].date, prices[-1].date, benchmark_source
         )
-        if benchmark_code is not None and not (
+        if benchmark_code is not None
+        and not (
             return_basis == "nav_only_excludes_idcw" and coverage_status != "verified_complete"
         )
         else None
