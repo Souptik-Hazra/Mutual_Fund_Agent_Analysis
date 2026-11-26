@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -106,11 +106,19 @@ class MarketObservationRequest(BaseModel):
         return value.strip().upper() or None if value is not None else None
 
 
-def _latest_market_observation(session: Session, security_key: str, isin: str | None = None):
+def _latest_market_observation(
+    session: Session,
+    security_key: str,
+    isin: str | None = None,
+    as_of: date | None = None,
+):
     query = select(SecurityMarketObservation).order_by(
         SecurityMarketObservation.observed_at.desc(),
         SecurityMarketObservation.observation_id.desc(),
     )
+    if as_of:
+        cutoff = datetime.combine(as_of, time.max, tzinfo=UTC)
+        query = query.where(SecurityMarketObservation.observed_at <= cutoff)
     if isin:
         exact_key_match = session.scalars(
             query.where(
@@ -129,18 +137,20 @@ def _latest_market_observation(session: Session, security_key: str, isin: str | 
     ).first()
 
 
-def _market_payload(row: SecurityMarketObservation | None) -> dict:
+def _market_payload(row: SecurityMarketObservation | None, *, as_of: date | None = None) -> dict:
     if row is None:
         return {
             "availability": "unavailable",
             "market_data": None,
-            "message": "No provider observation is stored for this security.",
+            "message": "No provider observation is stored for this security at the requested date.",
         }
     observed = row.observed_at
     if observed.tzinfo is None:
         observed = observed.replace(tzinfo=UTC)
-    age = datetime.now(UTC) - observed.astimezone(UTC)
-    freshness = "fresh" if age <= timedelta(hours=72) else "stale"
+    reference_time = datetime.combine(as_of, time.max, tzinfo=UTC) if as_of else datetime.now(UTC)
+    age = reference_time - observed.astimezone(UTC)
+    age_seconds = max(0.0, age.total_seconds())
+    freshness = "fresh" if age_seconds <= 72 * 3600 else "stale"
     fundamentals = row.fundamentals_json or {}
     signals = []
     for key, message in (
@@ -170,7 +180,7 @@ def _market_payload(row: SecurityMarketObservation | None) -> dict:
     return {
         "availability": "available",
         "freshness": freshness,
-        "age_hours": round(age.total_seconds() / 3600, 2),
+        "age_hours": round(age_seconds / 3600, 2),
         "market_data": {
             "security_key": row.security_key,
             "isin": row.isin,
@@ -203,8 +213,9 @@ def _market_payload(row: SecurityMarketObservation | None) -> dict:
             "corporate_events": row.corporate_events_json,
         },
         "freshness_policy": (
-            "Fresh means the observation is no more than 72 hours old; "
-            "verify exchange session and provider timestamp."
+            "Fresh means the observation is no more than 72 hours old relative to the "
+            "requested as-of date (or current UTC time for current requests); verify "
+            "exchange session and provider timestamp."
         ),
     }
 
@@ -272,7 +283,7 @@ def fund_equity_status(
     ).all()
     items = []
     for holding in holdings:
-        market = _latest_market_observation(session, holding.security_key, holding.isin)
+        market = _latest_market_observation(\n            session, holding.security_key, holding.isin, as_of=as_of\n        )
         items.append(
             {
                 "security_key": holding.security_key,
@@ -281,13 +292,13 @@ def fund_equity_status(
                 "sector": holding.sector,
                 "disclosed_weight_pct": holding.weight_pct,
                 "holding_asset_class": holding.asset_class,
-                **_market_payload(market),
+                **_market_payload(market, as_of=as_of),
             }
         )
     return {
         "scheme_code": scheme_code,
         "snapshot_id": snapshot.snapshot_id,
-        "holdings_as_of": snapshot.effective_date,
+        "holdings_as_of": snapshot.effective_date,\n        "market_data_as_of": as_of,
         "snapshot_status": snapshot.status,
         "equity_security_count": len(items),
         "market_data_available_count": sum(item["availability"] == "available" for item in items),
