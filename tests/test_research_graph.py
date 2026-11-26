@@ -401,9 +401,7 @@ def test_compiled_graph_returns_provenance_complete_fund_citation(monkeypatch):
         "analyze_fund",
         lambda *_args, **_kwargs: {"cagr": "0.125"},
     )
-    result = build_research_graph().invoke(
-        {"request": request, "session": Session()}
-    )
+    result = build_research_graph().invoke({"request": request, "session": Session()})
     citation = result["citations"][0]
     assert citation["source_key"] == "amfi"
     assert citation["canonical_url"] == "https://www.amfiindia.com"

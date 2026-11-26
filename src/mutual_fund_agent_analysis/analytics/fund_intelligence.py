@@ -86,8 +86,7 @@ def analyze_category_peers(
         + ([start_date] if start_date else [])
     )
     common_end = min(
-        [bounds[peer.scheme_code][1] for peer in eligible_peers]
-        + ([end_date] if end_date else [])
+        [bounds[peer.scheme_code][1] for peer in eligible_peers] + ([end_date] if end_date else [])
     )
     if common_start >= common_end:
         raise ValueError("Category peers do not share a common observation window.")

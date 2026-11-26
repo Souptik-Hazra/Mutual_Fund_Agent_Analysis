@@ -97,7 +97,6 @@ def _validate_source_url(
             )
 
 
-
 def _scheme_or_404(session: Session, scheme_code: int) -> MutualFundScheme:
     if scheme_code <= 0:
         raise HTTPException(status_code=422, detail="scheme_code must be a positive integer.")

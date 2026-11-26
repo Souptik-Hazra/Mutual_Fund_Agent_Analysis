@@ -318,9 +318,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     peer_definition=report.get("peer_definition"),
                     comparison_window=report.get("comparison_window"),
                     return_basis=selected_fund.get("return_basis"),
-                    distribution_coverage_status=selected_fund.get(
-                        "distribution_coverage_status"
-                    ),
+                    distribution_coverage_status=selected_fund.get("distribution_coverage_status"),
                     peer_count=report.get("peer_count"),
                     peer_limit=report.get("peer_limit"),
                     cohort_truncated=report.get("cohort_truncated"),
@@ -537,9 +535,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     (SocialPost.expires_at.is_(None) | (SocialPost.expires_at > datetime.now(UTC))),
                 )
                 if request.start_date:
-                    social_start = datetime.combine(
-                        request.start_date, datetime.min.time(), UTC
-                    )
+                    social_start = datetime.combine(request.start_date, datetime.min.time(), UTC)
                     social_statement = social_statement.where(
                         SocialPost.published_at >= social_start
                     )
@@ -647,10 +643,7 @@ def _bounded_evidence(results: dict[str, Any], max_chars: int = 18000) -> str:
 
     groups = list(results.items())
     per_group = max(64, (max_chars - 400) // max(1, len(groups)))
-    bounded = {
-        key: trim(value, per_group, key)
-        for key, value in groups
-    }
+    bounded = {key: trim(value, per_group, key) for key, value in groups}
     payload = {
         "results": bounded,
         "truncated": bool(omitted),
