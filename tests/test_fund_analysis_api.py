@@ -122,6 +122,7 @@ def test_comparison_request_rejects_reversed_date_range() -> None:
 
 def test_comparison_uses_exact_shared_dates() -> None:
     from mutual_fund_agent_analysis.analytics.service import compare_funds
+    from mutual_fund_agent_analysis.analytics import service as analytics_service
 
     session = Mock()
     session.scalars.return_value.all.return_value = [
