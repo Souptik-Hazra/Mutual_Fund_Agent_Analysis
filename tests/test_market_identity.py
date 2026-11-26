@@ -3,9 +3,9 @@
 from datetime import date
 from types import SimpleNamespace
 
-import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
+import pytest
 
 from mutual_fund_agent_analysis.api.routes.market_data import (
     QuoteSyncRequest,
