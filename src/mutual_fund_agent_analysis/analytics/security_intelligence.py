@@ -38,11 +38,17 @@ def security_profile(
     *,
     as_of: date | None = None,
     scheme_codes: list[int] | None = None,
+    history_limit: int = 100,
+    history_type: str = "quotes",
 ) -> dict[str, Any]:
     """Return independent, source-attributed quote, fundamentals and event timelines."""
     key = security_key.strip().upper()
     if len(key) < 2:
         raise ValueError("security_key must contain at least two characters.")
+    if not 1 <= history_limit <= 500:
+        raise ValueError("history_limit must be between 1 and 500.")
+    if history_type not in {"quotes", "fundamentals", "events", "all"}:
+        raise ValueError("history_type must be quotes, fundamentals, events, or all.")
 
     observation_filter = or_(
         SecurityMarketObservation.security_key == key,
@@ -58,7 +64,16 @@ def security_profile(
         SecurityMarketObservation.observation_id.desc(),
     )
     latest = session.scalars(base_statement.order_by(*ordering).limit(1)).first()
-    observations = session.scalars(base_statement.order_by(*ordering).limit(100)).all()
+    history_statement = base_statement
+    if history_type == "fundamentals":
+        history_statement = history_statement.where(SecurityMarketObservation.fundamentals_json != {})
+    elif history_type == "events":
+        history_statement = history_statement.where(SecurityMarketObservation.corporate_events_json != [])
+    elif history_type == "quotes":
+        history_statement = history_statement.where(SecurityMarketObservation.last_price.is_not(None))
+    observations = session.scalars(
+        history_statement.order_by(*ordering).limit(history_limit)
+    ).all()
 
     # Quote-only syncs are frequent. Do not let them evict the latest dated
     # fundamentals or event payload from the bounded quote-history window.
@@ -240,9 +255,12 @@ def security_profile(
                 "retrieved_at": row.retrieved_at,
                 "content_hash": row.content_hash,
             }
-            for row in observations
+            for row in reversed(observations)
         ],
-        "observation_history_limit": 100,
+        "observation_history_limit": history_limit,
+        "observation_history_type": history_type,
+        "observation_history_order": "ascending",
+
         "freshness_policy": {
             "quote_fresh_hours": 24,
             "fundamentals_fresh_days": 180,
