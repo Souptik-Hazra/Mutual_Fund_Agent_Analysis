@@ -36,12 +36,24 @@ def test_qdrant_document_filter_reindex_and_delete_lifecycle():
                 {
                     "id": point_id,
                     "vector": [0.1, 0.9],
-                    "payload": {"metadata": {"document_id": document_one, "chunk_index": 0, "scheme_code": 125497}},
+                    "payload": {
+                        "metadata": {
+                            "document_id": document_one,
+                            "chunk_index": 0,
+                            "scheme_code": 125497,
+                        }
+                    },
                 },
                 {
                     "id": other_point_id,
                     "vector": [0.9, 0.1],
-                    "payload": {"metadata": {"document_id": document_two, "chunk_index": 0, "scheme_code": 125498}},
+                    "payload": {
+                        "metadata": {
+                            "document_id": document_two,
+                            "chunk_index": 0,
+                            "scheme_code": 125498,
+                        }
+                    },
                 },
             ]
             client.put(
@@ -51,13 +63,28 @@ def test_qdrant_document_filter_reindex_and_delete_lifecycle():
             # Repeating the same point ID is an upsert, not a duplicate chunk.
             client.put(
                 f"/collections/{collection}/points?wait=true",
-                json={"points": [{"id": point_id, "vector": [0.2, 0.8], "payload": initial_points[0]["payload"]}]},
+                json={
+                    "points": [
+                        {
+                            "id": point_id,
+                            "vector": [0.2, 0.8],
+                            "payload": initial_points[0]["payload"],
+                        }
+                    ]
+                },
             ).raise_for_status()
 
             scroll = client.post(
                 f"/collections/{collection}/points/scroll",
                 json={
-                    "filter": {"must": [{"key": "metadata.scheme_code", "match": {"value": 125497}}]},
+                    "filter": {
+                        "must": [
+                            {
+                                "key": "metadata.scheme_code",
+                                "match": {"value": 125497},
+                            }
+                        ]
+                    },
                     "with_payload": True,
                     "limit": 10,
                 },
@@ -69,7 +96,16 @@ def test_qdrant_document_filter_reindex_and_delete_lifecycle():
 
             deleted = client.post(
                 f"/collections/{collection}/points/delete?wait=true",
-                json={"filter": {"must": [{"key": "metadata.document_id", "match": {"value": document_one}}]}},
+                json={
+                    "filter": {
+                        "must": [
+                            {
+                                "key": "metadata.document_id",
+                                "match": {"value": document_one},
+                            }
+                        ]
+                    }
+                },
             )
             deleted.raise_for_status()
             remaining = client.post(

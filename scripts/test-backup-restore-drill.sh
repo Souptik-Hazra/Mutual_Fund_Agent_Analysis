@@ -53,7 +53,7 @@ done
 
 printf 'Creating disposable database and vector fixtures ...\n'
 docker compose exec -T db psql -v ON_ERROR_STOP=1 -U mfa -d mutual_fund_agent \
-  -c "INSERT INTO mutual_fund_schemes (scheme_code, scheme_name) VALUES (99999999, 'Restore Drill Baseline') ON CONFLICT (scheme_code) DO UPDATE SET scheme_name = EXCLUDED.scheme_name;"
+  -c "INSERT INTO mutual_fund_schemes (scheme_code, scheme_name, source) VALUES (99999999, 'Restore Drill Baseline', 'restore_drill') ON CONFLICT (scheme_code) DO UPDATE SET scheme_name = EXCLUDED.scheme_name;"
 
 qdrant_curl -fsS -X PUT "$QDRANT_URL/collections/$QDRANT_COLLECTION" \
   -H 'Content-Type: application/json' \
