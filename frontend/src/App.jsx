@@ -76,7 +76,7 @@ export default function App() {
     }));
     const first = mappings[0]?.benchmark;
     const common = Boolean(first) && mappings.every((item) =>
-      item.availability === "mapped" && item.benchmark?.code === first.code && item.benchmark?.source === first.source
+      item.availability === "mapped" && item.benchmark?.code === first.code && item.benchmark?.source === first.source && item.benchmark?.source_key === first.source_key
     );
     const result = {
       availability: common ? "mapped" : mappings.some((item) => item.availability === "mapped") ? "not_common" : "unmapped",
@@ -87,7 +87,7 @@ export default function App() {
     return result;
   }
   const benchmarkDescription = benchmarkResolution?.benchmark
-    ? "Benchmark " + benchmarkResolution.benchmark.code + " · source " + benchmarkResolution.benchmark.source +
+    ? "Benchmark " + benchmarkResolution.benchmark.code + " · source " + (benchmarkResolution.benchmark.source_name || benchmarkResolution.benchmark.source) +
       " · effective " + (benchmarkResolution.benchmark.effective_from || "unknown") + " to " +
       (benchmarkResolution.benchmark.effective_to || "open-ended")
     : benchmarkResolution?.availability === "overridden"
@@ -109,19 +109,46 @@ export default function App() {
         params.set("benchmark_code", selection.benchmark.code);
         params.set("benchmark_source", selection.benchmark.source);
       }
-      const report = await request("/schemes/" + code + "/analytics?" + params.toString());
-      return { ...report, benchmark_selection: selection };
+      try {
+        const report = await request("/schemes/" + code + "/analytics?" + params.toString());
+        return { ...report, benchmark_selection: selection };
+      } catch (error) {
+        if (selection.availability !== "mapped") throw error;
+        params.delete("benchmark_code");
+        params.delete("benchmark_source");
+        const report = await request("/schemes/" + code + "/analytics?" + params.toString());
+        return {
+          ...report,
+          benchmark_selection: { ...selection, availability: "mapped_data_unavailable", benchmark: null },
+          benchmark_unavailable_reason: "The effective mapping exists, but its TRI observations were unavailable: " + error.message,
+        };
+      }
     });
   };
   const runCompare = () => run(async () => {
     const selection = await resolveBenchmarkForCodes(schemeCodes, dateTo, benchmark);
-    const result = await request("/schemes/compare", json("POST", {
+    const payload = {
       scheme_codes: schemeCodes,
       benchmark_code: selection.benchmark?.code || null,
       benchmark_source: selection.benchmark?.source || "niftyindices",
       start_date: dateFrom, end_date: dateTo, frequency: analysisFrequency,
-    }));
-    return { ...result, benchmark_selection: selection };
+    };
+    try {
+      const result = await request("/schemes/compare", json("POST", payload));
+      return { ...result, benchmark_selection: selection };
+    } catch (error) {
+      if (selection.availability !== "mapped") throw error;
+      payload.benchmark_code = null;
+      const result = await request("/schemes/compare", json("POST", payload));
+      return {
+        ...result,
+        benchmark_selection: { ...selection, availability: "mapped_data_unavailable", benchmark: null },
+        comparability_warnings: [
+          ...(result.comparability_warnings || []),
+          "The effective benchmark mapping exists, but TRI observations were unavailable: " + error.message,
+        ],
+      };
+    }
   });
   const runCategoryAnalysis = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
@@ -132,8 +159,20 @@ export default function App() {
         params.set("benchmark_code", selection.benchmark.code);
         params.set("benchmark_source", selection.benchmark.source);
       }
-      const result = await request("/fund-intelligence/schemes/" + schemeCodes[0] + "/category?" + params.toString());
-      return { ...result, benchmark_selection: selection };
+      try {
+        const result = await request("/fund-intelligence/schemes/" + schemeCodes[0] + "/category?" + params.toString());
+        return { ...result, benchmark_selection: selection };
+      } catch (error) {
+        if (selection.availability !== "mapped") throw error;
+        params.delete("benchmark_code");
+        params.delete("benchmark_source");
+        const result = await request("/fund-intelligence/schemes/" + schemeCodes[0] + "/category?" + params.toString());
+        return {
+          ...result,
+          benchmark_selection: { ...selection, availability: "mapped_data_unavailable", benchmark: null },
+          benchmark_unavailable_reason: "The effective mapping exists, but TRI observations were unavailable: " + error.message,
+        };
+      }
     });
   };
   const runEquityStatus = () => {
