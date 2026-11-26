@@ -181,8 +181,7 @@ def actual_portfolio_exposure(
         )
         if snapshot is None:
             reason = (
-                "No complete or partial holdings disclosure effective on or before "
-                f"{as_of_date}."
+                f"No complete or partial holdings disclosure effective on or before {as_of_date}."
             )
             warnings.append({"scheme_code": code, "reason": reason})
             data_quality_warnings.append(
