@@ -45,6 +45,11 @@ def resolve_category_benchmark(
         return None
     mapping = rows[0]
     source = session.get(DataSource, mapping.source_key) if mapping.source_key else None
-    if source is None or not source.enabled or not source.is_official or source.source_type != "official":
+    if (
+        source is None
+        or not source.enabled
+        or not source.is_official
+        or source.source_type != "official"
+    ):
         return None
     return mapping
