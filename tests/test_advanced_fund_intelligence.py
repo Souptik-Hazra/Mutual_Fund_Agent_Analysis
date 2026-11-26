@@ -169,6 +169,22 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
                 )
             raise AssertionError("Unexpected holdings query for no disclosed portfolio.")
 
+        def get(self, model, _key):
+            if model is portfolio_module.DataSource:
+                return SimpleNamespace(
+                    enabled=True,
+                    is_official=True,
+                    source_type="official",
+                    base_url="https://www.amfiindia.com",
+                )
+            if model is portfolio_module.EvidenceRecord:
+                return SimpleNamespace(
+                    verification_status="verified",
+                    canonical_url="https://www.amfiindia.com/disclosures",
+                    retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
+                )
+            return None
+
         def scalar(self, query):
             entity = query.column_descriptions[0]["entity"]
             if entity is portfolio_module.NavReconciliation:
@@ -176,6 +192,8 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
                     status="single_source",
                     canonical_nav=Decimal("20"),
                     nav_date=date(2026, 11, 25),
+                    canonical_source="amfi",
+                    evaluated_at=datetime(2026, 6, 30, tzinfo=UTC),
                 )
             assert entity is portfolio_module.PortfolioSnapshot
             return None
@@ -342,6 +360,22 @@ def test_exposure_math():
                 return Rows([holding])
             raise AssertionError(entity)
 
+        def get(self, model, _key):
+            if model is portfolio_module.DataSource:
+                return SimpleNamespace(
+                    enabled=True,
+                    is_official=True,
+                    source_type="official",
+                    base_url="https://www.amfiindia.com",
+                )
+            if model is portfolio_module.EvidenceRecord:
+                return SimpleNamespace(
+                    verification_status="verified",
+                    canonical_url="https://www.amfiindia.com/disclosures",
+                    retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
+                )
+            return None
+
         def scalar(self, query):
             entity = query.column_descriptions[0]["entity"]
             assert as_of in query.compile().params.values()
@@ -398,6 +432,8 @@ def test_actual_exposure_refuses_latest_conflicted_nav_instead_of_older_accepted
             return SimpleNamespace(
                 status="conflict",
                 nav_date=date(2026, 6, 29),
+                    canonical_source="amfi",
+                    evaluated_at=datetime(2026, 6, 30, tzinfo=UTC),
                 canonical_nav=Decimal("100"),
             )
 
@@ -435,6 +471,8 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
         status="single_source",
         canonical_nav=Decimal("10"),
         nav_date=date(2026, 6, 29),
+                    canonical_source="amfi",
+                    evaluated_at=datetime(2026, 6, 30, tzinfo=UTC),
     )
     holding = SimpleNamespace(
         isin="INE002B",
@@ -462,6 +500,22 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
             if entity is portfolio_module.PortfolioHolding:
                 return Rows([holding])
             raise AssertionError(entity)
+
+        def get(self, model, _key):
+            if model is portfolio_module.DataSource:
+                return SimpleNamespace(
+                    enabled=True,
+                    is_official=True,
+                    source_type="official",
+                    base_url="https://www.amfiindia.com",
+                )
+            if model is portfolio_module.EvidenceRecord:
+                return SimpleNamespace(
+                    verification_status="verified",
+                    canonical_url="https://www.amfiindia.com/disclosures",
+                    retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
+                )
+            return None
 
         def scalar(self, query):
             entity = query.column_descriptions[0]["entity"]
@@ -519,6 +573,22 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
                 return Rows([holding])
             raise AssertionError(entity)
 
+        def get(self, model, _key):
+            if model is portfolio_module.DataSource:
+                return SimpleNamespace(
+                    enabled=True,
+                    is_official=True,
+                    source_type="official",
+                    base_url="https://www.amfiindia.com",
+                )
+            if model is portfolio_module.EvidenceRecord:
+                return SimpleNamespace(
+                    verification_status="verified",
+                    canonical_url="https://www.amfiindia.com/disclosures",
+                    retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
+                )
+            return None
+
         def scalar(self, query):
             entity = query.column_descriptions[0]["entity"]
             if entity is portfolio_module.NavReconciliation:
@@ -526,6 +596,8 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
                     status="matched",
                     canonical_nav=Decimal("25"),
                     nav_date=date(2026, 6, 29),
+                    canonical_source="amfi",
+                    evaluated_at=datetime(2026, 6, 30, tzinfo=UTC),
                 )
             if entity is portfolio_module.PortfolioSnapshot:
                 assert as_of in query.compile().params.values()
