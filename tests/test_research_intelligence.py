@@ -778,7 +778,6 @@ def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatc
     result = routes.list_events(
         session=SessionStub(),
         as_of=as_of,
-        start_date=date(2026, 10, 29),
         limit=50,
         offset=0,
     )
