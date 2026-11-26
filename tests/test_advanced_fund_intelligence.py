@@ -173,12 +173,14 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
             if model is portfolio_module.DataSource:
                 return SimpleNamespace(
                     enabled=True,
+                    source_key="amfi_official",
                     is_official=True,
                     source_type="official",
                     base_url="https://www.amfiindia.com",
                 )
             if model is portfolio_module.EvidenceRecord:
                 return SimpleNamespace(
+                    evidence_id=1,
                     verification_status="verified",
                     canonical_url="https://www.amfiindia.com/disclosures",
                     retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
@@ -370,12 +372,14 @@ def test_exposure_math():
             if model is portfolio_module.DataSource:
                 return SimpleNamespace(
                     enabled=True,
+                    source_key="amfi_official",
                     is_official=True,
                     source_type="official",
                     base_url="https://www.amfiindia.com",
                 )
             if model is portfolio_module.EvidenceRecord:
                 return SimpleNamespace(
+                    evidence_id=1,
                     verification_status="verified",
                     canonical_url="https://www.amfiindia.com/disclosures",
                     retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
@@ -511,12 +515,14 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
             if model is portfolio_module.DataSource:
                 return SimpleNamespace(
                     enabled=True,
+                    source_key="amfi_official",
                     is_official=True,
                     source_type="official",
                     base_url="https://www.amfiindia.com",
                 )
             if model is portfolio_module.EvidenceRecord:
                 return SimpleNamespace(
+                    evidence_id=1,
                     verification_status="verified",
                     canonical_url="https://www.amfiindia.com/disclosures",
                     retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
@@ -583,12 +589,14 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
             if model is portfolio_module.DataSource:
                 return SimpleNamespace(
                     enabled=True,
+                    source_key="amfi_official",
                     is_official=True,
                     source_type="official",
                     base_url="https://www.amfiindia.com",
                 )
             if model is portfolio_module.EvidenceRecord:
                 return SimpleNamespace(
+                    evidence_id=1,
                     verification_status="verified",
                     canonical_url="https://www.amfiindia.com/disclosures",
                     retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
