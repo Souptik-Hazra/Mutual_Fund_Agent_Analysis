@@ -369,7 +369,10 @@ def _validate_registered_source_url(source: DataSource, candidate: str) -> str:
         or registered_port != supplied_port
         or not (supplied_host == registered_host or supplied_host.endswith("." + registered_host))
     ):
-        raise HTTPException(status_code=422, detail="source_url must use HTTPS on the registered data-source host.")
+        raise HTTPException(
+            status_code=422,
+            detail="source_url must use HTTPS on the registered data-source host.",
+        )
     return candidate
 
 

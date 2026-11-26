@@ -31,7 +31,12 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     social_analytics,
 )
 from mutual_fund_agent_analysis.llm.providers import create_chat_model
-from mutual_fund_agent_analysis.models import DataSource, EvidenceRecord, NavReconciliation, SocialPost
+from mutual_fund_agent_analysis.models import (
+    DataSource,
+    EvidenceRecord,
+    NavReconciliation,
+    SocialPost,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,14 +325,34 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                 results[intent] = _jsonable(exposure)
                 for item in exposure.get("valued_funds", []):
                     for source_key, url, retrieved_at, scope in (
-                        (item.get("nav_source_key"), None, item.get("nav_retrieved_at"), "nav_valuation"),
-                        (item.get("holdings_source_key"), item.get("holdings_url"), item.get("holdings_retrieved_at"), "holdings_lookthrough"),
+                        (
+                            item.get("nav_source_key"),
+                            None,
+                            item.get("nav_retrieved_at"),
+                            "nav_valuation",
+                        ),
+                        (
+                            item.get("holdings_source_key"),
+                            item.get("holdings_url"),
+                            item.get("holdings_retrieved_at"),
+                            "holdings_lookthrough",
+                        ),
                     ):
+                        verification = (
+                            item.get("holdings_verification_status", "unverified")
+                            if scope == "holdings_lookthrough"
+                            else "unverified"
+                        )
                         citation = _provenance_citation(
-                            session, source_key, url, retrieved_at,
-                            item.get("holdings_verification_status", "unverified") if scope == "holdings_lookthrough" else "unverified",
-                            type="actual_investor_exposure", data_scope=scope,
-                            scheme_code=item.get("scheme_code"), holdings_as_of=item.get("holdings_as_of"),
+                            session,
+                            source_key,
+                            url,
+                            retrieved_at,
+                            verification,
+                            type="actual_investor_exposure",
+                            data_scope=scope,
+                            scheme_code=item.get("scheme_code"),
+                            holdings_as_of=item.get("holdings_as_of"),
                         )
                         if citation:
                             citations.append(citation)
@@ -347,9 +372,19 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             "type": "portfolio_disclosure",
                             "scheme_code": code,
                             "source_key": getattr(snapshot, "source_key", None),
-                            "canonical_url": (payload.get("evidence") or {}).get("canonical_url") or (payload.get("source") or {}).get("base_url"),
-                            "retrieved_at": (payload.get("evidence") or {}).get("retrieved_at") or getattr(snapshot, "retrieved_at", None),
-                            "verification_status": (payload.get("evidence") or {}).get("verification_status", "unverified"),
+                            "canonical_url": (
+                                (payload.get("evidence") or {}).get("canonical_url")
+                                or (payload.get("source") or {}).get("base_url")
+                            ),
+                            "retrieved_at": (
+                                (payload.get("evidence") or {}).get("retrieved_at")
+                                or getattr(snapshot, "retrieved_at", None)
+                            ),
+                            "verification_status": (
+                                (payload.get("evidence") or {}).get(
+                                    "verification_status", "unverified"
+                                )
+                            ),
                             "effective_date": snapshot.effective_date,
                             "content_hash": snapshot.content_hash,
                         }
@@ -376,12 +411,16 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         disclosure = portfolio_payload(session, snapshot)
                         evidence = disclosure.get("evidence") or {}
                         source_citation = _provenance_citation(
-                            session, snapshot.source_key,
-                            evidence.get("canonical_url") or (disclosure.get("source") or {}).get("base_url"),
+                            session,
+                            snapshot.source_key,
+                            evidence.get("canonical_url")
+                            or (disclosure.get("source") or {}).get("base_url"),
                             evidence.get("retrieved_at") or snapshot.retrieved_at,
                             evidence.get("verification_status", "unverified"),
-                            type="portfolio_disclosure", scheme_code=code,
-                            effective_date=snapshot.effective_date, content_hash=snapshot.content_hash,
+                            type="portfolio_disclosure",
+                            scheme_code=code,
+                            effective_date=snapshot.effective_date,
+                            content_hash=snapshot.content_hash,
                         )
                         if source_citation:
                             citations.append(source_citation)
@@ -447,7 +486,9 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                                     "evidence_id": event.get("evidence_id"),
                                     "canonical_url": event.get("canonical_url"),
                                     "retrieved_at": event.get("retrieved_at"),
-                                    "verification_status": event.get("verification_status", "unverified"),
+                                    "verification_status": event.get(
+                                        "verification_status", "unverified"
+                                    ),
                                 }
                             )
                 else:
@@ -483,19 +524,36 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     (SocialPost.expires_at.is_(None) | (SocialPost.expires_at > datetime.now(UTC))),
                 )
                 if request.start_date:
-                    social_statement = social_statement.where(SocialPost.published_at >= datetime.combine(request.start_date, datetime.min.time(), UTC))
+                    social_start = datetime.combine(
+                        request.start_date, datetime.min.time(), UTC
+                    )
+                    social_statement = social_statement.where(
+                        SocialPost.published_at >= social_start
+                    )
                 if request.end_date:
-                    social_statement = social_statement.where(SocialPost.published_at < datetime.combine(request.end_date, datetime.max.time(), UTC))
-                social_rows = session.scalars(social_statement.order_by(SocialPost.published_at.desc()).limit(request.top_k)).all()
+                    social_end = datetime.combine(
+                        request.end_date, datetime.max.time(), UTC
+                    )
+                    social_statement = social_statement.where(
+                        SocialPost.published_at < social_end
+                    )
+                social_rows = session.scalars(
+                    social_statement.order_by(SocialPost.published_at.desc()).limit(
+                        request.top_k
+                    )
+                ).all()
                 for post in social_rows:
                     evidence = session.get(EvidenceRecord, post.evidence_id) if post.evidence_id else None
                     citation = _provenance_citation(
-                        session, post.source_key,
+                        session,
+                        post.source_key,
                         evidence.canonical_url if evidence else post.canonical_url,
                         evidence.retrieved_at if evidence else None,
                         evidence.verification_status if evidence else "unverified",
-                        type="social_aggregation", post_id=post.post_id,
-                        published_at=post.published_at, scope="fund_specific" if codes else "global",
+                        type="social_aggregation",
+                        post_id=post.post_id,
+                        published_at=post.published_at,
+                        scope="fund_specific" if codes else "global",
                     )
                     if citation:
                         citations.append(citation)

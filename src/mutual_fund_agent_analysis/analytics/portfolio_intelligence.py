@@ -7,9 +7,9 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from mutual_fund_agent_analysis.models.intelligence import DataSource, EvidenceRecord
 from mutual_fund_agent_analysis.models.investor import InvestorTransaction
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
-from mutual_fund_agent_analysis.models.intelligence import DataSource, EvidenceRecord
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
@@ -198,8 +198,17 @@ def actual_portfolio_exposure(
 
         holdings_fund_codes.add(code)
         source = session.get(DataSource, snapshot.source_key)
-        evidence = session.get(EvidenceRecord, snapshot.evidence_id) if snapshot.evidence_id else None
-        if source is None or not source.enabled or not source.is_official or source.source_type != "official":
+        evidence = (
+            session.get(EvidenceRecord, snapshot.evidence_id)
+            if snapshot.evidence_id
+            else None
+        )
+        if (
+            source is None
+            or not source.enabled
+            or not source.is_official
+            or source.source_type != "official"
+        ):
             reason = "The holdings source is not an enabled registered official source."
             warnings.append({"scheme_code": code, "reason": reason})
             data_quality_warnings.append(
@@ -220,12 +229,17 @@ def actual_portfolio_exposure(
             (D(holding.weight_pct) for holding in holdings if holding.weight_pct is not None),
             D("0"),
         )
-        weight_complete = missing_weight_count == 0 and D("99") <= disclosed_weight_total <= D("101")
+        weight_complete = (
+            missing_weight_count == 0
+            and D("99") <= disclosed_weight_total <= D("101")
+        )
         contexts[code].update(
             holdings_snapshot_id=snapshot.snapshot_id,
             holdings_as_of=snapshot.effective_date,
             holdings_source_key=snapshot.source_key,
-            holdings_url=evidence.canonical_url if evidence else (source.base_url if source else None),
+            holdings_url=(
+                evidence.canonical_url if evidence else (source.base_url if source else None)
+            ),
             holdings_retrieved_at=evidence.retrieved_at if evidence else snapshot.retrieved_at,
             holdings_verification_status=evidence.verification_status if evidence else "unverified",
         )
@@ -239,7 +253,12 @@ def actual_portfolio_exposure(
             data_quality_warnings.append(
                 {"scheme_code": code, "type": "missing_holding_weights", "reason": reason}
             )
-        if snapshot.status == "complete" and weight_complete and evidence is not None and evidence.verification_status == "verified":
+        if (
+            snapshot.status == "complete"
+            and weight_complete
+            and evidence is not None
+            and evidence.verification_status == "verified"
+        ):
             lookthrough_value += value
         if snapshot.status != "complete":
             reason = (
@@ -316,7 +335,9 @@ def actual_portfolio_exposure(
                 "holdings_source_key": contexts[c].get("holdings_source_key"),
                 "holdings_url": contexts[c].get("holdings_url"),
                 "holdings_retrieved_at": contexts[c].get("holdings_retrieved_at"),
-                "holdings_verification_status": contexts[c].get("holdings_verification_status", "unverified"),
+                "holdings_verification_status": contexts[c].get(
+                    "holdings_verification_status", "unverified"
+                ),
                 "market_value_inr": v,
                 "portfolio_weight_pct": v / total * D("100") if total > 0 else None,
             }
