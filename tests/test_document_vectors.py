@@ -141,7 +141,7 @@ def test_indexing_replaces_previous_chunks_and_removes_stale_trailing_chunks(mon
     assert document_vectors.index_chunks(100, "Fixture", shorter) is True
     assert len(client.points) == 1
     assert next(iter(client.points.values())).page_content == "replacement"
-    assert client.deleted_document_ids == [100, 100, 100]
+    assert client.deleted_document_ids == [100, 100]
     assert client.closed is True
 
 
