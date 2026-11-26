@@ -281,12 +281,15 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
             elif intent == "actual_exposure":
                 if not codes:
                     raise ValueError("Actual investor exposure requires one or more scheme_codes.")
-                exposure = actual_portfolio_exposure(session, codes)
+                exposure = actual_portfolio_exposure(
+                    session, codes, request.as_of_date or request.end_date
+                )
                 results[intent] = _jsonable(exposure)
                 citations.append(
                     {
                         "type": "actual_investor_exposure",
                         "scheme_codes": codes,
+                        "as_of_date": exposure.get("as_of_date"),
                         "valuation_basis": exposure.get("valuation_basis"),
                         "valued_fund_count": exposure.get("coverage", {}).get("valued_fund_count"),
                         "selected_fund_count": exposure.get("coverage", {}).get(
@@ -308,6 +311,8 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             }
                         ),
                         "excluded_funds": exposure.get("excluded_funds", []),
+                        "coverage": exposure.get("coverage", {}),
+                        "data_quality_warnings": exposure.get("data_quality_warnings", []),
                         "limitations": exposure.get("warning"),
                     }
                 )
