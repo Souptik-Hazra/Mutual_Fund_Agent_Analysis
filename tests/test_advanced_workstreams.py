@@ -124,6 +124,10 @@ def test_security_profile_abstains_when_no_provider_observation_exists():
                 def all():
                     return []
 
+                @staticmethod
+                def first():
+                    return None
+
             return Result()
 
     result = security_profile(EmptySession(), "ine002a01018")
@@ -201,11 +205,21 @@ def test_quote_only_observation_does_not_erase_older_fundamentals_or_events():
 
         def scalars(self, _statement):
             self.calls += 1
-            rows = [latest_quote, older_fundamentals] if self.calls == 1 else []
+            rows_by_query = {
+                1: [latest_quote],
+                2: [latest_quote, older_fundamentals],
+                3: [older_fundamentals],
+                4: [older_fundamentals],
+                5: [],
+            }
+            rows = rows_by_query[self.calls]
 
             class Result:
                 def all(self):
                     return rows
+
+                def first(self):
+                    return rows[0] if rows else None
 
             return Result()
 
