@@ -12,7 +12,7 @@ from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.api.schemas.research import (
@@ -28,6 +28,7 @@ from mutual_fund_agent_analysis.data.providers.social import (
     search_reddit,
     search_x,
 )
+from mutual_fund_agent_analysis.data.services.document_vectors import delete_document_chunks
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     collect_rss_events,
     compare_portfolios,
@@ -55,7 +56,7 @@ from mutual_fund_agent_analysis.models import (
     MarketEventRevision,
     PortfolioSnapshot,
 )
-from mutual_fund_agent_analysis.models.research import ResearchDocument
+from mutual_fund_agent_analysis.models.research import DocumentChunk, ResearchDocument
 
 router = APIRouter(tags=["research-intelligence"])
 
@@ -528,11 +529,7 @@ def _event_state_as_of(
     if next_revision is not None:
         return next_revision.snapshot
 
-    evidence_record = (
-        session.get(EvidenceRecord, event.evidence_id)
-        if event.evidence_id is not None
-        else None
-    )
+    evidence_record = session.get(EvidenceRecord, event.evidence_id) if event.evidence_id is not None else None
     evidence_snapshot = (
         {
             "evidence_id": evidence_record.evidence_id,
@@ -955,6 +952,39 @@ def list_documents(
             }
             for d in rows
         ],
+    }
+
+
+@router.delete("/documents/{document_id}")
+def delete_research_document(
+    document_id: int,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Delete lexical chunks and the document after confirmed semantic-index cleanup."""
+    if document_id <= 0:
+        raise HTTPException(status_code=422, detail="document_id must be positive.")
+    document = session.get(ResearchDocument, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Research document not found.")
+    if not delete_document_chunks(document_id):
+        raise HTTPException(
+            status_code=503,
+            detail="Semantic index cleanup failed; the document was retained for safe retry.",
+        )
+    try:
+        session.execute(
+            delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+        )
+        session.delete(document)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return {
+        "document_id": document_id,
+        "deleted": True,
+        "semantic_cleanup": "complete",
+        "evidence_records": "retained for provenance",
     }
 
 

@@ -55,7 +55,7 @@ def delete_document_chunks(document_id: int) -> bool:
         raise ValueError("document_id must be positive.")
     settings = get_settings()
     if not settings.qdrant_url:
-        return False
+        return True
     client = None
     try:
         client = _configured_client(settings)

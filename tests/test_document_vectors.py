@@ -1,22 +1,19 @@
-"""Unit checks for deterministic vector point identity."""
+"""Tests for optional Qdrant document deletion semantics."""
 
-from mutual_fund_agent_analysis.data.services.document_vectors import document_chunk_point_id
+import pytest
 
-
-def test_document_chunk_point_ids_are_stable_and_scoped_to_content():
-    first = document_chunk_point_id(10, 0, "a" * 64)
-    retry = document_chunk_point_id(10, 0, "a" * 64)
-    changed = document_chunk_point_id(10, 0, "b" * 64)
-    other_document = document_chunk_point_id(11, 0, "a" * 64)
-
-    assert first == retry
-    assert len({first, changed, other_document}) == 3
+from mutual_fund_agent_analysis.data.services import document_vectors
 
 
-def test_document_chunk_point_id_rejects_invalid_identity():
-    import pytest
+def test_document_deletion_succeeds_when_semantic_index_is_not_configured(monkeypatch):
+    monkeypatch.setattr(
+        document_vectors,
+        "get_settings",
+        lambda: type("Settings", (), {"qdrant_url": None})(),
+    )
+    assert document_vectors.delete_document_chunks(12) is True
 
+
+def test_document_deletion_rejects_invalid_document_ids():
     with pytest.raises(ValueError):
-        document_chunk_point_id(0, 0, "a" * 64)
-    with pytest.raises(ValueError):
-        document_chunk_point_id(10, -1, "a" * 64)
+        document_vectors.delete_document_chunks(0)

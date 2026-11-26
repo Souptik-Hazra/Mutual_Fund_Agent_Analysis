@@ -49,7 +49,6 @@ def test_readiness_returns_503_when_migrations_are_pending(monkeypatch) -> None:
     }
 
 
-
 def test_request_id_is_correlated_and_untrusted_values_are_replaced() -> None:
     client = TestClient(create_app())
     accepted = client.get("/api/v1/health/live", headers={"X-Request-ID": "local-run_123"})

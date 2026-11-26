@@ -49,3 +49,8 @@ def test_event_listing_exposes_timezone_aware_historical_as_of_filter():
     as_of = next(item for item in parameters if item["name"] == "as_of")
     assert as_of["schema"]["type"] == "string"
     assert as_of["schema"]["format"] == "date-time"
+
+
+def test_document_delete_route_is_registered():
+    paths = create_app().openapi()["paths"]
+    assert "delete" in paths["/api/v1/documents/{document_id}"]

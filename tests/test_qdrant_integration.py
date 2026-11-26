@@ -11,6 +11,7 @@ def test_qdrant_document_filter_reindex_and_delete_lifecycle():
     base_url = os.getenv("QDRANT_TEST_URL")
     if not base_url:
         import pytest
+
         pytest.skip("Set QDRANT_TEST_URL to run the disposable Qdrant integration test.")
 
     collection = "mfa_test_" + uuid.uuid4().hex[:16]

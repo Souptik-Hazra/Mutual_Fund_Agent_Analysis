@@ -36,9 +36,7 @@ def test_historical_event_uses_next_revision_snapshot_before_source_update():
     )
     session = StubSession(revision=revision)
 
-    result = _event_state_as_of(
-        session, event, datetime(2026, 1, 6, tzinfo=UTC)
-    )
+    result = _event_state_as_of(session, event, datetime(2026, 1, 6, tzinfo=UTC))
 
     assert result == previous_state
     assert session.scalar_calls == 1
@@ -51,9 +49,7 @@ def test_event_is_absent_before_its_creation_time():
     )
     session = StubSession()
 
-    result = _event_state_as_of(
-        session, event, datetime(2026, 1, 1, tzinfo=UTC)
-    )
+    result = _event_state_as_of(session, event, datetime(2026, 1, 1, tzinfo=UTC))
 
     assert result is None
     assert session.scalar_calls == 0
@@ -79,9 +75,7 @@ def test_current_event_state_is_used_after_latest_revision():
     )
     session = StubSession(revision=None)
 
-    result = _event_state_as_of(
-        session, event, datetime(2026, 2, 1, tzinfo=UTC)
-    )
+    result = _event_state_as_of(session, event, datetime(2026, 2, 1, tzinfo=UTC))
 
     assert result["title"] == "Corrected announcement"
     assert result["status"] == "confirmed"

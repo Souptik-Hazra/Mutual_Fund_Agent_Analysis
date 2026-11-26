@@ -49,11 +49,7 @@ def create_app() -> FastAPI:
     @application.middleware("http")
     async def request_context(request: Request, call_next):
         supplied_id = request.headers.get("x-request-id", "")
-        request_id = (
-            supplied_id
-            if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", supplied_id)
-            else uuid.uuid4().hex
-        )
+        request_id = supplied_id if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", supplied_id) else uuid.uuid4().hex
         request.state.request_id = request_id
         started = time.perf_counter()
         try:

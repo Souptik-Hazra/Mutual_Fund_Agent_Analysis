@@ -23,9 +23,7 @@ CAPABILITY_REGISTRY = {
         "Exact-cohort category peers, common observation windows "
         "and comparable return bases."
     ),
-    "portfolio": (
-        "Dated AMC holdings, sector allocation, concentration and portfolio overlap."
-    ),
+    "portfolio": ("Dated AMC holdings, sector allocation, concentration and portfolio overlap."),
     "actual_exposure": (
         "Ledger-derived units, reconciled NAV valuation, "
         "redemption-aware exposure and XIRR context."

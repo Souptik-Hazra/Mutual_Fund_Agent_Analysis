@@ -16,9 +16,7 @@ def test_provider_quality_counts_duplicates_order_and_out_of_window_dates():
         SimpleNamespace(date=date(2026, 1, 1)),
         SimpleNamespace(date=date(2025, 12, 31)),
     ]
-    result = audit_local._observation_quality(
-        points, date(2026, 1, 1), date(2026, 1, 2)
-    )
+    result = audit_local._observation_quality(points, date(2026, 1, 1), date(2026, 1, 2))
     assert result == {
         "duplicate_date_count": 1,
         "out_of_order_pair_count": 2,
