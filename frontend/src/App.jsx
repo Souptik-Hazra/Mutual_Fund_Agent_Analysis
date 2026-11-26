@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { request, streamRequest } from "./api";
-import { buildDocumentSearchPath, eventRows } from "./research";
+import { buildDocumentSearchPath, eventRows, isBenchmarkObservationUnavailable } from "./research";
 import AdvancedIntelligence from "./AdvancedIntelligence";
 
 const tabs = ["Overview", "Funds", "Compare", "Portfolio", "Investments", "Category & Equity", "Events", "Social", "Documents", "Fund Profile", "Actual Exposure", "Security Intelligence", "Assistant"];
@@ -70,8 +70,6 @@ export default function App() {
       const params = asOf ? "?as_of=" + encodeURIComponent(asOf) : "";
       try {
         return await request("/fund-intelligence/schemes/" + code + "/benchmark" + params);
-      } catch (error) {
-        return { scheme_code: code, availability: "unavailable", benchmark: null, error: error.message };
       }
     }));
     const first = mappings[0]?.benchmark;
@@ -113,7 +111,7 @@ export default function App() {
         const report = await request("/schemes/" + code + "/analytics?" + params.toString());
         return { ...report, benchmark_selection: selection };
       } catch (error) {
-        if (selection.availability !== "mapped") throw error;
+        if (selection.availability !== "mapped" || !isBenchmarkObservationUnavailable(error)) throw error;
         params.delete("benchmark_code");
         params.delete("benchmark_source");
         const report = await request("/schemes/" + code + "/analytics?" + params.toString());
@@ -137,7 +135,7 @@ export default function App() {
       const result = await request("/schemes/compare", json("POST", payload));
       return { ...result, benchmark_selection: selection };
     } catch (error) {
-      if (selection.availability !== "mapped") throw error;
+      if (selection.availability !== "mapped" || !isBenchmarkObservationUnavailable(error)) throw error;
       payload.benchmark_code = null;
       const result = await request("/schemes/compare", json("POST", payload));
       return {
@@ -163,7 +161,7 @@ export default function App() {
         const result = await request("/fund-intelligence/schemes/" + schemeCodes[0] + "/category?" + params.toString());
         return { ...result, benchmark_selection: selection };
       } catch (error) {
-        if (selection.availability !== "mapped") throw error;
+        if (selection.availability !== "mapped" || !isBenchmarkObservationUnavailable(error)) throw error;
         params.delete("benchmark_code");
         params.delete("benchmark_source");
         const result = await request("/fund-intelligence/schemes/" + schemeCodes[0] + "/category?" + params.toString());
@@ -231,7 +229,7 @@ export default function App() {
       const selection = await resolveBenchmarkForCodes(schemeCodes, dateTo, benchmark);
       const result = await streamRequest(
         "/assistant/research/stream",
-        { question, scheme_codes: schemeCodes, benchmark_code: selection.benchmark?.code || null, benchmark_source: selection.benchmark?.source || null, start_date: dateFrom, end_date: dateTo },
+        { question, scheme_codes: schemeCodes, benchmark_code: selection.benchmark?.code || null, benchmark_source: selection.benchmark?.source || null, start_date: dateFrom, end_date: dateTo, as_of_date: dateTo },
         (progress) => setStreamProgress((current) => [...current, progress]),
       );
       setData(result);
