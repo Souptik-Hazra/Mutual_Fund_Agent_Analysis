@@ -990,7 +990,7 @@ def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
     session = StubSession()
     upload = UploadFile(
         filename="reddit-export.csv",
-        file=io.BytesIO(b"external_id,text_excerpt,canonical_url\\npost-1,Market discussion,https://www.reddit.com/r/example/comments/post-1/\\n"),
+        file=io.BytesIO(b"external_id,text_excerpt,canonical_url\npost-1,Market discussion,https://www.reddit.com/r/example/comments/post-1/\n"),
     )
     result = asyncio.run(
         research_routes.import_social_dataset(session=session, source="reddit", file=upload)
