@@ -118,9 +118,7 @@ def _latest_market_observation(
         SecurityMarketObservation.observation_id.desc(),
     )
     if as_of:
-        cutoff = datetime.combine(
-            as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")
-        ).astimezone(UTC)
+        cutoff = datetime.combine(as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(UTC)
         query = query.where(SecurityMarketObservation.observed_at <= cutoff)
     if isin:
         exact_key_match = session.scalars(
