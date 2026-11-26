@@ -19,10 +19,7 @@ class ResearchAssistantRequest(BaseModel):
     top_k: int = Field(default=6, ge=1, le=15)
     synthesize: bool = Field(
         default=False,
-        description=(
-            "Opt in to LLM-generated narrative synthesis; "
-            "deterministic research runs by default."
-        ),
+        description="Opt in to LLM narrative synthesis; disabled by default.",
     )
 
     @field_validator("scheme_codes")
