@@ -1,8 +1,8 @@
 """Regression tests for IDCW-aware fund and benchmark return bases."""
 
+import importlib
 from datetime import date
 from decimal import Decimal
-import importlib
 from types import SimpleNamespace
 
 import pytest
