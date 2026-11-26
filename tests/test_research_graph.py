@@ -362,6 +362,7 @@ def test_assistant_request_rejects_as_of_date_after_end_date():
             as_of_date=date(2026, 7, 1),
         )
 
+
 def test_llm_evidence_budget_preserves_valid_json_and_reports_omissions():
     payload = research_graph._bounded_evidence(
         {
@@ -375,6 +376,7 @@ def test_llm_evidence_budget_preserves_valid_json_and_reports_omissions():
     assert set(parsed["results"]) == {"fund", "portfolio"}
     assert parsed["truncated"] is True
     assert parsed["omitted_paths"]
+
 
 def test_compiled_graph_returns_provenance_complete_fund_citation(monkeypatch):
     request = ResearchAssistantRequest(

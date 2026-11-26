@@ -539,6 +539,7 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
     assert result["coverage"]["is_complete"] is False
     assert result["data_quality_warnings"][0]["type"] == "partial_holdings"
 
+
 def test_complete_snapshot_with_missing_weights_is_not_full_lookthrough():
     holdings = [
         SimpleNamespace(weight_pct=Decimal("70")),

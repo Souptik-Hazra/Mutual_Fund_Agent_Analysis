@@ -846,6 +846,7 @@ def test_document_delete_removes_vectors_before_lexical_records(monkeypatch):
     assert result["deleted"] is True
     assert order == ["vectors", "lexical_chunks", "document", "commit"]
 
+
 def test_portfolio_content_hash_ignores_caller_hash_and_holding_order():
     first = HoldingInput(
         security_key="INE000A01001",
@@ -867,6 +868,7 @@ def test_portfolio_content_hash_ignores_caller_hash_and_holding_order():
     left = PortfolioImportRequest(**common, content_hash="a" * 64, holdings=[first, second])
     right = PortfolioImportRequest(**common, content_hash="b" * 64, holdings=[second, first])
     assert _portfolio_content_hash(left) == _portfolio_content_hash(right)
+
 
 
 def test_portfolio_import_accepts_server_generated_content_hash():

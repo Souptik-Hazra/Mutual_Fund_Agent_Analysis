@@ -102,9 +102,7 @@ def _metadata_observation_is_current(
     valid_to: date | None,
     today: date,
 ) -> bool:
-    return (valid_from is None or valid_from <= today) and (
-        valid_to is None or valid_to >= today
-    )
+    return (valid_from is None or valid_from <= today) and (valid_to is None or valid_to >= today)
 
 
 def _validate_distribution_revision_chain(
