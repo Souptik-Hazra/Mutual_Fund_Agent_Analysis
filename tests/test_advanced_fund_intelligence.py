@@ -1,6 +1,6 @@
 """Regression tests for advanced fund intelligence foundations."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -89,12 +89,14 @@ def test_benchmark_resolver_accepts_effective_mapping_with_official_registry_sou
 
 def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypatch):
     from decimal import Decimal
-    from types import SimpleNamespace
     import mutual_fund_agent_analysis.analytics.portfolio_intelligence as module
 
     class Rows:
-        def __init__(self, rows): self.rows = rows
-        def all(self): return self.rows
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
 
     class Session:
         def scalars(self, query):
@@ -147,8 +149,6 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav(monkeyp
     assert result["valued_funds"][0]["market_value_inr"] == Decimal("120")
 
 def test_security_history_contract_is_bounded_typed_and_chronological():
-    from datetime import datetime, timezone
-    from sqlalchemy import select
     from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
     from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 
@@ -173,7 +173,14 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
         volume=100,
         market_status="closed",
     )
-    newer = SimpleNamespace(**{**older.__dict__, "observed_at": datetime(2026, 2, 1, tzinfo=timezone.utc), "observation_id": 2, "content_hash": "b"})
+    newer = SimpleNamespace(
+        **{
+            **older.__dict__,
+            "observed_at": datetime(2026, 2, 1, tzinfo=timezone.utc),
+            "observation_id": 2,
+            "content_hash": "b",
+        }
+    )
     class ScalarRows:
         def __init__(self, rows): self.rows = rows
         def first(self): return self.rows[0] if self.rows else None
