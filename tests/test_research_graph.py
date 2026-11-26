@@ -109,3 +109,84 @@ def test_global_social_research_is_explicitly_labelled(monkeypatch):
     assert result["results"]["social"]["scope"] == "global"
     assert result["results"]["social"]["aggregation"]["post_count"] == 3
     assert result["citations"][0]["scope"] == "global"
+
+def test_router_selects_category_specialist_for_peer_rankings():
+    assert classify_intents("Rank this fund against category peers", [125497]) == ["category"]
+
+
+def test_router_selects_actual_investor_exposure_specialist():
+    assert classify_intents("Show my actual investor exposure from the ledger", [125497, 120503]) == [
+        "actual_exposure"
+    ]
+
+
+def test_router_keeps_hypothetical_portfolio_exposure_separate():
+    assert classify_intents("Compare equity exposure across these fund portfolios", [125497, 120503]) == [
+        "portfolio"
+    ]
+
+
+def test_category_specialist_uses_existing_deterministic_peer_service(monkeypatch):
+    requested_end = date(2026, 11, 25)
+    captured = {}
+
+    def analyze(session, code, start_date, end_date, **kwargs):
+        captured.update(code=code, start_date=start_date, end_date=end_date, **kwargs)
+        return {
+            "category": "Large Cap",
+            "start_date": date(2025, 1, 1),
+            "end_date": requested_end,
+            "observation_dates": 200,
+            "return_basis": "growth_nav",
+            "peer_count": 8,
+            "excluded_peers": [],
+            "rankings": [],
+        }
+
+    monkeypatch.setattr(research_graph, "analyze_category_peers", analyze)
+    request = ResearchAssistantRequest(
+        question="Rank fund category peers",
+        scheme_codes=[125497],
+        start_date=date(2025, 1, 1),
+        end_date=requested_end,
+        top_k=4,
+    )
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["category"]}
+    )
+    assert captured == {
+        "code": 125497,
+        "start_date": date(2025, 1, 1),
+        "end_date": requested_end,
+        "max_peers": 40,
+        "benchmark_code": None,
+        "benchmark_source": "niftyindices",
+    }
+    assert result["results"]["category"]["return_basis"] == "growth_nav"
+    assert result["citations"][0]["type"] == "category_peer_analysis"
+
+
+def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
+    captured = {}
+
+    def exposure(session, codes):
+        captured["codes"] = codes
+        return {
+            "valuation_basis": "ledger units x reconciled NAV",
+            "coverage": {"valued_fund_count": 1, "selected_fund_count": 2},
+            "valued_funds": [{"scheme_code": 125497, "nav_date": date(2026, 11, 25)}],
+            "excluded_funds": [{"scheme_code": 120503, "reason": "No units"}],
+            "equity_exposure": [],
+            "warning": "Dated holdings disclosures only.",
+        }
+
+    monkeypatch.setattr(research_graph, "actual_portfolio_exposure", exposure)
+    request = ResearchAssistantRequest(
+        question="Show my actual investor exposure",
+        scheme_codes=[125497, 120503],
+    )
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["actual_exposure"]}
+    )
+    assert captured["codes"] == [125497, 120503]
+    assert result["citations"][0]["valuation_dates"][0]["nav_date"] == date(2026, 11, 25)
