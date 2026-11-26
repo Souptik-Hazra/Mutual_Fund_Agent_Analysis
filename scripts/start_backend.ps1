@@ -12,7 +12,7 @@ $env:DATABASE_URL = "postgresql+psycopg://mfa:mfa_dev_password@127.0.0.1:5432/mu
 $env:QDRANT_URL = "http://127.0.0.1:6333"
 $env:QDRANT_API_KEY = ""
 
-& (Join-Path $PSScriptRoot "wait_for_postgres.ps1")
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "wait_for_postgres.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "PostgreSQL readiness check failed."
 }
