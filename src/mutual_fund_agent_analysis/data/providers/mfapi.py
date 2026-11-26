@@ -21,6 +21,8 @@ class MFAPIScheme(BaseModel):
 
     scheme_code: int = Field(alias="schemeCode", gt=0)
     scheme_name: str = Field(alias="schemeName", min_length=1)
+    isin_growth: str | None = Field(default=None, alias="isinGrowth")
+    isin_div_reinvestment: str | None = Field(default=None, alias="isinDivReinvestment")
 
 
 class MFAPINavPoint(BaseModel):
@@ -136,6 +138,15 @@ class MFAPIClient:
         if last_error is not None:
             raise last_error
         raise RuntimeError("MFAPI request failed without an exception.")
+
+    def list_schemes(self, limit: int = 1000, offset: int = 0) -> list[MFAPIScheme]:
+        """List a page of schemes from the upstream catalogue."""
+        if not 1 <= limit <= 1000 or offset < 0:
+            raise ValueError("limit must be 1..1000 and offset must be non-negative.")
+        payload = self._get_json("/mf", params={"limit": str(limit), "offset": str(offset)})
+        if not isinstance(payload, list):
+            raise ValueError("MFAPI returned an unexpected scheme-list response.")
+        return [MFAPIScheme.model_validate(item) for item in payload]
 
     def search_schemes(self, query: str) -> list[MFAPIScheme]:
         """Search schemes by name and return validated scheme codes."""
