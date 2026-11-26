@@ -50,7 +50,15 @@ class GraphSession:
 
     def get(self, model, _key):
         if model.__name__ == "DataSource":
-            return SimpleNamespace(base_url="https://www.amfiindia.com")
+            return SimpleNamespace(
+                source_key="amfi",
+                display_name="AMFI",
+                source_type="official",
+                authority_tier=1,
+                is_official=True,
+                enabled=True,
+                base_url="https://www.amfiindia.com",
+            )
         if model.__name__ == "EvidenceRecord":
             return SimpleNamespace(
                 evidence_id=10,
