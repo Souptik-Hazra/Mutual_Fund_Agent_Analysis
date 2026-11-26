@@ -302,7 +302,7 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
 
 
 
-def test_actual_exposure_uses_as_of_ledger_nav_and_holdings_with_exact_values():
+def test_actual_exposure_value_math_and_as_of_selection():
     as_of = date(2026, 6, 30)
     snapshot = SimpleNamespace(snapshot_id=4, status="complete", effective_date=date(2026, 6, 1))
     nav = SimpleNamespace(status="matched", canonical_nav=Decimal("20"), nav_date=date(2026, 6, 29))
