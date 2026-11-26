@@ -349,8 +349,8 @@ def test_document_specialist_preserves_retrieval_citations(monkeypatch):
 
 
 def test_assistant_request_rejects_as_of_date_after_end_date():
-    from pydantic import ValidationError
     import pytest
+    from pydantic import ValidationError
 
     with pytest.raises(ValidationError, match="as_of_date cannot be later"):
         ResearchAssistantRequest(
