@@ -178,6 +178,8 @@ def actual_portfolio_exposure(
     )
     sectors, warnings = defaultdict(lambda: D("0")), []
     lookthrough_value = D("0")
+    lookthrough_eligible_fund_codes: set[int] = set()
+    disclosed_weights_by_fund: dict[str, Decimal] = {}
     holdings_fund_codes = set()
     for code, value in values.items():
         if value <= 0:
@@ -245,6 +247,16 @@ def actual_portfolio_exposure(
             holdings_retrieved_at=evidence.retrieved_at if evidence else snapshot.retrieved_at,
             holdings_verification_status=evidence.verification_status if evidence else "unverified",
         )
+        disclosed_weights_by_fund[str(code)] = disclosed_weight_total
+        lookthrough_eligible = (
+            snapshot.status == "complete"
+            and weight_complete
+            and evidence is not None
+            and evidence.verification_status == "verified"
+        )
+        if lookthrough_eligible:
+            lookthrough_value += value
+            lookthrough_eligible_fund_codes.add(code)
         if snapshot.status == "complete" and not weight_complete:
             reason = (
                 f"Complete disclosure effective {snapshot.effective_date} has "
@@ -255,13 +267,6 @@ def actual_portfolio_exposure(
             data_quality_warnings.append(
                 {"scheme_code": code, "type": "missing_holding_weights", "reason": reason}
             )
-        if (
-            snapshot.status == "complete"
-            and weight_complete
-            and evidence is not None
-            and evidence.verification_status == "verified"
-        ):
-            lookthrough_value += value
         if snapshot.status != "complete":
             reason = (
                 f"Holdings disclosure effective {snapshot.effective_date} is partial; "
@@ -358,6 +363,18 @@ def actual_portfolio_exposure(
             "lookthrough_covered_value_inr": lookthrough_value,
             "lookthrough_coverage_pct": (
                 lookthrough_value / total * D("100") if total > 0 else D("0")
+            ),
+            "lookthrough_eligible_fund_count": len(lookthrough_eligible_fund_codes),
+            "lookthrough_incomplete_fund_count": (
+                sum(1 for value in values.values() if value > 0)
+                - len(lookthrough_eligible_fund_codes)
+            ),
+            "disclosed_weight_pct_by_fund": disclosed_weights_by_fund,
+            "coverage_basis": (
+                "A fund counts as look-through covered only when its latest eligible official "
+                "disclosure is marked complete, every holding has a reported weight summing "
+                "to 99–101%, and its linked evidence is verified. Partial, missing-weight or "
+                "unverified disclosures contribute only lower-bound observed holdings."
             ),
             "is_complete": not excluded and not warnings and not data_quality_warnings,
         },
