@@ -257,8 +257,32 @@ def compare_portfolios(
                      "weight_b": maps[right][key]} for key in sorted(common)
                 ],
             })
+    disclosures = []
+    for code, snapshot in snapshots.items():
+        source = session.get(DataSource, snapshot.source_key)
+        evidence = (
+            session.get(EvidenceRecord, snapshot.evidence_id)
+            if snapshot.evidence_id
+            else None
+        )
+        disclosures.append(
+            {
+                "scheme_code": code,
+                "snapshot_id": snapshot.snapshot_id,
+                "effective_date": snapshot.effective_date,
+                "source_key": snapshot.source_key,
+                "source_name": source.display_name if source else None,
+                "canonical_url": (
+                    evidence.canonical_url if evidence else (source.base_url if source else None)
+                ),
+                "verification_status": (
+                    evidence.verification_status if evidence else "missing"
+                ),
+            }
+        )
     return {
         "as_of": {str(code): snapshots[code].effective_date for code in scheme_codes},
+        "disclosures": disclosures,
         "pairwise_overlap": pairwise,
     }
 

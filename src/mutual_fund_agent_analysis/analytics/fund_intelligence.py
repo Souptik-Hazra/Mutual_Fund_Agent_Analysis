@@ -9,7 +9,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.service import analyze_fund
-from mutual_fund_agent_analysis.models.intelligence import DataSource
+from mutual_fund_agent_analysis.models.intelligence import DataSource, EvidenceRecord
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
@@ -245,6 +245,7 @@ def compare_disclosed_equity(
         raise ValueError(f"Unknown scheme code(s): {missing}.")
     snapshots = {}
     holdings_by_fund = {}
+    provenance_by_fund = {}
     for code in scheme_codes:
         snapshot = session.scalars(
             select(PortfolioSnapshot)
@@ -265,6 +266,20 @@ def compare_disclosed_equity(
         if snapshot is None:
             raise ValueError(f"No portfolio disclosure is available for scheme {code}.")
         snapshots[code] = snapshot
+        source = session.get(DataSource, snapshot.source_key)
+        evidence = (
+            session.get(EvidenceRecord, snapshot.evidence_id)
+            if snapshot.evidence_id
+            else None
+        )
+        provenance_by_fund[code] = {
+            "source_key": snapshot.source_key,
+            "source_name": source.display_name if source else None,
+            "canonical_url": (
+                evidence.canonical_url if evidence else (source.base_url if source else None)
+            ),
+            "verification_status": evidence.verification_status if evidence else "missing",
+        }
         rows = session.scalars(
             select(PortfolioHolding).where(
                 PortfolioHolding.snapshot_id == snapshot.snapshot_id,
@@ -346,6 +361,7 @@ def compare_disclosed_equity(
                 "snapshot_id": snapshots[code].snapshot_id,
                 "holdings_as_of": snapshots[code].effective_date,
                 "snapshot_status": snapshots[code].status,
+                **provenance_by_fund[code],
                 "equity_positions_with_weights": len(holdings_by_fund[code]),
             }
             for code in scheme_codes
