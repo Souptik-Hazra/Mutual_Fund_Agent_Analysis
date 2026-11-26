@@ -140,7 +140,7 @@ def test_fund_specific_social_research_requires_a_complete_date_range(monkeypatc
     )
 
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["social"]}
+        {"request": request, "session": GraphSession(), "intents": ["social"]}
     )
 
     assert "social" not in result["results"]
@@ -156,7 +156,7 @@ def test_global_social_research_is_explicitly_labelled(monkeypatch):
     request = ResearchAssistantRequest(question="Show overall social sentiment")
 
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["social"]}
+        {"request": request, "session": GraphSession(), "intents": ["social"]}
     )
 
     assert result["results"]["social"]["scope"] == "global"
@@ -206,7 +206,7 @@ def test_category_specialist_uses_existing_deterministic_peer_service(monkeypatc
         top_k=4,
     )
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["category"]}
+        {"request": request, "session": GraphSession(), "intents": ["category"]}
     )
     assert captured == {
         "code": 125497,
@@ -249,7 +249,7 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
         as_of_date=date(2026, 11, 20),
     )
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["actual_exposure"]}
+        {"request": request, "session": GraphSession(), "intents": ["actual_exposure"]}
     )
     assert captured["codes"] == [125497, 120503]
     assert captured["as_of_date"] == date(2026, 11, 20)
@@ -269,7 +269,7 @@ def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
         scheme_codes=[125497],
     )
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["fund"]}
+        {"request": request, "session": GraphSession(), "intents": ["fund"]}
     )
     assert result["results"]["fund"] == expected
 
@@ -298,7 +298,7 @@ def test_portfolio_specialist_preserves_disclosure_allocation_and_overlap(monkey
         scheme_codes=[125497, 120503],
     )
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["portfolio"]}
+        {"request": request, "session": GraphSession(), "intents": ["portfolio"]}
     )
     assert result["results"]["portfolio"] == {
         "snapshots": [expected_snapshot, expected_snapshot],
@@ -332,7 +332,7 @@ def test_security_specialist_preserves_market_and_fundamental_observations(monke
         scheme_codes=[125497],
     )
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["security"]}
+        {"request": request, "session": GraphSession(), "intents": ["security"]}
     )
     assert result["results"]["security"] == expected
     assert {item["type"] for item in result["citations"]} == {
@@ -363,7 +363,7 @@ def test_event_specialist_preserves_historical_event_snapshot(monkeypatch):
         end_date=date(2026, 11, 30),
     )
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["events"]}
+        {"request": request, "session": GraphSession(), "intents": ["events"]}
     )
     assert result["results"]["events"] == [expected]
     assert result["citations"][0]["event_id"] == 77
@@ -378,7 +378,7 @@ def test_social_specialist_preserves_aggregated_sentiment_metrics(monkeypatch):
     monkeypatch.setattr(research_graph, "social_analytics", lambda *args: expected)
     request = ResearchAssistantRequest(question="Show global Reddit sentiment")
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["social"]}
+        {"request": request, "session": GraphSession(), "intents": ["social"]}
     )
     assert result["results"]["social"]["aggregation"] == expected
 
@@ -402,7 +402,7 @@ def test_document_specialist_preserves_retrieval_citations(monkeypatch):
     monkeypatch.setattr(research_graph, "search_documents", lambda *args: expected)
     request = ResearchAssistantRequest(question="Find expense ratio in factsheet")
     result = research_graph._run_tools(
-        {"request": request, "session": object(), "intents": ["documents"]}
+        {"request": request, "session": GraphSession(), "intents": ["documents"]}
     )
     assert result["results"]["documents"] == expected
     assert result["citations"][0]["content_hash"] == "f" * 64
