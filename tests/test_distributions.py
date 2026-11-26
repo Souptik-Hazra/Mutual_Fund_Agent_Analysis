@@ -117,9 +117,7 @@ def test_zero_distribution_payout_index_matches_nav_index():
 
 def test_historical_and_future_scheme_metadata_do_not_change_current_projection():
     today = date(2026, 11, 26)
-    assert not _metadata_observation_is_current(
-        date(2024, 1, 1), date(2025, 12, 31), today
-    )
+    assert not _metadata_observation_is_current(date(2024, 1, 1), date(2025, 12, 31), today)
     assert not _metadata_observation_is_current(date(2027, 1, 1), None, today)
     assert _metadata_observation_is_current(date(2026, 1, 1), None, today)
 
