@@ -481,9 +481,18 @@ def get_security_intelligence(
     session: Annotated[Session, Depends(get_db)],
     as_of: date | None = None,
     scheme_codes: Annotated[list[int] | None, Query(max_length=20)] = None,
+    history_limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    history_type: Annotated[str, Query(pattern="^(quotes|fundamentals|events|all)$")] = "quotes",
 ) -> dict:
-    """Return dated stock intelligence and matching positions from the latest AMC disclosures."""
+    """Return dated stock intelligence and bounded, typed observation history."""
     try:
-        return security_profile(session, security_key, as_of=as_of, scheme_codes=scheme_codes)
+        return security_profile(
+            session,
+            security_key,
+            as_of=as_of,
+            scheme_codes=scheme_codes,
+            history_limit=history_limit,
+            history_type=history_type,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
