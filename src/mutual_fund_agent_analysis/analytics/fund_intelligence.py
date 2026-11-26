@@ -268,9 +268,7 @@ def compare_disclosed_equity(
         snapshots[code] = snapshot
         source = session.get(DataSource, snapshot.source_key)
         evidence = (
-            session.get(EvidenceRecord, snapshot.evidence_id)
-            if snapshot.evidence_id
-            else None
+            session.get(EvidenceRecord, snapshot.evidence_id) if snapshot.evidence_id else None
         )
         provenance_by_fund[code] = {
             "source_key": snapshot.source_key,
