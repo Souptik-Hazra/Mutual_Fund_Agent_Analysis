@@ -184,9 +184,10 @@ export default function App() {
     setData(null);
     setStreamProgress([]);
     try {
+      const selection = await resolveBenchmarkForCodes(schemeCodes, dateTo, benchmark);
       const result = await streamRequest(
         "/assistant/research/stream",
-        { question, scheme_codes: schemeCodes, benchmark_code: benchmark || null, start_date: dateFrom, end_date: dateTo },
+        { question, scheme_codes: schemeCodes, benchmark_code: selection.benchmark?.code || null, benchmark_source: selection.benchmark?.source || null, start_date: dateFrom, end_date: dateTo },
         (progress) => setStreamProgress((current) => [...current, progress]),
       );
       setData(result);
