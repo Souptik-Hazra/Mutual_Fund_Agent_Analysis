@@ -220,7 +220,9 @@ def security_profile(
             else None,
         },
         "corporate_events": corporate_events,
-        "corporate_events_observed_at": (\n            event_observation.observed_at if event_observation else None\n        ),
+        "corporate_events_observed_at": (
+            event_observation.observed_at if event_observation else None
+        ),
         "corporate_events_source_key": event_observation.source_key if event_observation else None,
         "portfolio_positions": positions,
         "portfolio_coverage": {
