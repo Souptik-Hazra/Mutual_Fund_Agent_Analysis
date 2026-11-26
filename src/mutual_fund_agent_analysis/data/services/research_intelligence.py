@@ -1236,7 +1236,7 @@ def events_for_fund_exposure(
             "event_type": event.event_type, "status": event.status,
             "event_date": event.event_date, "source_key": event.source_key,
             "evidence_id": event.evidence_id, "canonical_url": event.canonical_url,
-            "retrieved_at": evidence.retrieved_at if evidence else None,
+            "retrieved_at": evidence.retrieved_at if evidence else event.created_at,
             "verification_status": evidence.verification_status if evidence else "unverified",
             "portfolio_effective_date": snapshot.effective_date,
             "exposure_found": bool(matches), "holdings": matches,

@@ -35,6 +35,8 @@ from mutual_fund_agent_analysis.models import (
     DataSource,
     EvidenceRecord,
     NavReconciliation,
+    PortfolioHolding,
+    PortfolioSnapshot,
     SocialPost,
 )
 
@@ -531,9 +533,29 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         ),
                     }
                 social_statement = select(SocialPost).where(
+                    SocialPost.related_entity_id.is_not(None),
+                    SocialPost.sentiment_score.is_not(None),
                     SocialPost.is_spam.is_(False),
                     (SocialPost.expires_at.is_(None) | (SocialPost.expires_at > datetime.now(UTC))),
                 )
+                if codes:
+                    entity_ids = session.scalars(
+                        select(PortfolioHolding.company_entity_id)
+                        .join(
+                            PortfolioSnapshot,
+                            PortfolioSnapshot.snapshot_id == PortfolioHolding.snapshot_id,
+                        )
+                        .where(
+                            PortfolioSnapshot.scheme_code.in_(codes),
+                            PortfolioSnapshot.effective_date <= (request.end_date or date.today()),
+                            PortfolioHolding.asset_class == "equity",
+                            PortfolioHolding.company_entity_id.is_not(None),
+                        )
+                        .distinct()
+                    ).all()
+                    social_statement = social_statement.where(
+                        SocialPost.related_entity_id.in_(entity_ids)
+                    )
                 if request.start_date:
                     social_start = datetime.combine(request.start_date, datetime.min.time(), UTC)
                     social_statement = social_statement.where(
