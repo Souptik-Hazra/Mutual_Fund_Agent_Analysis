@@ -22,7 +22,7 @@ def analyze_category_peers(
     benchmark_code: str | None = None,
     benchmark_source: str = "niftyindices",
 ) -> dict:
-    """Rank funds only against same-category, same-plan and same-option peers."""
+    """Rank the exact category cohort on one identical observation-date set."""
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be on or before end_date.")
     if not 1 <= max_peers <= 500:
@@ -39,58 +39,91 @@ def analyze_category_peers(
         MutualFundScheme.option_type == selected.option_type,
     ]
     peer_rows = session.scalars(
-        select(MutualFundScheme)
-        .where(*filters)
-        .order_by(
+        select(MutualFundScheme).where(*filters).order_by(
             case((MutualFundScheme.scheme_code == scheme_code, 0), else_=1),
-            MutualFundScheme.scheme_name,
-            MutualFundScheme.scheme_code,
-        )
-        .limit(max_peers + 1)
+            MutualFundScheme.scheme_name, MutualFundScheme.scheme_code,
+        ).limit(max_peers + 1)
     ).all()
     cohort_truncated = len(peer_rows) > max_peers
     peers = peer_rows[:max_peers]
-    ranked = []
+    initial_reports = {}
     excluded = []
     for peer in peers:
         try:
-            report = analyze_fund(
-                session,
-                peer.scheme_code,
-                benchmark_code=benchmark_code,
-                start_date=start_date,
-                end_date=end_date,
-                benchmark_source=benchmark_source,
+            initial_reports[peer.scheme_code] = analyze_fund(
+                session, peer.scheme_code, benchmark_code=benchmark_code,
+                start_date=start_date, end_date=end_date, benchmark_source=benchmark_source,
             )
         except ValueError as exc:
             excluded.append({"scheme_code": peer.scheme_code, "reason": str(exc)})
+    if scheme_code not in initial_reports:
+        raise ValueError("Selected scheme has insufficient reconciled history for peer analysis.")
+
+    common_start = max(report.start_date for report in initial_reports.values())
+    common_end = min(report.end_date for report in initial_reports.values())
+    if common_start >= common_end:
+        raise ValueError("Category peers do not share a common observation window.")
+
+    aligned_reports = {}
+    for code in initial_reports:
+        try:
+            report = analyze_fund(
+                session, code, benchmark_code=benchmark_code,
+                start_date=common_start, end_date=common_end,
+                benchmark_source=benchmark_source,
+            )
+        except ValueError as exc:
+            excluded.append({"scheme_code": code, "reason": str(exc)})
             continue
-        ranked.append(
-            {
-                "scheme_code": peer.scheme_code,
-                "scheme_name": peer.scheme_name,
-                "fund_house": peer.fund_house,
-                "category": peer.scheme_category,
-                "cagr": report.cagr,
-                "absolute_return": report.absolute_return,
-                "annualized_volatility": report.risk.annualized_volatility,
-                "sharpe_ratio": report.risk.sharpe_ratio,
-                "maximum_drawdown": report.drawdown.maximum_drawdown,
-                "benchmark": asdict(report.benchmark) if report.benchmark else None,
-                "observation_count": report.observation_count,
-                "start_date": report.start_date,
-                "end_date": report.end_date,
-            }
-        )
+        if report.start_date != common_start or report.end_date != common_end:
+            excluded.append({
+                "scheme_code": code,
+                "reason": (
+                    f"Actual observations {report.start_date} to {report.end_date} do not "
+                    f"cover the common window {common_start} to {common_end}."
+                ),
+            })
+            continue
+        aligned_reports[code] = report
+
+    if scheme_code not in aligned_reports:
+        raise ValueError("Selected scheme cannot satisfy the common category observation window.")
+    reference_dates = tuple(day for day, _ in aligned_reports[scheme_code].base100_series)
+    ranked = []
+    for code, report in aligned_reports.items():
+        dates = tuple(day for day, _ in report.base100_series)
+        if dates != reference_dates:
+            excluded.append({
+                "scheme_code": code,
+                "reason": "Observation dates differ from the selected fund; exact-date category ranking requires identical observations.",
+            })
+            continue
+        peer = next(item for item in peers if item.scheme_code == code)
+        ranked.append({
+            "scheme_code": code,
+            "scheme_name": peer.scheme_name,
+            "fund_house": peer.fund_house,
+            "category": peer.scheme_category,
+            "cagr": report.cagr,
+            "absolute_return": report.absolute_return,
+            "annualized_volatility": report.risk.annualized_volatility,
+            "sharpe_ratio": report.risk.sharpe_ratio,
+            "maximum_drawdown": report.drawdown.maximum_drawdown,
+            "benchmark": asdict(report.benchmark) if report.benchmark else None,
+            "benchmark_unavailable_reason": getattr(report, "benchmark_unavailable_reason", None),
+            "return_basis": getattr(report, "return_basis", "unknown"),
+            "distribution_coverage_status": getattr(report, "distribution_coverage_status", "unknown"),
+            "observation_count": report.observation_count,
+            "start_date": report.start_date,
+            "end_date": report.end_date,
+        })
     if not any(row["scheme_code"] == scheme_code for row in ranked):
-        raise ValueError(
-            "Selected scheme has insufficient reconciled NAV history for peer analysis."
-        )
+        raise ValueError("Selected scheme has no eligible peers with identical observation dates.")
+
     for metric in ("cagr", "sharpe_ratio"):
         valid = sorted(
             (row for row in ranked if row[metric] is not None),
-            key=lambda row: row[metric],
-            reverse=True,
+            key=lambda row: row[metric], reverse=True,
         )
         for rank, row in enumerate(valid, start=1):
             row[f"{metric}_rank"] = rank
@@ -108,6 +141,12 @@ def analyze_category_peers(
             "plan_type": selected.plan_type,
             "option_type": selected.option_type,
         },
+        "comparison_window": {
+            "start_date": common_start,
+            "end_date": common_end,
+            "observation_count": len(reference_dates),
+            "requires_identical_observation_dates": True,
+        },
         "peer_count": len(ranked),
         "peer_limit": max_peers,
         "cohort_truncated": cohort_truncated,
@@ -118,9 +157,11 @@ def analyze_category_peers(
         "peers": ranked,
         "excluded_peers": excluded,
         "methodology": (
-            "Exact local category/type/plan/option cohort. Metrics use reconciled NAV-only "
-            "returns; IDCW distributions are excluded. Peers without sufficient NAV history "
-            "are excluded and listed. Ranks are descriptive, not recommendations."
+            "Exact local category/type/plan/option cohort. Every ranked peer must have "
+            "identical actual observation dates and the same start/end boundaries. Peers "
+            "that cannot satisfy this common window are excluded and listed. IDCW benchmark "
+            "metrics require verified complete official distribution coverage. Ranks are "
+            "descriptive, not recommendations."
         ),
     }
 
