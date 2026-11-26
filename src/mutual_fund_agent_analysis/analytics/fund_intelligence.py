@@ -108,7 +108,10 @@ def analyze_category_peers(
         if dates != reference_dates:
             excluded.append({
                 "scheme_code": code,
-                "reason": "Observation dates differ from the selected fund; exact-date category ranking requires identical observations.",
+                "reason": (
+                    "Observation dates differ from the selected fund; exact-date category "
+                    "ranking requires identical observations."
+                ),
             })
             continue
         peer = next(item for item in peers if item.scheme_code == code)
@@ -125,7 +128,9 @@ def analyze_category_peers(
             "benchmark": asdict(report.benchmark) if report.benchmark else None,
             "benchmark_unavailable_reason": getattr(report, "benchmark_unavailable_reason", None),
             "return_basis": getattr(report, "return_basis", "unknown"),
-            "distribution_coverage_status": getattr(report, "distribution_coverage_status", "unknown"),
+            "distribution_coverage_status": getattr(
+                report, "distribution_coverage_status", "unknown"
+            ),
             "observation_count": report.observation_count,
             "start_date": report.start_date,
             "end_date": report.end_date,
