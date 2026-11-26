@@ -51,6 +51,14 @@ These gates are not satisfied by mocks or by the green offline evaluation. Keep 
 | P3-05 | Code cleanup | **Partial** | Cleanup has been limited to the Qdrant lifecycle and directly touched request/route logic. A broader unused-code/dead-component review remains open and must preserve API contracts. |
 | P3-06 | Observability and integration limitations | **Implemented; CI verified** | CI run [45770684450](https://github.com/Souptik-Hazra/Mutual_Fund_Agent_Analysis/actions/runs/45770684450) passed request-ID correlation/invalid-header replacement tests, streaming and non-streaming research_run_id response tests, SSE event tests and graph-node run-ID propagation tests. HTTP middleware logs only request ID, method, path, status and duration (not query strings, headers or request bodies). LangGraph specialist completion/limited logs carry the separate research run ID and status without financial payloads. Provider entitlements, freshness and access limitations remain documented. |
 
+## Actual exposure and benchmark fallback implementation (2026-11-26)
+
+The actual-exposure analytics accepts a calendar `as_of_date`, filters investor transactions to that date, chooses the newest reconciled NAV row on or before the date before inspecting its status (a latest conflict blocks valuation), and selects the latest complete/partial holdings snapshot effective on or before the date. Responses expose per-fund NAV date/status/age, selected valuation date, excluded funds, missing/partial disclosure and data-quality warnings, and look-through coverage. The request schema, assistant specialist propagation, GET query parameter and React panel carry the valuation date. Expected-value regression fixtures cover 10 units × ₹20 NAV = ₹200, 40% holding = ₹80, future transactions, latest NAV conflict refusal, and partial disclosures.
+
+Benchmark lookup errors now propagate rather than being silently converted to unmapped status. Retrying without benchmark data is restricted to the API's explicit HTTP 422 no-TRI-observations response. Frontend tests cover genuine missing observations and unrelated 404/422/500 errors.
+
+The following wider numeric-parity work remains open: independent expected-value fixtures for multi-fund comparisons, category rank outputs, full portfolio allocation and overlap calculations, unequal history windows, and systematic missing/stale/partial data cases. The focused tests above must not be interpreted as completing P2-10.
+
 ## CI and Git workflow contract
 
 - All implementation changes are committed directly to the existing `main` branch; no feature branches or pull requests.
