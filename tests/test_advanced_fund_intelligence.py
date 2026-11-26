@@ -85,3 +85,63 @@ def test_benchmark_resolver_accepts_effective_mapping_with_official_registry_sou
         scheme_category="Large Cap", scheme_type="Equity", plan_type="direct", option_type="growth"
     )
     assert resolve_category_benchmark(Session(), scheme, date(2026, 11, 26)) is mapping
+
+
+def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypatch):
+    from decimal import Decimal
+    from types import SimpleNamespace
+    import mutual_fund_agent_analysis.analytics.portfolio_intelligence as module
+
+    class Rows:
+        def __init__(self, rows): self.rows = rows
+        def all(self): return self.rows
+
+    class Session:
+        def scalars(self, query):
+            entity = getattr(query, "column_descriptions", [{}])[0].get("entity")
+            if entity is module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=101, scheme_name="Redeemed")])
+            if entity is module.InvestorTransaction:
+                return Rows([
+                    SimpleNamespace(transaction_type="purchase", units=Decimal("10"), transaction_date=date(2024,1,1), transaction_id=1),
+                    SimpleNamespace(transaction_type="redemption", units=Decimal("10"), transaction_date=date(2024,2,1), transaction_id=2),
+                ])
+            raise AssertionError("A zero-unit position must not query NAV or holdings.")
+
+    result = module.actual_portfolio_exposure(Session(), [101])
+    assert result["total_valued_portfolio_inr"] == Decimal("0")
+    assert result["valued_funds"] == []
+    assert result["coverage"]["valued_fund_count"] == 0
+    assert result["excluded_funds"][0]["scheme_code"] == 101
+    assert "remaining units" in result["excluded_funds"][0]["reason"]
+
+
+def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav(monkeypatch):
+    from decimal import Decimal
+    import mutual_fund_agent_analysis.analytics.portfolio_intelligence as module
+
+    class Rows:
+        def __init__(self, rows): self.rows = rows
+        def all(self): return self.rows
+
+    class Session:
+        def scalars(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=102, scheme_name="Partial")])
+            if entity is module.InvestorTransaction:
+                return Rows([
+                    SimpleNamespace(transaction_type="purchase", units=Decimal("10"), transaction_date=date(2024,1,1), transaction_id=1),
+                    SimpleNamespace(transaction_type="redemption", units=Decimal("4"), transaction_date=date(2024,2,1), transaction_id=2),
+                ])
+            raise AssertionError("Unexpected holdings query for no disclosed portfolio.")
+
+        def scalar(self, query):
+            assert query.column_descriptions[0]["entity"] is module.NavReconciliation
+            return SimpleNamespace(canonical_nav=Decimal("20"), nav_date=date(2026,11,25))
+
+    result = module.actual_portfolio_exposure(Session(), [102])
+    assert result["total_valued_portfolio_inr"] == Decimal("120")
+    assert result["coverage"]["valued_fund_count"] == 1
+    assert result["valued_funds"][0]["units"] == Decimal("6")
+    assert result["valued_funds"][0]["market_value_inr"] == Decimal("120")
