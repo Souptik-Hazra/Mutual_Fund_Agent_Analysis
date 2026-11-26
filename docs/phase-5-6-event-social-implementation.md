@@ -52,7 +52,7 @@ The registered `base_url` must be HTTPS and its hostname must exactly match the 
 
 ### Delivered
 
-- Official Reddit OAuth and X API v2 recent-search clients remain separate provider adapters.
+- Official Reddit OAuth and X API v2 recent-search clients remain separate provider adapters. Credentials are optional for application startup; `GET /api/v1/social/providers` reports readiness without exposing secret values.
 - Collection is blocked unless the source is enabled, classified as social, has a terms URL, and has explicit `terms_reviewed`, `access_confirmed`, and `reviewed_at` metadata.
 - Provider authorization failures are returned as access-denied responses; rate limits are surfaced as rate limits rather than generic server errors.
 - Persisted social records contain provider IDs, canonical URLs, SHA-256 content hashes, publication time, engagement metadata, optional entity IDs, and expiry. Text excerpts and raw text fields are discarded before persistence.
@@ -64,7 +64,9 @@ The registered `base_url` must be HTTPS and its hostname must exactly match the 
 
 ### API
 
-- `GET /api/v1/social/collect?source=reddit|x&q=...` — opt-in provider collection.
+- `GET /api/v1/social/providers` — reports whether credentials, source enablement, and terms/access review permit collection or manual import.
+- `GET /api/v1/social/collect?source=reddit|x&q=...` — opt-in provider collection; returns HTTP 409 with an actionable explanation when credentials are absent.
+- `POST /api/v1/social/import-file` — import up to 500 authorized records from CSV or JSON (maximum 5 MB) when the matching source has been enabled and reviewed.
 - `POST /api/v1/social/posts` — ingest normalized post metadata and optional approved external sentiment.
 - `GET /api/v1/social/analytics` — discussion volume and scored sentiment coverage.
 - `GET /api/v1/social/funds/{scheme_code}/sentiment?start_date=...&end_date=...` — holdings-weighted company discussion signal.
@@ -78,11 +80,12 @@ For each provider, review the current API tier, access, terms, attribution, and 
 - `metadata.retention_days` set to the reviewed retention period (1–365).
 - `metadata.evaluated_sentiment_models` containing only finance sentiment model IDs that have been independently evaluated. Leave it empty when no such model is approved.
 
-Credentials are supplied through `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, and `X_BEARER_TOKEN`. Provider credentials do not bypass the source review gate.
+Credentials are supplied through `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, and `X_BEARER_TOKEN`; they are optional and empty values are treated as unconfigured. When API access is unavailable, an operator may import a CSV/JSON export only when the source is enabled and its terms/access review is recorded. Supported import fields include `external_id`, `text_excerpt` (or `text`), `canonical_url` (or `url`), `published_at`, `engagement_count`, `related_entity_id`, `metadata`, and optional evaluated sentiment fields. Imports receive a SHA-256 hash and source-specific expiry; raw text is discarded by the persistence service. Provider credentials do not bypass the source review gate.
 
 ### Deliberate limits
 
 - Reddit/X sources remain disabled until the operator verifies current access and terms. This implementation does not claim the user's account has API access.
+- Missing API keys do not disable the rest of the application. News/event data remains a separate source category and must not be reported as Reddit/X community sentiment. Manual import is not a workaround for platform terms or export restrictions.
 - Collected posts are not automatically assigned to a company; supply a canonical `related_entity_id` after deterministic resolution.
 - Sentiment requires a separately evaluated finance model. No keyword sentiment heuristic is used.
 - Engagement and discussion volume are not credibility, causal impact, or NAV predictors.
