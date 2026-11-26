@@ -149,7 +149,12 @@ def load_fund_return_prices(
     attestation = None
     for item in attestations:
         source = session.get(DataSource, item.source_key)
-        if source is not None and source.enabled and source.is_official:
+        if (
+            source is not None
+            and source.enabled
+            and source.is_official
+            and source.source_type == "official"
+        ):
             attestation = item
             break
     if attestation is None:
@@ -176,6 +181,7 @@ def load_fund_return_prices(
             or source is None
             or not source.enabled
             or not source.is_official
+            or source.source_type != "official"
         ):
             return prices, conflicts, "nav_only_excludes_idcw", "incomplete", (
                 "An in-range distribution is not verified against an enabled official source."
