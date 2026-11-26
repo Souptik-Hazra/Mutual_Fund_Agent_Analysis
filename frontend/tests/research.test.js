@@ -72,5 +72,5 @@ test("historical equity status passes the selected end date as API as_of", async
   const component = await readFile(new URL("../src/AdvancedIntelligence.jsx", import.meta.url), "utf8");
   assert.match(component, /params\.set\(tab === "Fund Profile" \? "end_date" : "as_of", dateTo\)/);
   assert.match(component, /\/fund-intelligence\/schemes\/\$\{schemeCodes\[0\]\}\/profile/);
-  assert.match(component, /params\.set\("as_of", dateTo\)/);
+  assert.match(component, /\/market-data\/securities\/\$\{encodeURIComponent\(securityKey\.trim\(\)\)\}/);
 });
