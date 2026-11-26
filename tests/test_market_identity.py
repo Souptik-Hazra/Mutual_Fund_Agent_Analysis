@@ -155,8 +155,11 @@ def test_security_identity_rejects_missing_isin_mapping():
             return Rows()
 
     request = QuoteSyncRequest(
-        security_key=ISIN, security_name="Infosys Limited",
-        symbol="INFY", exchange="NSE", isin=ISIN,
+        security_key=ISIN,
+        security_name="Infosys Limited",
+        symbol="INFY",
+        exchange="NSE",
+        isin=ISIN,
     )
     with pytest.raises(HTTPException) as error:
         _resolve_security_identity(Session(), request, date(2026, 11, 25))
@@ -173,8 +176,11 @@ def test_security_identity_rejects_ambiguous_isin_mapping():
             return Rows()
 
     request = QuoteSyncRequest(
-        security_key=ISIN, security_name="Infosys Limited",
-        symbol="INFY", exchange="NSE", isin=ISIN,
+        security_key=ISIN,
+        security_name="Infosys Limited",
+        symbol="INFY",
+        exchange="NSE",
+        isin=ISIN,
     )
     with pytest.raises(HTTPException) as error:
         _resolve_security_identity(Session(), request, date(2026, 11, 25))
@@ -203,8 +209,11 @@ def test_security_identity_rejects_unofficial_mapping_provenance():
             return None
 
     request = QuoteSyncRequest(
-        security_key=ISIN, security_name="Infosys Limited",
-        symbol="INFY", exchange="NSE", isin=ISIN,
+        security_key=ISIN,
+        security_name="Infosys Limited",
+        symbol="INFY",
+        exchange="NSE",
+        isin=ISIN,
     )
     with pytest.raises(HTTPException) as error:
         _resolve_security_identity(Session(), request, date(2026, 11, 25))
@@ -241,8 +250,11 @@ def test_security_identity_rejects_exchange_symbol_mapped_to_another_entity():
             return None
 
     request = QuoteSyncRequest(
-        security_key=ISIN, security_name="Infosys Limited",
-        symbol="INFY", exchange="NSE", isin=ISIN,
+        security_key=ISIN,
+        security_name="Infosys Limited",
+        symbol="INFY",
+        exchange="NSE",
+        isin=ISIN,
     )
     with pytest.raises(HTTPException) as error:
         _resolve_security_identity(Session(), request, date(2026, 11, 25))
