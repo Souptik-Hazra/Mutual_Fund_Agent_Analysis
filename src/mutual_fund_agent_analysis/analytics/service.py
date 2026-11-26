@@ -292,7 +292,7 @@ def _build_report(
             "absolute_return": "(ending fund return index / starting fund return index) - 1.",
             "cagr": "Geometric annualization using 365.25 calendar days.",
             "annualized_volatility": (
-                Sample standard deviation of periodic simple fund returns multiplied by 
+                "Sample standard deviation of periodic simple fund returns multiplied by "
                 "sqrt(periods_per_year)."
             ),
             "annualized_downside_deviation": (
