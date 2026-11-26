@@ -155,3 +155,24 @@ def test_mixed_growth_and_idcw_comparison_is_rejected_before_ranking():
 
     with pytest.raises(ValueError, match="Mixed Growth and IDCW"):
         service.compare_funds(Session(), [1, 2])
+
+
+def test_multi_idcw_comparison_rejects_mixed_verified_and_nav_only_bases(monkeypatch):
+    class Session:
+        def scalars(self, _statement):
+            class Result:
+                def all(self):
+                    return [
+                        SimpleNamespace(scheme_code=1, option_type="idcw_reinvestment"),
+                        SimpleNamespace(scheme_code=2, option_type="idcw_reinvestment"),
+                    ]
+            return Result()
+
+    def fake_loader(_session, code, *_args, **_kwargs):
+        basis = "idcw_reinvested_total_return" if code == 1 else "nav_only_excludes_idcw"
+        coverage = "verified_complete" if code == 1 else "incomplete"
+        return NAVS, (), basis, coverage, None
+
+    monkeypatch.setattr(service, "load_fund_return_prices", fake_loader)
+    with pytest.raises(ValueError, match="do not share one verified return basis"):
+        service.compare_funds(Session(), [1, 2])
