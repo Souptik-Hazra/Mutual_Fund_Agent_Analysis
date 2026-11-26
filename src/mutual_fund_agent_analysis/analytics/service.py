@@ -455,8 +455,8 @@ def compare_funds(
     options = set(option_by_code.values())
     if len(options) > 1:
         raise ValueError(
-            "Mixed Growth and IDCW options are not ranked together. "
-            "Select schemes with the same option type."
+            "Mixed Growth and IDCW options are not ranked together; select "
+            "like-for-like scheme options with the same option type."
         )
 
     loaded = {
