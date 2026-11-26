@@ -50,7 +50,7 @@ PAYLOAD="$WORK_DIR/backup"
 }
 (cd "$PAYLOAD" && sha256sum -c SHA256SUMS)
 FORMAT_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["format_version"])' "$PAYLOAD/manifest.json")"
-[[ "$FORMAT_VERSION" == 2 ]] || { printf 'Unsupported backup format: %s (expected 2).\n' "$FORMAT_VERSION" >&2; exit 1; }
+[[ "$FORMAT_VERSION" == 1 || "$FORMAT_VERSION" == 2 ]] || { printf 'Unsupported backup format: %s (supported: 1, 2).\n' "$FORMAT_VERSION" >&2; exit 1; }
 DB_NAME="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["postgres_database"])' "$PAYLOAD/manifest.json")"
 QDRANT_COLLECTION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["qdrant_collection"])' "$PAYLOAD/manifest.json")"
 QDRANT_INCLUDED="$(python3 -c 'import json,sys; print("true" if json.load(open(sys.argv[1]))["qdrant_snapshot_included"] else "false")' "$PAYLOAD/manifest.json")"
