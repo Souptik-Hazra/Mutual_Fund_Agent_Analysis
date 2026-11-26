@@ -45,3 +45,14 @@
 .chart-readout small{color:#8fa1aa}
 .chart-axis{display:flex;justify-content:space-between;margin:0 0 10px;color:#81939c;font-size:10px}
 @media(max-width:650px){.performance-svg{min-height:150px}.chart-legend{gap:10px}.chart-readout{gap:8px}}
+
+/* Category peer table readability and horizontal overflow */
+.peer-table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.peer-table{min-width:1120px;table-layout:auto}
+.peer-table th,.peer-table td{padding:12px 14px;vertical-align:middle}
+.peer-table .peer-scheme-cell{min-width:260px;white-space:normal;line-height:1.45}
+.peer-scheme-cell strong,.peer-scheme-cell small{display:block}
+.peer-scheme-cell strong{font-size:11px;font-weight:600;color:#e1e9ec;white-space:normal;overflow-wrap:anywhere}
+.peer-scheme-cell small{font-size:10px;color:#8fa1aa;margin-top:4px}
+.peer-table td:not(.peer-scheme-cell),.peer-table th:not(:first-child){white-space:nowrap}
+.peer-table tbody tr:hover{background:#192831}
