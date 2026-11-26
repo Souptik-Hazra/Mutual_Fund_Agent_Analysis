@@ -289,10 +289,10 @@ def _build_report(
             "fund_return_basis": return_basis,
             "distribution_coverage_status": distribution_coverage_status,
             "distribution_coverage_limitation": distribution_unavailable_reason or "Not applicable.",
-            "absolute_return": "(ending NAV / starting NAV) - 1.",
+            "absolute_return": "(ending fund return index / starting fund return index) - 1.",
             "cagr": "Geometric annualization using 365.25 calendar days.",
             "annualized_volatility": (
-                "Sample standard deviation of periodic simple NAV returns multiplied by "
+                Sample standard deviation of periodic simple fund returns multiplied by 
                 "sqrt(periods_per_year)."
             ),
             "annualized_downside_deviation": (
@@ -395,7 +395,6 @@ def compare_funds(
         for code in codes
     }
     bases = {item[2] for item in loaded.values()}
-    coverage_states = {item[3] for item in loaded.values()}
     warnings = []
     effective_benchmark = benchmark_code
     if "nav_only_excludes_idcw" in bases and benchmark_code is not None:
