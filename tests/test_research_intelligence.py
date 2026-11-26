@@ -677,7 +677,7 @@ def test_portfolio_upload_rejects_xlsx_with_rows_beyond_bounded_scan():
     with pytest.raises(HTTPException) as error:
         asyncio.run(
             research_routes.import_portfolio_file(
-                session=None,
+                session=SimpleNamespace(rollback=lambda: None),
                 file=upload,
                 scheme_code=100,
                 effective_date=date(2026, 11, 25),
