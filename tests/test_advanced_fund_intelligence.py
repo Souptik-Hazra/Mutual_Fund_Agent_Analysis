@@ -299,3 +299,148 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
     payload = security_profile(Session(), "EX", as_of=date(2026, 11, 25))
     assert payload["availability"] == "available"
     assert payload["observation_history"][0]["content_hash"] == "late-india-observation"
+
+
+def test_actual_exposure_uses_as_of_ledger_nav_and_holdings_with_exact_expected_values():
+    as_of = date(2026, 6, 30)
+    snapshot = SimpleNamespace(snapshot_id=4, status="complete", effective_date=date(2026, 6, 1))
+    nav = SimpleNamespace(status="matched", canonical_nav=Decimal("20"), nav_date=date(2026, 6, 29))
+    holding = SimpleNamespace(isin="INE000A", security_key="INE000A", security_name="Example Bank", sector="Banks", weight_pct=Decimal("40"))
+
+    class Rows:
+        def __init__(self, rows): self.rows = rows
+        def all(self): return self.rows
+
+    class Session:
+        def scalars(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=201, scheme_name="As-of Test Fund")])
+            if entity is portfolio_module.InvestorTransaction:
+                assert as_of in query.compile().params.values()
+                return Rows([SimpleNamespace(transaction_type="purchase", units=Decimal("10"), transaction_date=date(2026, 1, 1), transaction_id=1)])
+            if entity is portfolio_module.PortfolioHolding:
+                return Rows([holding])
+            raise AssertionError(entity)
+        def scalar(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            assert as_of in query.compile().params.values()
+            if entity is portfolio_module.NavReconciliation:
+                assert "status in" not in str(query).lower()
+                return nav
+            if entity is portfolio_module.PortfolioSnapshot:
+                return snapshot
+            raise AssertionError(entity)
+
+    result = actual_portfolio_exposure(Session(), [201], as_of)
+    assert result["as_of_date"] == as_of
+    assert result["total_valued_portfolio_inr"] == Decimal("200")
+    assert result["valued_funds"][0]["units"] == Decimal("10")
+    assert result["valued_funds"][0]["market_value_inr"] == Decimal("200")
+    assert result["valued_funds"][0]["nav_date"] == date(2026, 6, 29)
+    assert result["equity_exposure"][0]["actual_exposure_inr"] == Decimal("80")
+    assert result["equity_exposure"][0]["actual_portfolio_weight_pct"] == Decimal("40")
+    assert result["sector_exposure"][0]["exposure_inr"] == Decimal("80")
+    assert result["coverage"]["lookthrough_coverage_pct"] == Decimal("100")
+
+
+def test_actual_exposure_refuses_latest_conflicted_nav_instead_of_older_accepted_row():
+    as_of = date(2026, 6, 30)
+
+    class Rows:
+        def __init__(self, items): self.items = items
+        def all(self): return self.items
+
+    class Session:
+        def scalars(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=202, scheme_name="Conflict Fund")])
+            if entity is portfolio_module.InvestorTransaction:
+                return Rows([SimpleNamespace(transaction_type="purchase", units=Decimal("5"), transaction_date=date(2026, 1, 1), transaction_id=1)])
+            raise AssertionError("Conflicted NAV must prevent holdings queries.")
+        def scalar(self, query):
+            assert query.column_descriptions[0]["entity"] is portfolio_module.NavReconciliation
+            assert as_of in query.compile().params.values()
+            assert "status in" not in str(query).lower()
+            return SimpleNamespace(status="conflict", nav_date=date(2026, 6, 29), canonical_nav=Decimal("100"))
+
+    result = actual_portfolio_exposure(Session(), [202], as_of)
+    assert result["total_valued_portfolio_inr"] == Decimal("0")
+    assert result["valued_funds"] == []
+    assert "falling back" in result["excluded_funds"][0]["reason"]
+    assert result["data_quality_warnings"][0]["type"] == "nav_conflict"
+
+
+def test_actual_exposure_filters_future_transactions_and_selects_historical_holdings():
+    as_of = date(2026, 6, 30)
+    txns = [
+        SimpleNamespace(transaction_type="purchase", units=Decimal("10"), transaction_date=date(2026, 1, 1), transaction_id=1),
+        SimpleNamespace(transaction_type="purchase", units=Decimal("100"), transaction_date=date(2026, 7, 1), transaction_id=2),
+        SimpleNamespace(transaction_type="redemption", units=Decimal("3"), transaction_date=date(2026, 7, 2), transaction_id=3),
+    ]
+    old_snapshot = SimpleNamespace(snapshot_id=5, status="complete", effective_date=date(2026, 6, 1))
+    nav = SimpleNamespace(status="single_source", canonical_nav=Decimal("10"), nav_date=date(2026, 6, 29))
+    holding = SimpleNamespace(isin="INE002B", security_key="INE002B", security_name="Example Co", sector="IT", weight_pct=Decimal("25"))
+
+    class Rows:
+        def __init__(self, items): self.items = items
+        def all(self): return self.items
+
+    class Session:
+        def scalars(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=203, scheme_name="Future Row Fund")])
+            if entity is portfolio_module.InvestorTransaction:
+                assert as_of in query.compile().params.values()
+                return Rows([item for item in txns if item.transaction_date <= as_of])
+            if entity is portfolio_module.PortfolioHolding:
+                return Rows([holding])
+            raise AssertionError(entity)
+        def scalar(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            assert as_of in query.compile().params.values()
+            if entity is portfolio_module.NavReconciliation:
+                return nav
+            if entity is portfolio_module.PortfolioSnapshot:
+                return old_snapshot
+            raise AssertionError(entity)
+
+    result = actual_portfolio_exposure(Session(), [203], as_of)
+    assert result["valued_funds"][0]["units"] == Decimal("10")
+    assert result["total_valued_portfolio_inr"] == Decimal("100")
+    assert result["equity_exposure"][0]["actual_exposure_inr"] == Decimal("25")
+    assert result["equity_exposure"][0]["fund_exposures"][0]["holdings_as_of"] == date(2026, 6, 1)
+
+
+def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
+    as_of = date(2026, 6, 30)
+    partial = SimpleNamespace(snapshot_id=6, status="partial", effective_date=date(2026, 5, 31))
+    class Rows:
+        def __init__(self, items): self.items = items
+        def all(self): return self.items
+    class Session:
+        def scalars(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=204, scheme_name="Partial Disclosure Fund")])
+            if entity is portfolio_module.InvestorTransaction:
+                return Rows([SimpleNamespace(transaction_type="purchase", units=Decimal("4"), transaction_date=date(2026, 1, 1), transaction_id=1)])
+            if entity is portfolio_module.PortfolioHolding:
+                return Rows([SimpleNamespace(isin="INE003C", security_key="INE003C", security_name="Partial Co", sector="Health", weight_pct=Decimal("50"))])
+            raise AssertionError(entity)
+        def scalar(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.NavReconciliation:
+                return SimpleNamespace(status="matched", canonical_nav=Decimal("25"), nav_date=date(2026, 6, 29))
+            if entity is portfolio_module.PortfolioSnapshot:
+                assert as_of in query.compile().params.values()
+                return partial
+            raise AssertionError(entity)
+    result = actual_portfolio_exposure(Session(), [204], as_of)
+    assert result["total_valued_portfolio_inr"] == Decimal("100")
+    assert result["equity_exposure"][0]["actual_exposure_inr"] == Decimal("50")
+    assert result["coverage"]["lookthrough_coverage_pct"] == Decimal("100")
+    assert result["coverage"]["is_complete"] is False
+    assert result["data_quality_warnings"][0]["type"] == "partial_holdings"
