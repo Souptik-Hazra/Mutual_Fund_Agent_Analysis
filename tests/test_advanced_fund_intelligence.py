@@ -132,7 +132,6 @@ def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypa
 
 def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
     from decimal import Decimal
-    import mutual_fund_agent_analysis.analytics.portfolio_intelligence as module
 
     class Rows:
         def __init__(self, rows): self.rows = rows
@@ -178,7 +177,7 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
         change_pct=1,
         source_key="provider",
         source_url="https://provider.example/old",
-        retrieved_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
         content_hash="a",
         fundamentals_json={"pe_ratio": 10},
         fundamentals_as_of=date(2025, 12, 31),
