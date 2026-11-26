@@ -75,7 +75,7 @@ REM Terminal 1: start Docker Engine, PostgreSQL and Qdrant.
 start "Docker - WSL" wt.exe -w new --title "Docker - WSL" wsl.exe --cd "%WSL_PROJECT%" -- bash -lc "sudo service docker start && docker compose up -d db qdrant; exec bash -i"
 
 REM Terminal 2: wait for PostgreSQL, apply migrations, then start FastAPI.
-start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" cmd.exe /k "cd /d ""%PROJECT_DIR%"" && call ""%VENV_ACTIVATE%"" && python -c ""import socket,time,sys; deadline=time.time()+120; s=socket.socket(); exec('while time.time()<deadline:\n try:\n  s.connect((\'127.0.0.1\',5432)); s.close(); sys.exit(0)\n except OSError:\n  time.sleep(2)'); sys.exit('PostgreSQL did not become ready within 120 seconds')"" && alembic upgrade head && uvicorn mutual_fund_agent_analysis.main:app --reload"
+start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" cmd.exe /k "cd /d ""%PROJECT_DIR%"" && call ""%VENV_ACTIVATE%"" && powershell -NoProfile -Command ""$deadline=(Get-Date).AddSeconds(120); while ((Get-Date) -lt $deadline) { try { $client=New-Object Net.Sockets.TcpClient; $client.Connect('127.0.0.1',5432); $client.Close(); exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"" && alembic upgrade head && uvicorn mutual_fund_agent_analysis.main:app --reload"
 
 REM Terminal 3: start the Vite development server.
 start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" cmd.exe /k "cd /d ""%FRONTEND_DIR%"" && npm run dev"
