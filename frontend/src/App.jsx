@@ -333,6 +333,13 @@ export default function App() {
     setData(null);
     setStreamProgress([]);
     try {
+      if (schemeCodes.length) {
+        await Promise.all(
+          schemeCodes.map((code) =>
+            request("/schemes/" + code + "/sync-nav", { method: "POST" })
+          )
+        );
+      }
       const selection = await resolveBenchmarkForCodes(schemeCodes, dateTo, benchmark);
       const result = await streamRequest(
         "/assistant/research/stream",
