@@ -29,7 +29,7 @@ class PortfolioImportRequest(BaseModel):
     effective_date: date
     published_at: datetime | None = None
     document_url: HttpUrl | None = None
-    content_hash: str = Field(min_length=32, max_length=128)
+    content_hash: str | None = Field(default=None, min_length=32, max_length=128)
     total_market_value: Decimal | None = Field(default=None, ge=0)
     status: Literal["complete", "partial"] = "complete"
     holdings: list[HoldingInput] = Field(min_length=1, max_length=5000)

@@ -293,3 +293,28 @@ def test_unknown_and_disabled_sources_are_rejected(session):
     session.flush()
     with pytest.raises(ValueError, match="disabled"):
         record_evidence(session, "disabled")
+
+
+def test_verified_evidence_requires_an_official_source(session):
+    with pytest.raises(ValueError, match="official source"):
+        record_evidence(
+            session,
+            "mfapi",
+            external_id="provider-verified",
+            verification_status="verified",
+        )
+
+
+def test_verified_relationship_requires_linked_verified_evidence(session):
+    scheme = create_entity(session, "scheme", "Unverified Scheme")
+    amc = create_entity(session, "amc", "Unverified AMC")
+    evidence = record_evidence(session, "amfi", external_id="unverified-link")
+    with pytest.raises(ValueError, match="linked verified evidence"):
+        create_entity_relationship(
+            session,
+            scheme.entity_id,
+            amc.entity_id,
+            "managed_by",
+            evidence_id=evidence.evidence_id,
+            verification_status="verified",
+        )

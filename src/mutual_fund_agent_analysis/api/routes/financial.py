@@ -180,7 +180,9 @@ def add_scheme_metadata_observation(
     _validate_source_url(
         source, source_url, require_registered_host=request.verification_status == "verified"
     )
-    if request.verification_status == "verified" and not source.is_official:
+    if request.verification_status == "verified" and (
+        not source.is_official or source.source_type != "official"
+    ):
         raise HTTPException(
             status_code=422,
             detail="Only a registered official source can back verified scheme metadata.",
@@ -363,7 +365,9 @@ def add_distribution_observation(
     _validate_source_url(
         source, source_url, require_registered_host=request.verification_status == "verified"
     )
-    if request.verification_status == "verified" and not source.is_official:
+    if request.verification_status == "verified" and (
+        not source.is_official or source.source_type != "official"
+    ):
         raise HTTPException(
             status_code=422,
             detail="Only a registered official source can back a verified distribution.",
@@ -499,7 +503,9 @@ def add_distribution_coverage_attestation(
     _validate_source_url(
         source, source_url, require_registered_host=request.verification_status == "verified"
     )
-    if request.verification_status == "verified" and not source.is_official:
+    if request.verification_status == "verified" and (
+        not source.is_official or source.source_type != "official"
+    ):
         raise HTTPException(
             status_code=422,
             detail="A verified coverage attestation must reference an official source.",
@@ -634,6 +640,7 @@ def get_idcw_total_return(
         or coverage_source is None
         or not coverage_source.enabled
         or not coverage_source.is_official
+        or coverage_source.source_type != "official"
         or attestation.start_date > start_date
         or attestation.end_date < end_date
     ):

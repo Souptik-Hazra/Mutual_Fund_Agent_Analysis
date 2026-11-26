@@ -73,8 +73,11 @@ def ingest_portfolio(
     """Persist one AMC disclosure snapshot; repeat imports with the same hash are idempotent."""
     try:
         snapshot = import_portfolio_snapshot(session, payload)
+        session.commit()
+        session.refresh(snapshot)
         return portfolio_payload(session, snapshot)
     except ValueError as exc:
+        session.rollback()
         raise _domain_error(exc) from exc
 
 
@@ -258,10 +261,14 @@ async def import_portfolio_file(
             },
         )
         snapshot = import_portfolio_snapshot(session, payload)
+        session.commit()
+        session.refresh(snapshot)
         return portfolio_payload(session, snapshot)
     except HTTPException:
+        session.rollback()
         raise
     except Exception as exc:
+        session.rollback()
         if isinstance(exc, ValueError):
             raise _domain_error(exc) from exc
         raise HTTPException(

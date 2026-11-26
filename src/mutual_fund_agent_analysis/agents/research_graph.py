@@ -543,7 +543,11 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     )
                 ).all()
                 for post in social_rows:
-                    evidence = session.get(EvidenceRecord, post.evidence_id) if post.evidence_id else None
+                    evidence = (
+                        session.get(EvidenceRecord, post.evidence_id)
+                        if post.evidence_id
+                        else None
+                    )
                     citation = _provenance_citation(
                         session,
                         post.source_key,

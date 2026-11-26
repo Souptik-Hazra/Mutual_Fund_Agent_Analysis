@@ -227,6 +227,10 @@ def record_evidence(
         raise ValueError(f"Source {source_key!r} is disabled.")
     if verification_status not in VERIFICATION_STATUSES:
         raise ValueError("Unsupported verification_status.")
+    if verification_status == "verified" and (
+        not source.is_official or source.source_type != "official"
+    ):
+        raise ValueError("Verified evidence requires an enabled registered official source.")
     _validate_aware_datetime(published_at, "published_at")
     _validate_aware_datetime(retrieved_at, "retrieved_at")
     if external_id is not None and not external_id.strip():
@@ -239,8 +243,32 @@ def record_evidence(
         raise ValueError("confidence must be between 0 and 1.")
     if canonical_url:
         parsed = urlparse(canonical_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("canonical_url must be an absolute HTTP(S) URL.")
+        allowed_schemes = {"https"} if verification_status == "verified" else {"http", "https"}
+        if (
+            parsed.scheme not in allowed_schemes
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise ValueError("canonical_url must be an absolute HTTPS URL without credentials when verified.")
+        if verification_status == "verified" and source.base_url:
+            registered = urlparse(source.base_url)
+            try:
+                actual_port = parsed.port or 443
+                registered_port = registered.port or 443
+            except ValueError as exc:
+                raise ValueError("canonical_url or registered source has an invalid port.") from exc
+            actual_host = (parsed.hostname or "").lower().rstrip(".")
+            registered_host = (registered.hostname or "").lower().rstrip(".")
+            if (
+                registered.scheme != "https"
+                or actual_port != registered_port
+                or not (
+                    actual_host == registered_host
+                    or actual_host.endswith("." + registered_host)
+                )
+            ):
+                raise ValueError("Verified evidence URL must match the registered official source host.")
     if content_hash and not re.fullmatch(r"[a-fA-F0-9]{32,128}", content_hash):
         raise ValueError("content_hash must be a hexadecimal digest between 32 and 128 characters.")
     existing = None
@@ -421,6 +449,17 @@ def create_entity_relationship(
         if source_key and evidence.source_key != source_key:
             raise ValueError("source_key must match the linked evidence source.")
         source_key = source_key or evidence.source_key
+    if verification_status == "verified":
+        if evidence is None or evidence.verification_status != "verified":
+            raise ValueError("A verified relationship requires linked verified evidence.")
+        source = session.get(DataSource, source_key) if source_key else None
+        if (
+            source is None
+            or not source.enabled
+            or not source.is_official
+            or source.source_type != "official"
+        ):
+            raise ValueError("A verified relationship requires an enabled registered official source.")
 
     existing = session.scalar(
         select(EntityRelationship).where(

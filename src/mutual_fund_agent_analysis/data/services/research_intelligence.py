@@ -30,6 +30,14 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
     if not source.is_official or source.source_type != "official":
         raise ValueError("Portfolio disclosures must use an enabled registered official source.")
     canonical_payload = payload.model_dump(mode="json", exclude={"content_hash"})
+    canonical_payload["holdings"] = sorted(
+        canonical_payload["holdings"],
+        key=lambda item: (
+            item["security_key"].strip().upper(),
+            item["asset_class"],
+            (item.get("isin") or "").strip().upper(),
+        ),
+    )
     content_hash = hashlib.sha256(
         json.dumps(canonical_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -89,8 +97,7 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
             asset_class=item.asset_class, quantity=item.quantity, market_value=item.market_value,
             weight_pct=item.weight_pct, currency=item.currency.upper(), metadata_json=item.metadata,
         ))
-    session.commit()
-    session.refresh(snapshot)
+    session.flush()
     return snapshot
 
 
@@ -235,20 +242,33 @@ def compare_portfolios(
 
 def security_fund_exposure(session: Session, security_key: str) -> dict[str, Any]:
     key = security_key.strip().upper()
-    ranked_snapshots = select(
-        PortfolioSnapshot.snapshot_id,
-        func.row_number().over(
-            partition_by=PortfolioSnapshot.scheme_code,
-            order_by=(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc()),
-        ).label("snapshot_rank"),
-    ).subquery()
+    ranked_snapshots = (
+        select(
+            PortfolioSnapshot.snapshot_id,
+            func.row_number().over(
+                partition_by=PortfolioSnapshot.scheme_code,
+                order_by=(
+                    PortfolioSnapshot.effective_date.desc(),
+                    PortfolioSnapshot.snapshot_id.desc(),
+                ),
+            ).label("snapshot_rank"),
+        )
+        .join(DataSource, DataSource.source_key == PortfolioSnapshot.source_key)
+        .where(
+            PortfolioSnapshot.status.in_(["complete", "partial"]),
+            DataSource.enabled.is_(True),
+            DataSource.is_official.is_(True),
+            DataSource.source_type == "official",
+        )
+        .subquery()
+    )
     stmt = (
         select(PortfolioHolding, PortfolioSnapshot, MutualFundScheme)
         .join(PortfolioSnapshot, PortfolioSnapshot.snapshot_id == PortfolioHolding.snapshot_id)
         .join(MutualFundScheme, MutualFundScheme.scheme_code == PortfolioSnapshot.scheme_code)
         .join(ranked_snapshots, ranked_snapshots.c.snapshot_id == PortfolioSnapshot.snapshot_id)
         .where(ranked_snapshots.c.snapshot_rank == 1)
-        .where(PortfolioHolding.security_key == key)
+        .where((PortfolioHolding.security_key == key) | (PortfolioHolding.isin == key))
         .order_by(PortfolioHolding.weight_pct.desc().nullslast())
     )
     rows = session.execute(stmt).all()
