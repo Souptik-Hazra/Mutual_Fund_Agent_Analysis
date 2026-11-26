@@ -187,27 +187,38 @@ def get_scheme(
 def sync_scheme_nav_on_demand(
     scheme_code: int,
     session: Annotated[Session, Depends(get_db)],
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> dict:
-    """Fetch NAV history once when a catalogue-only scheme is first analysed."""
+    """Fetch NAV history when no observations cover the requested analysis window."""
     _validate_scheme_code(scheme_code)
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
     if session.get(MutualFundScheme, scheme_code) is None:
         raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
 
-    existing_count = session.scalar(
+    coverage_statement = (
         select(func.count())
         .select_from(NavReconciliation)
         .where(NavReconciliation.scheme_code == scheme_code)
-    ) or 0
+    )
+    if start_date is not None:
+        coverage_statement = coverage_statement.where(NavReconciliation.nav_date >= start_date)
+    if end_date is not None:
+        coverage_statement = coverage_statement.where(NavReconciliation.nav_date <= end_date)
+    existing_count = session.scalar(coverage_statement) or 0
     if existing_count:
         return {
             "scheme_code": scheme_code,
             "synced": False,
             "observation_count": existing_count,
-            "message": "NAV history is already available locally.",
+            "requested_start_date": start_date,
+            "requested_end_date": end_date,
+            "message": "NAV observations already exist within the requested date window.",
         }
 
     try:
-        processed = sync_scheme_nav(session, scheme_code)
+        processed = sync_scheme_nav(session, scheme_code, start_date, end_date)
         session.commit()
     except (httpx.HTTPError, ValueError) as exc:
         session.rollback()
@@ -228,6 +239,8 @@ def sync_scheme_nav_on_demand(
         "scheme_code": scheme_code,
         "synced": True,
         "observation_count": processed,
+        "requested_start_date": start_date,
+        "requested_end_date": end_date,
         "message": "NAV history fetched and reconciled successfully.",
     }
 
