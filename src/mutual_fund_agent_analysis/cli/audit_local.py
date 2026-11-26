@@ -173,7 +173,8 @@ def probe_twelve_data(symbol: str, exchange: str) -> dict[str, Any]:
             "coverage_scope": "single quote endpoint only",
             "limitations": [
                 "A successful quote does not establish plan-wide exchange entitlement.",
-                "No historical price, comprehensive fundamentals, or corporate-action coverage is inferred.",
+                "No historical price, comprehensive fundamentals, or "
+                "corporate-action coverage is inferred.",
             ],
         }
     except Exception as exc:  # noqa: BLE001
@@ -211,7 +212,10 @@ def probe_live_sources(
             }
     mfapi_data = outcomes.get("mfapi", {}).pop("_nav_by_date", {})
     amfi_data = outcomes.get("amfi", {}).pop("_nav_by_date", {})
-    if outcomes.get("mfapi", {}).get("status") == "success" and outcomes.get("amfi", {}).get("status") == "success":
+    if (
+        outcomes.get("mfapi", {}).get("status") == "success"
+        and outcomes.get("amfi", {}).get("status") == "success"
+    ):
         outcomes["nav_reconciliation"] = _reconcile_nav(mfapi_data, amfi_data)
     return outcomes
 

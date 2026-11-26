@@ -63,7 +63,7 @@ qdrant_curl -fsS -X PUT "$QDRANT_URL/collections/$QDRANT_COLLECTION/points?wait=
   -d '{"points":[{"id":"00000000-0000-4000-8000-000000000001","vector":[0.25,0.75],"payload":{"metadata":{"document_id":99999999,"chunk_index":0}}}]}' >/dev/null
 
 printf 'Creating PostgreSQL and Qdrant backup ...\n'
-BACKUP_KEEP=0 ./scripts/backup-local.sh
+BACKUP_KEEP=0 bash ./scripts/backup-local.sh
 ARCHIVE="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'mfa-backup-*.tar.gz' -print -quit)"
 [[ -n "$ARCHIVE" && -s "$ARCHIVE" ]] || { printf 'Backup archive was not created.\n' >&2; exit 1; }
 
@@ -75,7 +75,7 @@ qdrant_curl -fsS -X DELETE "$QDRANT_URL/collections/$QDRANT_COLLECTION/points/de
   -d '{"points":["00000000-0000-4000-8000-000000000001"]}' >/dev/null
 
 printf 'Restoring the archive into the isolated services ...\n'
-./scripts/restore-local.sh "$ARCHIVE" --yes
+bash ./scripts/restore-local.sh "$ARCHIVE" --yes
 
 RESTORED_NAME="$(docker compose exec -T db psql -At -U mfa -d mutual_fund_agent \
   -c "SELECT scheme_name FROM mutual_fund_schemes WHERE scheme_code = 99999999;")"

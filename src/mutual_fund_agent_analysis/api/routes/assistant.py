@@ -27,12 +27,17 @@ CAPABILITY_REGISTRY = {
         "Dated AMC holdings, sector allocation, concentration and portfolio overlap."
     ),
     "actual_exposure": (
-        "Ledger-derived units, reconciled NAV valuation, redemption-aware exposure and XIRR context."
+        "Ledger-derived units, reconciled NAV valuation, "
+        "redemption-aware exposure and XIRR context."
     ),
     "security": (
-        "Underlying equity quotes, dated fundamentals, corporate observations and source provenance."
+        "Underlying equity quotes, dated fundamentals, "
+        "corporate observations and source provenance."
     ),
-    "events": "Source-attributed events, publication/effective dates, corrections and historical exposure.",
+    "events": (
+        "Source-attributed events, publication/effective dates, "
+        "corrections and historical exposure."
+    ),
     "social": "Permitted Reddit/X collection, retention-aware discussion volume and sentiment.",
     "documents": "Lexical and optional Qdrant retrieval with document/chunk citations.",
 }
