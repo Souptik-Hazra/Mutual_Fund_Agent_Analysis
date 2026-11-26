@@ -777,12 +777,12 @@ def get_social_provider_status(session: Annotated[Session, Depends(get_db)]) -> 
         )
         enabled = bool(registry and registry.enabled and registry.source_type == "social")
         configured = credentials[source_key]
-        if not configured:
-            state = "not_configured"
-        elif not enabled:
+        if not enabled:
             state = "disabled"
         elif not reviewed:
             state = "review_required"
+        elif not configured:
+            state = "not_configured"
         else:
             state = "ready"
         providers[source_key] = {
@@ -811,7 +811,13 @@ async def import_social_dataset(
     filename = (file.filename or "").lower()
     try:
         if filename.endswith(".csv"):
-            rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+            reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+            if reader.fieldnames and len(reader.fieldnames) > 50:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Social CSV files are limited to 50 columns.",
+                )
+            rows = list(reader)
         elif filename.endswith(".json"):
             parsed = json.loads(content)
             rows = parsed.get("posts", []) if isinstance(parsed, dict) else parsed
@@ -867,7 +873,7 @@ async def import_social_dataset(
                 "expires_at": datetime.now(UTC) + timedelta(days=retention_days),
                 "metadata": raw_metadata,
             })
-            create_social_post(session, payload)
+            create_social_post(session, payload, commit=False)
             imported += 1
             scored_imported += int(payload.sentiment_score is not None)
         session.commit()
@@ -912,6 +918,14 @@ def collect_social_posts(
         raise HTTPException(
             status_code=403,
             detail="Social collection requires a recorded terms review, confirmed API access, and terms URL.",
+        )
+    if not social_provider_credentials().get(source, False):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{source} API credentials are not configured. "
+                "Add the approved provider credentials or use an authorized CSV/JSON export."
+            ),
         )
     try:
         retention_days = source_social_retention_days(
