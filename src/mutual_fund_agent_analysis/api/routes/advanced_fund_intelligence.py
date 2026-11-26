@@ -168,7 +168,8 @@ def fund_research_profile(
                 "source_key": mapping.source_key,
                 "source_name": (
                     session.get(DataSource, mapping.source_key).display_name
-                    if session.get(DataSource, mapping.source_key) else None
+                    if session.get(DataSource, mapping.source_key)
+                    else None
                 ),
             },
         }
