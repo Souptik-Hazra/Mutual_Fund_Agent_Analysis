@@ -97,6 +97,44 @@ def _validate_source_url(
             )
 
 
+def _metadata_observation_is_current(
+    valid_from: date | None,
+    valid_to: date | None,
+    today: date,
+) -> bool:
+    return (valid_from is None or valid_from <= today) and (
+        valid_to is None or valid_to >= today
+    )
+
+
+def _validate_distribution_revision_chain(
+    previous: DistributionObservation | None,
+    latest: DistributionObservation | None,
+    revision: int,
+) -> None:
+    if latest is None:
+        if previous is not None or revision != 1:
+            raise HTTPException(
+                status_code=409,
+                detail="The first distribution revision must be revision 1 and cannot supersede another record.",
+            )
+        return
+    if (
+        previous is None
+        or previous.distribution_id != latest.distribution_id
+        or latest.status != "active"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="A new distribution revision must explicitly supersede the latest active revision.",
+        )
+    if revision != latest.revision + 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Distribution revisions must increase sequentially.",
+        )
+
+
 def _scheme_or_404(session: Session, scheme_code: int) -> MutualFundScheme:
     if scheme_code <= 0:
         raise HTTPException(status_code=422, detail="scheme_code must be a positive integer.")
@@ -219,8 +257,7 @@ def add_scheme_metadata_observation(
 
     today = datetime.now(UTC).date()
     observation_is_current = request.verification_status == "verified" and (
-        (request.valid_from is None or request.valid_from <= today)
-        and (request.valid_to is None or request.valid_to >= today)
+        _metadata_observation_is_current(request.valid_from, request.valid_to, today)
     )
     if observation_is_current:
         if request.plan_type is not None:
@@ -430,25 +467,7 @@ def add_distribution_observation(
         .order_by(DistributionObservation.revision.desc())
         .limit(1)
     )
-    if latest_revision is None:
-        if previous is not None or request.revision != 1:
-            raise HTTPException(
-                status_code=409,
-                detail="The first distribution revision must be revision 1 and cannot supersede another record.",
-            )
-    elif (
-        previous is None
-        or previous.distribution_id != latest_revision.distribution_id
-        or latest_revision.status != "active"
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="A new distribution revision must explicitly supersede the latest active revision.",
-        )
-    elif request.revision != latest_revision.revision + 1:
-        raise HTTPException(
-            status_code=422, detail="Distribution revisions must increase sequentially."
-        )
+    _validate_distribution_revision_chain(previous, latest_revision, request.revision)
 
     record = DistributionObservation(
         scheme_code=scheme_code,

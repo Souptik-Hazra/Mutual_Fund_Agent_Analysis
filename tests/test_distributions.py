@@ -2,8 +2,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from fastapi import HTTPException
 
 from mutual_fund_agent_analysis.analytics.distributions import reinvested_distribution_index
+from mutual_fund_agent_analysis.api.routes.financial import (
+    _metadata_observation_is_current,
+    _validate_distribution_revision_chain,
+)
 from mutual_fund_agent_analysis.api.schemas.financial import (
     DistributionObservationCreate,
     SchemeMetadataObservationCreate,
@@ -108,3 +113,26 @@ def test_zero_distribution_payout_index_matches_nav_index():
         {},
     )
     assert points[-1].total_return_index == points[-1].nav_index
+
+
+def test_historical_and_future_scheme_metadata_do_not_change_current_projection():
+    today = date(2026, 11, 26)
+    assert not _metadata_observation_is_current(date(2024, 1, 1), date(2025, 12, 31), today)
+    assert not _metadata_observation_is_current(date(2027, 1, 1), None, today)
+    assert _metadata_observation_is_current(date(2026, 1, 1), None, today)
+
+
+def test_distribution_revision_must_supersede_latest_active_revision():
+    latest = type(
+        "Distribution",
+        (),
+        {"distribution_id": 10, "revision": 1, "status": "active"},
+    )()
+    with pytest.raises(HTTPException) as exc:
+        _validate_distribution_revision_chain(None, latest, 2)
+    assert exc.value.status_code == 409
+
+    _validate_distribution_revision_chain(latest, latest, 2)
+    with pytest.raises(HTTPException) as exc:
+        _validate_distribution_revision_chain(latest, latest, 3)
+    assert exc.value.status_code == 422
