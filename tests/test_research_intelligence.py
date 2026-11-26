@@ -718,29 +718,11 @@ def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypat
         engine.dispose()
 
 
-def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatch):
+def test_historical_event_route_serializes_selected_revision(monkeypatch):
     from mutual_fund_agent_analysis.api.routes import research as routes
 
     as_of = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
-    created_at = as_of - timedelta(days=10)
-    corrected_at = as_of + timedelta(days=2)
-    current_event = SimpleNamespace(
-        event_id=77,
-        created_at=created_at,
-        source_key="nse",
-        external_id="notice-77",
-        evidence_id=None,
-        related_entity_id=None,
-        title="Corrected title",
-        summary="Corrected summary",
-        event_type="results",
-        status="confirmed",
-        event_date=date(2026, 10, 29),
-        published_at=created_at,
-        canonical_url="https://www.nseindia.com/notice/77",
-        confidence=Decimal("0.9"),
-        metadata_json={"revision": 2},
-    )
+    current_event = SimpleNamespace(event_id=77)
     prior_snapshot = {
         "source_key": "nse",
         "external_id": "notice-77",
@@ -751,7 +733,7 @@ def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatc
         "event_type": "results",
         "status": "reported",
         "event_date": "2026-10-29",
-        "published_at": created_at.isoformat(),
+        "published_at": "2026-10-22T12:00:00+00:00",
         "canonical_url": "https://www.nseindia.com/notice/77",
         "confidence": "0.5",
         "metadata": {"revision": 1},
@@ -761,9 +743,6 @@ def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatc
     class SessionStub:
         def scalars(self, _statement):
             return SimpleNamespace(all=lambda: [current_event])
-
-        def scalar(self, _statement):
-            return SimpleNamespace(snapshot=prior_snapshot, recorded_at=corrected_at)
 
         def get(self, model, _key):
             if model is routes.DataSource:
@@ -775,12 +754,20 @@ def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatc
                 )
             return None
 
+    monkeypatch.setattr(
+        routes,
+        "_event_state_as_of",
+        lambda _session, _event, _as_of: prior_snapshot,
+    )
     result = routes.list_events(
         session=SessionStub(),
         as_of=as_of,
         limit=50,
         offset=0,
     )
+
+    assert result["count"] == 1
+    assert result["total_count"] == 1
     assert result["items"][0]["title"] == "Original title"
     assert result["items"][0]["status"] == "reported"
     assert result["items"][0]["event_date"] == "2026-10-29"
