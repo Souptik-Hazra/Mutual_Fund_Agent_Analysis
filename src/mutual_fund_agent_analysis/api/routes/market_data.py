@@ -174,7 +174,9 @@ def sync_twelvedata_quote(
         ) from exc
     finally:
         client.close()
-    canonical_entity = _resolve_security_identity(\n        session, payload, quote.observed_at.astimezone(ZoneInfo("Asia/Kolkata")).date()\n    )
+    canonical_entity = _resolve_security_identity(
+        session, payload, quote.observed_at.astimezone(ZoneInfo("Asia/Kolkata")).date()
+    )
     canonical = {
         "security_key": payload.isin,
         "canonical_entity_id": canonical_entity.entity_id,
