@@ -1,9 +1,8 @@
 from datetime import date
 from decimal import Decimal
 
-from fastapi import HTTPException
-
 import pytest
+from fastapi import HTTPException
 
 from mutual_fund_agent_analysis.analytics.distributions import reinvested_distribution_index
 from mutual_fund_agent_analysis.api.routes.financial import (
