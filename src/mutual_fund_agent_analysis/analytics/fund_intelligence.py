@@ -271,9 +271,19 @@ def compare_disclosed_equity(
                 PortfolioHolding.asset_class == "equity",
             )
         ).all()
-        holdings_by_fund[code] = {
-            row.isin or row.security_key: row for row in rows if row.weight_pct is not None
-        }
+        holdings_by_fund[code] = {}
+        for row in rows:
+            if row.weight_pct is None:
+                continue
+            identity = (row.isin or row.security_key).strip().upper()
+            existing = holdings_by_fund[code].get(identity)
+            if existing is None:
+                holdings_by_fund[code][identity] = {
+                    "security_name": row.security_name,
+                    "weight_pct": Decimal(row.weight_pct),
+                }
+            else:
+                existing["weight_pct"] += Decimal(row.weight_pct)
     pairwise = []
     for index, left_code in enumerate(scheme_codes):
         for right_code in scheme_codes[index + 1 :]:
@@ -282,7 +292,7 @@ def compare_disclosed_equity(
             common = sorted(set(left) & set(right))
             overlap = sum(
                 (
-                    min(Decimal(left[key].weight_pct), Decimal(right[key].weight_pct))
+                    min(left[key]["weight_pct"], right[key]["weight_pct"])
                     for key in common
                 ),
                 Decimal("0"),
@@ -302,9 +312,9 @@ def compare_disclosed_equity(
                     "common_securities": [
                         {
                             "security_key": key,
-                            "security_name": left[key].security_name,
-                            "weight_a_pct": left[key].weight_pct,
-                            "weight_b_pct": right[key].weight_pct,
+                            "security_name": left[key]["security_name"],
+                            "weight_a_pct": left[key]["weight_pct"],
+                            "weight_b_pct": right[key]["weight_pct"],
                         }
                         for key in common
                     ],
@@ -320,9 +330,9 @@ def compare_disclosed_equity(
     for code in scheme_codes:
         for key, holding in holdings_by_fund[code].items():
             item = aggregate[key]
-            item["name"] = holding.security_name
+            item["name"] = holding["security_name"]
             item["funds_present"] += 1
-            item["equal_weight_exposure_pct"] += Decimal(holding.weight_pct) / Decimal(
+            item["equal_weight_exposure_pct"] += holding["weight_pct"] / Decimal(
                 len(scheme_codes)
             )
     exposure = [{"security_key": key, **value} for key, value in aggregate.items()]

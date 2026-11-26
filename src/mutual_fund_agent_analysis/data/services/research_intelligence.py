@@ -243,7 +243,7 @@ def compare_portfolios(
         for row in rows:
             if row.weight_pct is not None:
                 identity = (row.isin or row.security_key).strip().upper()
-                maps[code][identity] = row.weight_pct
+                maps[code][identity] = maps[code].get(identity, Decimal("0")) + row.weight_pct
                 names[identity] = row.security_name
     pairwise = []
     for i, left in enumerate(scheme_codes):
