@@ -740,10 +740,14 @@ def get_portfolio_quality(
     _scheme_or_404(session, scheme_code)
     snapshot = session.scalars(
         select(PortfolioSnapshot)
+        .join(DataSource, DataSource.source_key == PortfolioSnapshot.source_key)
         .where(
             PortfolioSnapshot.scheme_code == scheme_code,
             PortfolioSnapshot.status.in_(["complete", "partial"]),
             PortfolioSnapshot.effective_date <= (as_of or date.max),
+            DataSource.enabled.is_(True),
+            DataSource.is_official.is_(True),
+            DataSource.source_type == "official",
         )
         .order_by(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc())
         .limit(1)
@@ -782,7 +786,11 @@ def get_portfolio_quality(
         if snapshot.published_at is not None
         else None
     )
+    source = session.get(DataSource, snapshot.source_key)
+    evidence = session.get(EvidenceRecord, snapshot.evidence_id) if snapshot.evidence_id else None
     warnings = []
+    if evidence is None or evidence.verification_status != "verified":
+        warnings.append("Official-source disclosure evidence has not been independently verified.")
     if snapshot.status != "complete":
         warnings.append("Portfolio snapshot is marked partial.")
     if missing_weight_count:
@@ -806,6 +814,10 @@ def get_portfolio_quality(
             publication_lag_days is not None and publication_lag_days < 0
         ),
         "snapshot_status": snapshot.status,
+        "source_key": snapshot.source_key,
+        "source_name": source.display_name if source else None,
+        "evidence_verification_status": evidence.verification_status if evidence else "missing",
+        "evidence_url": evidence.canonical_url if evidence else snapshot.document_url,
         "holding_count": len(holdings),
         "missing_weight_count": missing_weight_count,
         "reported_weight_pct": total_weight,

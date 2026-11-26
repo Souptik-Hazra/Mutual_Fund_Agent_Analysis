@@ -702,7 +702,8 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     else:
         for key, value in values.items():
             setattr(row, key, value)
-    evidence_external_id = f"social:{payload.external_id}"
+    external_digest = hashlib.sha256(payload.external_id.encode("utf-8")).hexdigest()
+    evidence_external_id = f"social:{external_digest}"
     evidence = session.scalar(
         select(EvidenceRecord).where(
             EvidenceRecord.source_key == payload.source_key,
