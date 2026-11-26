@@ -4,8 +4,10 @@
 import csv
 import hashlib
 import io
+import zipfile
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from itertools import islice
 from typing import Annotated, Any
 
 import httpx
@@ -42,6 +44,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     security_fund_exposure,
     social_analytics,
     source_social_retention_days,
+    split_document,
     store_document,
 )
 from mutual_fund_agent_analysis.database.session import get_db
@@ -130,24 +133,64 @@ async def import_portfolio_file(
     filename = (file.filename or "").lower()
     try:
         if filename.endswith(".csv"):
-            rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+            reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+            if reader.fieldnames and len(reader.fieldnames) > 100:
+                raise HTTPException(
+                    status_code=413, detail="Portfolio files are limited to 100 columns."
+                )
+            rows = list(islice(reader, 5001))
         elif filename.endswith(".xlsx"):
             from openpyxl import load_workbook
 
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                members = archive.infolist()
+                uncompressed_size = sum(member.file_size for member in members)
+                if uncompressed_size > 100 * 1024 * 1024 or any(
+                    member.file_size > 25 * 1024 * 1024
+                    or (member.compress_size > 0 and member.file_size / member.compress_size > 100)
+                    for member in members
+                ):
+                    raise HTTPException(
+                        status_code=413,
+                        detail="XLSX expands beyond the permitted workbook resource limits.",
+                    )
             workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-            sheet = workbook.active
-            values = list(sheet.iter_rows(values_only=True))
-            if not values:
-                raise ValueError("Workbook is empty.")
-            headers = [str(value or "").strip().lower().replace(" ", "_") for value in values[0]]
-            rows = [
-                dict(zip(headers, row, strict=False))
-                for row in values[1:]
-                if any(v is not None for v in row)
-            ]
+            try:
+                sheet = workbook.active
+                if sheet.max_column is not None and sheet.max_column > 100:
+                    raise HTTPException(
+                        status_code=413, detail="Portfolio files are limited to 100 columns."
+                    )
+                if sheet.max_row is not None and sheet.max_row > 5001:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Portfolio files are limited to 5,000 holding rows plus a header.",
+                    )
+                values = list(islice(sheet.iter_rows(max_col=100, values_only=True), 5002))
+                if len(values) > 5001:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Portfolio files are limited to 5,000 holding rows plus a header.",
+                    )
+                if not values:
+                    raise ValueError("Workbook is empty.")
+                headers = [
+                    str(value or "").strip().lower().replace(" ", "_") for value in values[0]
+                ]
+                rows = [
+                    dict(zip(headers, row, strict=False))
+                    for row in values[1:]
+                    if any(v is not None for v in row)
+                ]
+            finally:
+                workbook.close()
         else:
             raise HTTPException(
                 status_code=415, detail="Only .csv and .xlsx portfolio files are supported."
+            )
+        if len(rows) > 5000:
+            raise HTTPException(
+                status_code=413, detail="Portfolio files are limited to 5,000 holding rows."
             )
         if not rows:
             raise ValueError("No holding rows were found.")
@@ -732,7 +775,7 @@ async def upload_research_document(
         "title": document.title,
         "content_hash": document.content_hash,
         "page_count": document.page_count,
-        "chunk_count": len(document.extracted_text) // 1200 + 1,
+        "chunk_count": len(split_document(document.extracted_text)),
         "effective_date": document.effective_date,
         "source_key": document.source_key,
     }

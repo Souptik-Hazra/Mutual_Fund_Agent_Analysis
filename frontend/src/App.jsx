@@ -54,7 +54,7 @@ export default function App() {
   const [transactionNotes, setTransactionNotes] = useState("");
   const schemeCodes = useMemo(() => codes.split(",").map((x) => Number(x.trim())).filter((x) => Number.isInteger(x) && x > 0), [codes]);
 
-  useEffect(() => { fetch("/health/live").then((r) => r.ok ? r.json() : Promise.reject()).then(() => setHealth("API connected")).catch(() => setHealth("API offline")); }, []);
+  useEffect(() => { request("/health/live").then(() => setHealth("API connected")).catch(() => setHealth("API offline")); }, []);
   async function run(fn) { setBusy(true); setError(""); setData(null); try { setData(await fn()); } catch (e) { setError(e.message); } finally { setBusy(false); } }
   function json(method, body) { return { method, body: JSON.stringify(body) }; }
   const runFunds = () => run(() => request(query.trim() ? `/schemes?q=${encodeURIComponent(query.trim())}&limit=30` : "/schemes?limit=30"));

@@ -5,6 +5,7 @@ import json
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -71,8 +72,10 @@ def sync_twelvedata_quote(
     try:
         quote = client.get_quote(payload.symbol, payload.exchange)
     except (httpx.HTTPError, ValueError) as exc:
+        # Provider exceptions may contain request URLs or credentials; never expose them.
         raise HTTPException(
-            status_code=502, detail=f"Twelve Data quote request failed: {exc}"
+            status_code=502,
+            detail="Twelve Data quote request failed; provider details were withheld.",
         ) from exc
     finally:
         client.close()
@@ -207,6 +210,9 @@ class SecurityObservationInput(BaseModel):
             "total_equity",
             "operating_margin_pct",
             "profit_margin_pct",
+            "revenue_growth_pct",
+            "profit_growth_pct",
+            "promoter_pledge_pct",
         }
         unknown = set(values) - allowed
         if unknown:
@@ -242,6 +248,37 @@ class SecurityObservationInput(BaseModel):
         return self
 
 
+def _validate_registered_source_url(source: DataSource, candidate: str) -> str:
+    """Require HTTPS and keep source attribution on the registered source host."""
+    registered = urlsplit(source.base_url or "")
+    supplied = urlsplit(candidate)
+    registered_host = (registered.hostname or "").lower().rstrip(".")
+    supplied_host = (supplied.hostname or "").lower().rstrip(".")
+    try:
+        registered_port = registered.port or 443
+        supplied_port = supplied.port or 443
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="source_url must use a valid port on the registered data-source host.",
+        ) from exc
+    if (
+        registered.scheme.lower() != "https"
+        or supplied.scheme.lower() != "https"
+        or not registered_host
+        or not supplied_host
+        or registered_port != supplied_port
+        or supplied.username is not None
+        or supplied.password is not None
+        or not (supplied_host == registered_host or supplied_host.endswith("." + registered_host))
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="source_url must use HTTPS on the registered data-source host.",
+        )
+    return candidate
+
+
 @router.post("/security-observations", status_code=201)
 def ingest_security_observation(
     payload: SecurityObservationInput,
@@ -265,15 +302,22 @@ def ingest_security_observation(
             status_code=422,
             detail="Provide source_url or register a base_url for the enabled source.",
         )
-    corporate_events = [
-        {
-            **event.model_dump(mode="json"),
-            "source_key": source_key,
-            "source_url": str(event.source_url) if event.source_url else source_url,
-            "verification_status": "unverified",
-        }
-        for event in payload.corporate_events
-    ]
+    source_url = _validate_registered_source_url(source, source_url)
+    corporate_events = []
+    for event in payload.corporate_events:
+        event_url = (
+            _validate_registered_source_url(source, str(event.source_url))
+            if event.source_url
+            else source_url
+        )
+        corporate_events.append(
+            {
+                **event.model_dump(mode="json"),
+                "source_key": source_key,
+                "source_url": event_url,
+                "verification_status": "unverified",
+            }
+        )
     canonical = payload.model_dump(mode="json")
     canonical.update(
         {
@@ -304,14 +348,7 @@ def ingest_security_observation(
             key: str(value) if value is not None else None
             for key, value in payload.fundamentals.items()
         },
-        corporate_events_json=[
-            {
-                **event.model_dump(mode="json"),
-                "source_key": source_key,
-                "verification_status": "unverified",
-            }
-            for event in payload.corporate_events
-        ],
+        corporate_events_json=corporate_events,
         content_hash=digest,
     )
     session.add(row)

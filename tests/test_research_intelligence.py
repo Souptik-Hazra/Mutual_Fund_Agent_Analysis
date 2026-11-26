@@ -1,10 +1,20 @@
+import asyncio
+import io
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
+import httpx
 import pytest
+from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from mutual_fund_agent_analysis.api.routes import research as research_routes
+from mutual_fund_agent_analysis.api.routes.market_data import (
+    _validate_registered_source_url,
+)
 from mutual_fund_agent_analysis.api.schemas.research import (
     EventInput,
     HoldingInput,
@@ -12,12 +22,14 @@ from mutual_fund_agent_analysis.api.schemas.research import (
     SocialPostInput,
 )
 from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
+from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     portfolio_payload,
     source_social_retention_days,
     split_document,
 )
-from mutual_fund_agent_analysis.models import DataSource
+from mutual_fund_agent_analysis.database.base import Base
+from mutual_fund_agent_analysis.models import DataSource, DocumentChunk, ResearchDocument
 
 
 def test_document_split_preserves_page_markers_and_overlap():
@@ -569,3 +581,138 @@ def test_rss_event_date_is_not_inferred_from_publication_date():
     )
     assert _parse_event_date(no_effective_date) is None
     assert _parse_event_date(explicit_event_date) == date(2026, 11, 20)
+
+
+def test_security_observation_source_url_must_match_registered_https_host():
+    source = SimpleNamespace(base_url="https://nseindia.com")
+    assert (
+        _validate_registered_source_url(source, "https://www.nseindia.com/api/filings")
+        == "https://www.nseindia.com/api/filings"
+    )
+    assert (
+        _validate_registered_source_url(source, "https://feeds.nseindia.com/announcements")
+        == "https://feeds.nseindia.com/announcements"
+    )
+    for candidate in (
+        "http://www.nseindia.com/filings",
+        "https://nseindia.com.attacker.example/filings",
+        "https://attacker.example/nse/filings",
+        "https://nseindia.com:8443/filings",
+    ):
+        with pytest.raises(HTTPException):
+            _validate_registered_source_url(source, candidate)
+
+
+def test_twelve_data_http_errors_do_not_expose_api_key():
+    api_key = "sensitive-test-api-key"
+
+    def reject_request(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, request=request)
+
+    client = TwelveDataClient(
+        api_key,
+        client=httpx.Client(transport=httpx.MockTransport(reject_request)),
+    )
+    try:
+        with pytest.raises(ValueError) as error:
+            client.get_quote("INFY", "NSE")
+        assert api_key not in str(error.value)
+        assert "provider details were withheld" in str(error.value)
+    finally:
+        client.close()
+
+
+def test_portfolio_upload_rejects_more_than_5000_rows_before_persistence():
+    csv_content = "security_key,security_name,asset_class\n" + "".join(
+        f"INE{i:09d},Example {i},equity\n" for i in range(5001)
+    )
+    upload = UploadFile(
+        filename="holdings.csv",
+        file=io.BytesIO(csv_content.encode("utf-8")),
+    )
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_portfolio_file(
+                session=None,
+                file=upload,
+                scheme_code=100,
+                effective_date=date(2026, 11, 25),
+            )
+        )
+    assert error.value.status_code == 413
+
+
+def test_portfolio_upload_rejects_xlsx_with_rows_beyond_bounded_scan():
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["security_key", "security_name", "asset_class"])
+    sheet.cell(row=6000, column=1, value="INE000000001")
+    content = io.BytesIO()
+    workbook.save(content)
+    workbook.close()
+    upload = UploadFile(filename="sparse.xlsx", file=io.BytesIO(content.getvalue()))
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_portfolio_file(
+                session=None,
+                file=upload,
+                scheme_code=100,
+                effective_date=date(2026, 11, 25),
+            )
+        )
+
+    assert error.value.status_code == 413
+
+
+def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypatch):
+    from mutual_fund_agent_analysis.data.services import document_vectors
+    from mutual_fund_agent_analysis.data.services.research_intelligence import search_documents
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine, expire_on_commit=False)()
+    session.add(
+        DataSource(
+            source_key="test_source",
+            display_name="Test source",
+            source_type="internal",
+            authority_tier=5,
+            is_official=False,
+            enabled=True,
+        )
+    )
+    session.flush()
+
+    for index in range(205):
+        text = " ".join(["bank"] * 20) if index == 0 else "bank "
+        document = ResearchDocument(
+            source_key="test_source",
+            title="Older high-relevance document" if index == 0 else f"Document {index}",
+            media_type="text/plain",
+            content_hash=f"{index:064x}",
+            extracted_text=text,
+            page_count=1,
+        )
+        session.add(document)
+        session.flush()
+        session.add(
+            DocumentChunk(
+                document_id=document.document_id,
+                chunk_index=0,
+                chunk_text=text,
+                token_estimate=max(1, len(text) // 4),
+                metadata_json={},
+            )
+        )
+    session.commit()
+    monkeypatch.setattr(document_vectors, "search_chunks", lambda *args, **kwargs: None)
+
+    try:
+        result = search_documents(session, "bank", None, limit=1)
+        assert result["results"][0]["title"] == "Older high-relevance document"
+    finally:
+        session.close()
+        engine.dispose()

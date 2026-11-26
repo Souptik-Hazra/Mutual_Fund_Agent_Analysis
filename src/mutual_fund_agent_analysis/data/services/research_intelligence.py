@@ -844,8 +844,23 @@ def search_documents(session: Session, query: str, scheme_code: int | None, limi
         stmt = stmt.where(ResearchDocument.scheme_code == scheme_code)
     conditions = [func.lower(DocumentChunk.chunk_text).contains(term) for term in terms]
     stmt = stmt.where(or_(*conditions))
+    # Rank candidates in SQL before applying the cap; do not let arbitrary row order
+    # discard highly relevant chunks from large document collections.
+    normalized_chunk = func.lower(DocumentChunk.chunk_text)
+    candidate_score = sum(
+        (
+            func.length(normalized_chunk)
+            - func.length(func.replace(normalized_chunk, term, ""))
+        )
+        / len(term)
+        for term in terms
+    )
     rows = session.execute(
-        stmt.limit(min(max(bounded_limit * 8, bounded_limit), 200))
+        stmt.order_by(
+            candidate_score.desc(),
+            DocumentChunk.document_id.desc(),
+            DocumentChunk.chunk_index.asc(),
+        ).limit(min(max(bounded_limit * 8, bounded_limit), 200))
     ).all()
     lexical = []
     for chunk, doc in rows:
