@@ -12,7 +12,7 @@ Specialist calculations and retrieval are performed by existing Python analytics
 - LLM narrative synthesis remains available by setting `synthesize: true` on a request.
 - Removed the graph-level retry wrapper around `model.invoke`. The provider factory already configures LangChain model retries, so nesting another retry layer could multiply attempts.
 - Added structured log fields for synthesis call count, elapsed milliseconds, model, and provider-reported input/output/total tokens when available.
-- Exposed the opt-in behavior in the assistant capabilities endpoint.
+- Exposed the opt-in behavior in the assistant capabilities endpoint and the React assistant panel.
 - Added tests proving the default path makes no LLM call and the opt-in path invokes synthesis once.
 
 ## Baseline and measurement limits

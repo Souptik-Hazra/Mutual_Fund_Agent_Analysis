@@ -63,7 +63,7 @@ def test_agent_falls_back_deterministically_when_no_llm_key_is_configured(monkey
     monkeypatch.setattr(research_graph, "create_chat_model", no_model)
     result = research_graph._synthesize(
         {
-            "request": SimpleNamespace(question="Explain fund risk"),
+            "request": SimpleNamespace(question="Explain fund risk", synthesize=True),
             "intents": ["fund"],
             "results": {"fund": {"cagr": "0.12"}},
             "citations": [{"type": "financial_data"}],
