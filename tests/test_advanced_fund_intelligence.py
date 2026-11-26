@@ -176,6 +176,7 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
     assert result["valued_funds"][0]["units"] == Decimal("6")
     assert result["valued_funds"][0]["market_value_inr"] == Decimal("120")
 
+
 def test_security_history_contract_is_bounded_typed_and_chronological():
     older = SimpleNamespace(
         observed_at=datetime(2026, 1, 1, tzinfo=UTC),
@@ -206,6 +207,7 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
             "content_hash": "b",
         }
     )
+
     class ScalarRows:
         def __init__(self, rows):
             self.rows = rows
@@ -215,11 +217,13 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
 
         def all(self):
             return self.rows
+
     class Session:
         def scalars(self, query):
             if query.column_descriptions[0]["entity"] is SecurityMarketObservation:
                 return ScalarRows([newer, older])
             return ScalarRows([])
+
     payload = security_profile(Session(), "EX", history_limit=2, history_type="all")
     assert [item["content_hash"] for item in payload["observation_history"]] == ["a", "b"]
     assert payload["observation_history_order"] == "ascending"
