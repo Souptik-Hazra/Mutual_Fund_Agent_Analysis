@@ -306,10 +306,7 @@ def compare_disclosed_equity(
             right = holdings_by_fund[right_code]
             common = sorted(set(left) & set(right))
             overlap = sum(
-                (
-                    min(left[key]["weight_pct"], right[key]["weight_pct"])
-                    for key in common
-                ),
+                (min(left[key]["weight_pct"], right[key]["weight_pct"]) for key in common),
                 Decimal("0"),
             )
             pairwise.append(
@@ -347,9 +344,7 @@ def compare_disclosed_equity(
             item = aggregate[key]
             item["name"] = holding["security_name"]
             item["funds_present"] += 1
-            item["equal_weight_exposure_pct"] += holding["weight_pct"] / Decimal(
-                len(scheme_codes)
-            )
+            item["equal_weight_exposure_pct"] += holding["weight_pct"] / Decimal(len(scheme_codes))
     exposure = [{"security_key": key, **value} for key, value in aggregate.items()]
     exposure.sort(key=lambda row: row["equal_weight_exposure_pct"], reverse=True)
     return {
