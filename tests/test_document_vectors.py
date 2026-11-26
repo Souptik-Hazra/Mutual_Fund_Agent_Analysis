@@ -85,11 +85,15 @@ def test_indexing_replaces_previous_chunks_and_removes_stale_trailing_chunks(mon
     monkeypatch.setattr(document_vectors, "get_settings", lambda: settings)
     monkeypatch.setattr(document_vectors, "_configured_client", lambda _settings: client)
 
-    import langchain_google_genai
-    import langchain_qdrant
+    import sys
+    from types import ModuleType
 
+    import langchain_google_genai
+
+    fake_qdrant_module = ModuleType("langchain_qdrant")
+    fake_qdrant_module.QdrantVectorStore = FakeStore
+    monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
-    monkeypatch.setattr(langchain_qdrant, "QdrantVectorStore", FakeStore)
 
     original = [
         {"text": "one", "chunk_index": 0, "content_hash": "a" * 64},
@@ -146,11 +150,15 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
     monkeypatch.setattr(document_vectors, "get_settings", lambda: settings)
     monkeypatch.setattr(document_vectors, "_configured_client", lambda _settings: FakeClient())
 
-    import langchain_google_genai
-    import langchain_qdrant
+    import sys
+    from types import ModuleType
 
+    import langchain_google_genai
+
+    fake_qdrant_module = ModuleType("langchain_qdrant")
+    fake_qdrant_module.QdrantVectorStore = FailingStore
+    monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
-    monkeypatch.setattr(langchain_qdrant, "QdrantVectorStore", FailingStore)
 
     assert document_vectors.index_chunks(
         100,
