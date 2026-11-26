@@ -232,8 +232,8 @@ def actual_portfolio_exposure(
         holdings = session.scalars(
             select(PortfolioHolding).where(PortfolioHolding.snapshot_id == snapshot.snapshot_id)
         ).all()
-        missing_weight_count, disclosed_weight_total, weight_complete = (
-            _holding_weight_coverage(holdings)
+        missing_weight_count, disclosed_weight_total, weight_complete = _holding_weight_coverage(
+            holdings
         )
         contexts[code].update(
             holdings_snapshot_id=snapshot.snapshot_id,

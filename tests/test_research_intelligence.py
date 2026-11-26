@@ -864,12 +864,8 @@ def test_portfolio_content_hash_ignores_caller_hash_and_holding_order():
         "source_key": "amc_disclosures",
         "effective_date": date(2026, 10, 31),
     }
-    left = PortfolioImportRequest(
-        **common, content_hash="a" * 64, holdings=[first, second]
-    )
-    right = PortfolioImportRequest(
-        **common, content_hash="b" * 64, holdings=[second, first]
-    )
+    left = PortfolioImportRequest(**common, content_hash="a" * 64, holdings=[first, second])
+    right = PortfolioImportRequest(**common, content_hash="b" * 64, holdings=[second, first])
     assert _portfolio_content_hash(left) == _portfolio_content_hash(right)
 
 
