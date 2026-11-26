@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from mutual_fund_agent_analysis.data.providers.amfi import AMFIClient
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
 from mutual_fund_agent_analysis.data.providers.niftyindices import NiftyIndicesClient
+from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
+from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.database.session import get_session_factory
 from mutual_fund_agent_analysis.models import (
     BenchmarkObservation,
@@ -108,6 +110,83 @@ def build_coverage_report(session: Session) -> dict[str, Any]:
     }
 
 
+def _observation_quality(points: list[Any], start: date, end: date) -> dict[str, Any]:
+    dates = [point.date for point in points]
+    return {
+        "duplicate_date_count": len(dates) - len(set(dates)),
+        "out_of_order_pair_count": sum(
+            current < previous for previous, current in zip(dates, dates[1:], strict=False)
+        ),
+        "out_of_window_count": sum(not start <= item <= end for item in dates),
+    }
+
+
+def _reconcile_nav(
+    mfapi: dict[str, str], amfi: dict[str, str]
+) -> dict[str, Any]:
+    from decimal import Decimal
+
+    common = sorted(mfapi.keys() & amfi.keys())
+    conflicts = [
+        {
+            "date": day,
+            "mfapi_nav": mfapi[day],
+            "amfi_nav": amfi[day],
+            "absolute_difference": str(abs(Decimal(mfapi[day]) - Decimal(amfi[day]))),
+        }
+        for day in common
+        if abs(Decimal(mfapi[day]) - Decimal(amfi[day])) > Decimal("0.0001")
+    ]
+    return {
+        "matched_date_count": len(common),
+        "mfapi_only_date_count": len(mfapi.keys() - amfi.keys()),
+        "amfi_only_date_count": len(amfi.keys() - mfapi.keys()),
+        "conflict_count": len(conflicts),
+        "conflicts": conflicts[:50],
+        "tolerance": "0.0001 NAV units",
+    }
+
+
+def probe_twelve_data(symbol: str, exchange: str) -> dict[str, Any]:
+    """Probe only the requested quote endpoint and exact symbol/exchange identity."""
+    settings = get_settings()
+    if settings.twelve_data_api_key is None:
+        return {"status": "blocked", "reason": "Twelve Data API key is not configured."}
+    if not settings.twelve_data_exchange_access_confirmed:
+        return {
+            "status": "blocked",
+            "reason": "Exchange access has not been explicitly confirmed in local settings.",
+        }
+    client = TwelveDataClient(settings.twelve_data_api_key.get_secret_value())
+    try:
+        quote = client.get_quote(symbol, exchange)
+        return {
+            "status": "success",
+            "requested_symbol": symbol.strip().upper(),
+            "requested_exchange": exchange.strip().upper(),
+            "returned_symbol": quote.symbol,
+            "returned_exchange": quote.exchange,
+            "observed_at": quote.observed_at.isoformat(),
+            "price": str(quote.price),
+            "change_pct": str(quote.change_pct) if quote.change_pct is not None else None,
+            "market_status": quote.market_status,
+            "coverage_scope": "single quote endpoint only",
+            "limitations": [
+                "A successful quote does not establish plan-wide exchange entitlement.",
+                "No historical price, comprehensive fundamentals, or corporate-action coverage is inferred.",
+            ],
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "failed",
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+            "coverage_scope": "single quote endpoint only",
+        }
+    finally:
+        client.close()
+
+
 def probe_live_sources(
     scheme_code: int,
     benchmark_code: str,
@@ -130,6 +209,10 @@ def probe_live_sources(
                 "error_type": type(exc).__name__,
                 "error": str(exc),
             }
+    mfapi_data = outcomes.get("mfapi", {}).pop("_nav_by_date", {})
+    amfi_data = outcomes.get("amfi", {}).pop("_nav_by_date", {})
+    if outcomes.get("mfapi", {}).get("status") == "success" and outcomes.get("amfi", {}).get("status") == "success":
+        outcomes["nav_reconciliation"] = _reconcile_nav(mfapi_data, amfi_data)
     return outcomes
 
 
@@ -142,6 +225,8 @@ def _probe_mfapi(code: int, start: date, end: date) -> dict[str, Any]:
         "observation_count": len(response.data),
         "first_date": response.data[0].date.isoformat() if response.data else None,
         "last_date": response.data[-1].date.isoformat() if response.data else None,
+        "quality": _observation_quality(response.data, start, end),
+        "_nav_by_date": {point.date.isoformat(): str(point.nav) for point in response.data},
     }
 
 
@@ -153,6 +238,8 @@ def _probe_amfi(code: int, start: date, end: date) -> dict[str, Any]:
         "scheme_name": response.meta.scheme_name,
         "observation_count": len(response.data),
         "raw_chunks": (len(response.raw_payload.get("chunks", [])) if response.raw_payload else 0),
+        "quality": _observation_quality(response.data, start, end),
+        "_nav_by_date": {point.date.isoformat(): str(point.nav) for point in response.data},
     }
 
 
@@ -165,6 +252,7 @@ def _probe_nifty(code: str, start: date, end: date) -> dict[str, Any]:
         "observation_count": len(response.data),
         "first_date": response.data[0].date.isoformat() if response.data else None,
         "last_date": response.data[-1].date.isoformat() if response.data else None,
+        "quality": _observation_quality(response.data, start, end),
     }
 
 
@@ -180,7 +268,14 @@ def main() -> None:
     parser.add_argument("--benchmark-code")
     parser.add_argument("--start-date", type=date.fromisoformat)
     parser.add_argument("--end-date", type=date.fromisoformat)
+    parser.add_argument("--twelve-data-symbol")
+    parser.add_argument("--twelve-data-exchange")
     args = parser.parse_args()
+
+    if bool(args.twelve_data_symbol) != bool(args.twelve_data_exchange):
+        parser.error("--twelve-data-symbol and --twelve-data-exchange must be supplied together.")
+    if (args.twelve_data_symbol or args.twelve_data_exchange) and not args.live:
+        parser.error("Twelve Data probing requires --live.")
 
     if args.live:
         required = (args.scheme_code, args.benchmark_code, args.start_date, args.end_date)
@@ -201,6 +296,10 @@ def main() -> None:
         report["live_provider_probes"] = probe_live_sources(
             args.scheme_code, args.benchmark_code, args.start_date, args.end_date
         )
+        if args.twelve_data_symbol and args.twelve_data_exchange:
+            report["live_provider_probes"]["twelvedata"] = probe_twelve_data(
+                args.twelve_data_symbol, args.twelve_data_exchange
+            )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, default=str))
