@@ -121,9 +121,7 @@ def _observation_quality(points: list[Any], start: date, end: date) -> dict[str,
     }
 
 
-def _reconcile_nav(
-    mfapi: dict[str, str], amfi: dict[str, str]
-) -> dict[str, Any]:
+def _reconcile_nav(mfapi: dict[str, str], amfi: dict[str, str]) -> dict[str, Any]:
     from decimal import Decimal
 
     common = sorted(mfapi.keys() & amfi.keys())
