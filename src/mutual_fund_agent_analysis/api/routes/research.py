@@ -659,15 +659,15 @@ def list_events(
         raise HTTPException(status_code=422, detail="as_of must include a timezone offset.")
     as_of_utc = as_of.astimezone(UTC)
     stmt = select(MarketEvent)
-    if source_key:
-        stmt = stmt.where(MarketEvent.source_key == source_key)
-    if entity_id:
-        stmt = stmt.where(MarketEvent.related_entity_id == entity_id)
     rows = session.scalars(stmt.order_by(MarketEvent.event_id)).all()
     historical_items: list[dict[str, Any]] = []
     for row in rows:
         state = _event_state_as_of(session, row, as_of_utc)
         if state is None:
+            continue
+        if source_key and state.get("source_key") != source_key:
+            continue
+        if entity_id and state.get("related_entity_id") != entity_id:
             continue
         event_day = state.get("event_date")
         if isinstance(event_day, str):
