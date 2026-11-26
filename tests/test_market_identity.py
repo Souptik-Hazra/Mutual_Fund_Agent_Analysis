@@ -14,7 +14,6 @@ from mutual_fund_agent_analysis.api.routes.market_data import (
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.models.intelligence import DataSource, ResearchEntity
 
-
 ISIN = "INE009A01021"
 
 
