@@ -234,3 +234,51 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
     )
     assert alpha["equal_weight_exposure_pct"] == Decimal("4")
     assert alpha["funds_present"] == 2
+
+
+def test_category_ranking_excludes_peer_outside_common_observation_window(monkeypatch):
+    from types import SimpleNamespace
+
+    selected = SimpleNamespace(
+        scheme_code=1, scheme_category="Large Cap", scheme_type="Open Ended",
+        plan_type="direct", option_type="growth",
+    )
+    peers = [
+        SimpleNamespace(scheme_code=1, scheme_name="Selected", fund_house="AMC A", scheme_category="Large Cap"),
+        SimpleNamespace(scheme_code=2, scheme_name="Short history", fund_house="AMC B", scheme_category="Large Cap"),
+    ]
+
+    class Rows:
+        def all(self):
+            return peers
+
+    class Session:
+        def get(self, _model, _key):
+            return selected
+
+        def scalars(self, _statement):
+            return Rows()
+
+    def report(code, start, end):
+        return SimpleNamespace(
+            cagr=Decimal("0.1"), absolute_return=Decimal("0.1"),
+            risk=SimpleNamespace(annualized_volatility=Decimal("0.1"), sharpe_ratio=Decimal("0.5")),
+            drawdown=SimpleNamespace(maximum_drawdown=Decimal("-0.1")),
+            benchmark=None, benchmark_unavailable_reason=None,
+            return_basis="growth_nav_total_return",
+            distribution_coverage_status="not_required",
+            observation_count=2, start_date=start, end_date=end,
+            base100_series=((start, Decimal("100")), (end, Decimal("110"))),
+        )
+
+    def fake_analyze(_session, code, start_date=None, end_date=None, **_kwargs):
+        if code == 1:
+            return report(1, date(2025, 1, 1), date(2026, 1, 1))
+        return report(2, date(2024, 1, 1), date(2026, 1, 1))
+
+    monkeypatch.setattr(fund_intelligence, "analyze_fund", fake_analyze)
+    result = fund_intelligence.analyze_category_peers(Session(), 1)
+    assert result["peer_count"] == 1
+    assert result["excluded_peer_count"] == 1
+    assert result["excluded_peers"][0]["scheme_code"] == 2
+    assert "common window" in result["excluded_peers"][0]["reason"]
