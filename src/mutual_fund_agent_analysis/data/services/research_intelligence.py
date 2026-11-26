@@ -610,7 +610,7 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
             evidence.canonical_url = str(payload.canonical_url)
             evidence.title = payload.title
             evidence.published_at = payload.published_at
-            evidence.retrieved_at = datetime.now(UTC)
+            evidence.retrieved_at = datetime.now(timezone.utc)
             evidence.verification_status = "unverified"
     evidence_id = evidence.evidence_id if evidence is not None else None
     event = MarketEvent(
