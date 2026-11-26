@@ -1,57 +1,95 @@
 @echo off
-setlocal
+setlocal EnableExtensions
+
+title Mutual Fund Agent Analysis - Launcher
 
 REM Resolve the repository directory from this script's location.
 for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
 set "VENV_ACTIVATE=%PROJECT_DIR%\.venv\Scripts\activate.bat"
 set "FRONTEND_DIR=%PROJECT_DIR%\frontend"
 
-if not exist "%PROJECT_DIR%\docker-compose.yml" (
-    echo ERROR: docker-compose.yml was not found in:
-    echo %PROJECT_DIR%
-    pause
-    exit /b 1
-)
+echo.
+echo ==========================================
+echo   Mutual Fund Agent Analysis - Startup
+echo ==========================================
+echo Project: "%PROJECT_DIR%"
+echo.
 
+REM Validate required project files and local tools before opening terminals.
+if not exist "%PROJECT_DIR%\docker-compose.yml" (
+    echo ERROR: docker-compose.yml was not found in the project directory.
+    goto :fail
+)
 if not exist "%VENV_ACTIVATE%" (
     echo ERROR: Windows virtual environment not found:
-    echo %VENV_ACTIVATE%
-    pause
-    exit /b 1
+    echo "%VENV_ACTIVATE%"
+    goto :fail
 )
-
 if not exist "%FRONTEND_DIR%\package.json" (
-    echo ERROR: Frontend package.json not found:
-    echo %FRONTEND_DIR%
-    pause
-    exit /b 1
+    echo ERROR: Frontend package.json was not found.
+    goto :fail
+)
+if not exist "%FRONTEND_DIR%\node_modules\vite\bin\vite.js" (
+    echo ERROR: Frontend dependencies are missing. Run "npm ci" in frontend first.
+    goto :fail
+)
+where wsl.exe >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: WSL is not installed or wsl.exe is not on PATH.
+    goto :fail
+)
+where python.exe >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: Python was not found on PATH.
+    goto :fail
+)
+where npm.cmd >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: npm was not found on PATH.
+    goto :fail
 )
 
-REM Convert the actual repository path to the selected WSL distribution's path.
+REM Convert the actual Windows repository path to the default WSL distribution path.
+set "WSL_PROJECT="
 for /f "usebackq delims=" %%I in (`wsl.exe wslpath -a "%PROJECT_DIR%" 2^>nul`) do set "WSL_PROJECT=%%I"
 if not defined WSL_PROJECT (
     echo ERROR: Could not translate the project path into WSL.
-    echo Check that WSL is installed and the Windows drive is mounted.
-    pause
-    exit /b 1
+    echo Check that your Windows drive is mounted in the default WSL distribution.
+    goto :fail
+)
+
+REM Confirm Docker Compose is available inside the selected default WSL distribution.
+wsl.exe --cd "%WSL_PROJECT%" -- bash -lc "command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1"
+if errorlevel 1 (
+    echo ERROR: Docker Engine and Docker Compose must be installed in the default WSL distribution.
+    goto :fail
 )
 
 where wt.exe >nul 2>nul
 if errorlevel 1 (
-    echo Windows Terminal was not found. Opening separate Command Prompt windows.
-    start "Docker - WSL" cmd /k "wsl.exe --cd ""%WSL_PROJECT%"" -- bash -lc ""sudo service docker start && docker compose up -d db qdrant; exec bash"""
-    start "Backend - FastAPI" cmd /k "cd /d ""%PROJECT_DIR%"" && call ""%VENV_ACTIVATE%"" && uvicorn mutual_fund_agent_analysis.main:app --reload"
-    start "Frontend - Vite" cmd /k "cd /d ""%FRONTEND_DIR%"" && npm run dev"
-) else (
-    start "Docker - WSL" wt.exe -w new --title "Docker - WSL" wsl.exe --cd "%WSL_PROJECT%" -- bash -lc "sudo service docker start && docker compose up -d db qdrant; exec bash"
-    start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" cmd.exe /k "cd /d ""%PROJECT_DIR%"" && call ""%VENV_ACTIVATE%"" && uvicorn mutual_fund_agent_analysis.main:app --reload"
-    start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" cmd.exe /k "cd /d ""%FRONTEND_DIR%"" && npm run dev"
+    echo ERROR: Windows Terminal (wt.exe) is required for three separate terminals.
+    goto :fail
 )
+
+REM Terminal 1: start Docker Engine, PostgreSQL and Qdrant.
+start "Docker - WSL" wt.exe -w new --title "Docker - WSL" wsl.exe --cd "%WSL_PROJECT%" -- bash -lc "sudo service docker start && docker compose up -d db qdrant; exec bash -i"
+
+REM Terminal 2: wait for PostgreSQL, apply migrations, then start FastAPI.
+start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" cmd.exe /k "cd /d ""%PROJECT_DIR%"" && call ""%VENV_ACTIVATE%"" && python -c ""import socket,time,sys; deadline=time.time()+120; s=socket.socket(); exec('while time.time()<deadline:\n try:\n  s.connect((\'127.0.0.1\',5432)); s.close(); sys.exit(0)\n except OSError:\n  time.sleep(2)'); sys.exit('PostgreSQL did not become ready within 120 seconds')"" && alembic upgrade head && uvicorn mutual_fund_agent_analysis.main:app --reload"
+
+REM Terminal 3: start the Vite development server.
+start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" cmd.exe /k "cd /d ""%FRONTEND_DIR%"" && npm run dev"
 
 echo.
 echo Startup terminals have been launched.
-echo Docker services: PostgreSQL and Qdrant
-echo Backend:         http://127.0.0.1:8000
-echo Frontend:        Vite development server
+echo Docker:    PostgreSQL :5432 and Qdrant :6333 (WSL services)
+echo Backend:   http://127.0.0.1:8000
+echo Frontend:  http://127.0.0.1:5173
 echo.
-endlocal
+echo Keep all three terminals open while developing.
+goto :eof
+
+:fail
+echo.
+pause
+exit /b 1
