@@ -8,6 +8,7 @@ from decimal import Decimal
 from urllib.parse import urlparse
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.intelligence import (
@@ -98,9 +99,26 @@ def create_entity(
         description=description.strip() if description else None,
         status="active",
     )
-    session.add(entity)
-    session.flush()
-    return entity
+    # A concurrent request may create the same canonical entity after the
+    # lookup above. Isolate the insert in a savepoint so a unique-key race
+    # does not poison the caller's transaction.
+    try:
+        with session.begin_nested():
+            session.add(entity)
+            session.flush()
+        return entity
+    except IntegrityError:
+        existing = session.scalar(
+            select(ResearchEntity).where(
+                ResearchEntity.entity_type == normalized_type,
+                ResearchEntity.normalized_name == normalized_name,
+            )
+        )
+        if existing is None:
+            raise
+        if description and not existing.description:
+            existing.description = description.strip()
+        return existing
 
 
 def add_entity_alias(
