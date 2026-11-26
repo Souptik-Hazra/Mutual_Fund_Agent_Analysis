@@ -191,3 +191,155 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
     )
     assert captured["codes"] == [125497, 120503]
     assert result["citations"][0]["valuation_dates"][0]["nav_date"] == date(2026, 11, 25)
+
+
+def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
+    from decimal import Decimal
+    from types import SimpleNamespace
+
+    expected = {
+        "cagr": Decimal("0.1250"),
+        "volatility": Decimal("0.0825"),
+        "observation_count": 240,
+        "return_basis": "growth_nav",
+    }
+    monkeypatch.setattr(research_graph, "analyze_fund", lambda *args, **kwargs: expected)
+    request = ResearchAssistantRequest(
+        question="Show CAGR and volatility",
+        scheme_codes=[125497],
+    )
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["fund"]}
+    )
+    assert result["results"]["fund"] == expected
+
+
+def test_portfolio_specialist_preserves_disclosure_allocation_and_overlap(monkeypatch):
+    snapshot = SimpleNamespace(
+        effective_date=date(2026, 10, 31),
+        content_hash="d" * 64,
+        document_url="https://amc.example/portfolio.pdf",
+        source_key="amc_disclosures",
+        retrieved_at=None,
+    )
+    expected_snapshot = {
+        "holdings": [{"security_key": "INE1", "weight_pct": "12.5"}],
+        "sector_allocation": [{"sector": "Banks", "weight_pct": "30.0"}],
+        "hhi_0_to_1": "0.18",
+    }
+    expected_comparison = {
+        "pairwise_overlap": [{"scheme_a": 125497, "scheme_b": 120503, "overlap_pct": "42.0"}]
+    }
+    monkeypatch.setattr(research_graph, "latest_snapshot", lambda *args: snapshot)
+    monkeypatch.setattr(research_graph, "portfolio_payload", lambda *args: expected_snapshot)
+    monkeypatch.setattr(research_graph, "compare_portfolios", lambda *args: expected_comparison)
+    request = ResearchAssistantRequest(
+        question="Compare fund portfolio holdings overlap",
+        scheme_codes=[125497, 120503],
+    )
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["portfolio"]}
+    )
+    assert result["results"]["portfolio"] == {
+        "snapshots": [expected_snapshot, expected_snapshot],
+        "comparison": expected_comparison,
+    }
+
+
+def test_security_specialist_preserves_market_and_fundamental_observations(monkeypatch):
+    expected = {
+        "securities": [
+            {
+                "security_key": "INE1",
+                "market": {"last_price": "125.50", "source_key": "quotes"},
+                "fundamentals": {"metrics": {"pe_ratio": "22.5"}, "source_key": "fundamentals"},
+                "corporate_events": [],
+            }
+        ],
+        "coverage": {"schemes_with_disclosures": 1},
+    }
+    snapshot = SimpleNamespace(
+        effective_date=date(2026, 10, 31),
+        content_hash="e" * 64,
+        document_url="https://amc.example/portfolio.pdf",
+        source_key="amc_disclosures",
+        retrieved_at=None,
+    )
+    monkeypatch.setattr(research_graph, "securities_for_funds", lambda *args, **kwargs: expected)
+    monkeypatch.setattr(research_graph, "latest_snapshot", lambda *args, **kwargs: snapshot)
+    request = ResearchAssistantRequest(
+        question="Compare underlying stock fundamentals",
+        scheme_codes=[125497],
+    )
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["security"]}
+    )
+    assert result["results"]["security"] == expected
+    assert {item["type"] for item in result["citations"]} == {
+        "portfolio_disclosure",
+        "security_market_observation",
+    }
+
+
+def test_event_specialist_preserves_historical_event_snapshot(monkeypatch):
+    expected = {
+        "events": [
+            {
+                "event_id": 77,
+                "title": "Board meeting",
+                "status": "scheduled",
+                "published_at": "2026-10-25T10:00:00+00:00",
+                "event_date": "2026-11-05",
+                "canonical_url": "https://nse.example/77",
+            }
+        ],
+        "as_of": "2026-11-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(research_graph, "events_for_fund_exposure", lambda *args: expected)
+    request = ResearchAssistantRequest(
+        question="Show upcoming company events",
+        scheme_codes=[125497],
+        start_date=date(2026, 10, 1),
+        end_date=date(2026, 11, 30),
+    )
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["events"]}
+    )
+    assert result["results"]["events"] == [expected]
+    assert result["citations"][0]["event_id"] == 77
+
+
+def test_social_specialist_preserves_aggregated_sentiment_metrics(monkeypatch):
+    expected = {
+        "post_count": 10,
+        "sentiment_distribution": {"positive": 4, "neutral": 3, "negative": 3},
+        "weighted_sentiment": "0.1250",
+    }
+    monkeypatch.setattr(research_graph, "social_analytics", lambda *args: expected)
+    request = ResearchAssistantRequest(question="Show global Reddit sentiment")
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["social"]}
+    )
+    assert result["results"]["social"]["aggregation"] == expected
+
+
+def test_document_specialist_preserves_retrieval_citations(monkeypatch):
+    expected = {
+        "results": [
+            {
+                "document_id": 3,
+                "title": "Scheme factsheet",
+                "page_number": 5,
+                "text": "Expense ratio is 0.75%.",
+                "citation": {"content_hash": "f" * 64, "canonical_url": "https://amc.example/fs.pdf"},
+            }
+        ],
+        "retrieval_mode": "lexical_fallback",
+    }
+    monkeypatch.setattr(research_graph, "search_documents", lambda *args: expected)
+    request = ResearchAssistantRequest(question="Find expense ratio in factsheet")
+    result = research_graph._run_tools(
+        {"request": request, "session": object(), "intents": ["documents"]}
+    )
+    assert result["results"]["documents"] == expected
+    assert result["citations"][0]["content_hash"] == "f" * 64
