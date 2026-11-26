@@ -283,7 +283,9 @@ def fund_equity_status(
     ).all()
     items = []
     for holding in holdings:
-        market = _latest_market_observation(\n            session, holding.security_key, holding.isin, as_of=as_of\n        )
+        market = _latest_market_observation(
+            session, holding.security_key, holding.isin, as_of=as_of
+        )
         items.append(
             {
                 "security_key": holding.security_key,
@@ -298,7 +300,8 @@ def fund_equity_status(
     return {
         "scheme_code": scheme_code,
         "snapshot_id": snapshot.snapshot_id,
-        "holdings_as_of": snapshot.effective_date,\n        "market_data_as_of": as_of,
+        "holdings_as_of": snapshot.effective_date,
+        "market_data_as_of": as_of,
         "snapshot_status": snapshot.status,
         "equity_security_count": len(items),
         "market_data_available_count": sum(item["availability"] == "available" for item in items),
