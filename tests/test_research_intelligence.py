@@ -1,6 +1,6 @@
 import asyncio
 import io
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -719,7 +719,6 @@ def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypat
 
 
 def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatch):
-    from datetime import timedelta
     from mutual_fund_agent_analysis.api.routes import research as routes
 
     as_of = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
@@ -834,7 +833,9 @@ def test_document_delete_does_not_remove_lexical_records_when_vector_cleanup_fai
 def test_document_delete_removes_vectors_before_lexical_records(monkeypatch):
     order = []
     monkeypatch.setattr(
-        research_routes, "delete_document_chunks", lambda _document_id: order.append("vectors") or True
+        research_routes,
+        "delete_document_chunks",
+        lambda _document_id: order.append("vectors") or True,
     )
 
     class SessionStub:
