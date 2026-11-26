@@ -157,11 +157,13 @@ def probe_twelve_data(symbol: str, exchange: str) -> dict[str, Any]:
         }
     client = TwelveDataClient(settings.twelve_data_api_key.get_secret_value())
     try:
-        quote = client.get_quote(symbol, exchange)
+        requested_symbol = symbol.strip().upper()
+        requested_exchange = exchange.strip().upper()
+        quote = client.get_quote(requested_symbol, requested_exchange)
         return {
             "status": "success",
-            "requested_symbol": symbol.strip().upper(),
-            "requested_exchange": exchange.strip().upper(),
+            "requested_symbol": requested_symbol,
+            "requested_exchange": requested_exchange,
             "returned_symbol": quote.symbol,
             "returned_exchange": quote.exchange,
             "observed_at": quote.observed_at.isoformat(),
