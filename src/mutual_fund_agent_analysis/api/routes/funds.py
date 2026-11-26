@@ -23,6 +23,7 @@ from mutual_fund_agent_analysis.analytics.service import (
     compare_funds,
     load_benchmark_prices,
     load_fund_prices,
+    load_fund_return_prices,
 )
 from mutual_fund_agent_analysis.analytics.sip import simulate_monthly_sip
 from mutual_fund_agent_analysis.api.schemas.funds import (
@@ -430,7 +431,14 @@ def get_active_risk(
     if start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
     try:
-        prices, _ = load_fund_prices(session, scheme_code, start_date, end_date)
+        prices, _, return_basis, coverage_status, coverage_reason = load_fund_return_prices(
+            session, scheme_code, start_date, end_date
+        )
+        if return_basis == "nav_only_excludes_idcw":
+            raise ValueError(
+                coverage_reason
+                or "Verified IDCW total-return coverage is required for tracking error and information ratio."
+            )
         benchmark_prices = load_benchmark_prices(
             session, benchmark_code, start_date, end_date, benchmark_source
         )
@@ -450,4 +458,6 @@ def get_active_risk(
         information_ratio=metrics.information_ratio,
         mean_active_return=metrics.mean_active_return,
         coverage_ratio=metrics.coverage_ratio,
+        fund_return_basis=return_basis,
+        benchmark_return_basis="tri",
     )
