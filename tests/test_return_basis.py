@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from mutual_fund_agent_analysis.analytics import service
+import mutual_fund_agent_analysis.analytics.service as service
 from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
