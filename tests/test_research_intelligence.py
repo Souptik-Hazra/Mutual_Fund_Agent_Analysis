@@ -313,6 +313,7 @@ def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
 
     snapshot = SimpleNamespace(
         snapshot_id=3,
+        evidence_id=1,
         scheme_code=100,
         source_key="amc_disclosures",
         effective_date=date(2026, 10, 31),
