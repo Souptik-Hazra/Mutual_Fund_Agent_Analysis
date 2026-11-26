@@ -326,6 +326,7 @@ def test_security_specialist_preserves_market_and_fundamental_observations(monke
     snapshot = SimpleNamespace(
         effective_date=date(2026, 10, 31),
         content_hash="e" * 64,
+        evidence_id=10,
         document_url="https://amc.example/portfolio.pdf",
         source_key="amc_disclosures",
         retrieved_at=None,
