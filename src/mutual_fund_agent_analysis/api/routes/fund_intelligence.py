@@ -3,6 +3,7 @@
 import hashlib
 import json
 from datetime import UTC, date, datetime, time
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -117,7 +118,9 @@ def _latest_market_observation(
         SecurityMarketObservation.observation_id.desc(),
     )
     if as_of:
-        cutoff = datetime.combine(as_of, time.max, tzinfo=UTC)
+        cutoff = datetime.combine(
+            as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")
+        ).astimezone(UTC)
         query = query.where(SecurityMarketObservation.observed_at <= cutoff)
     if isin:
         exact_key_match = session.scalars(
@@ -147,7 +150,11 @@ def _market_payload(row: SecurityMarketObservation | None, *, as_of: date | None
     observed = row.observed_at
     if observed.tzinfo is None:
         observed = observed.replace(tzinfo=UTC)
-    reference_time = datetime.combine(as_of, time.max, tzinfo=UTC) if as_of else datetime.now(UTC)
+    reference_time = (
+        datetime.combine(as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(UTC)
+        if as_of
+        else datetime.now(UTC)
+    )
     age = reference_time - observed.astimezone(UTC)
     age_seconds = max(0.0, age.total_seconds())
     freshness = "fresh" if age_seconds <= 72 * 3600 else "stale"
