@@ -1,7 +1,7 @@
 """Static safety checks for the local backup and restore scripts."""
 
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 
