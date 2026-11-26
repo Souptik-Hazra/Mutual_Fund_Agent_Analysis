@@ -30,7 +30,8 @@ export default function App() {
   const [data, setData] = useState(null);
   const [query, setQuery] = useState("");
   const [codes, setCodes] = useState("125497");
-  const [benchmark, setBenchmark] = useState("NIFTY 50");
+  const [benchmark, setBenchmark] = useState("");
+  const [benchmarkResolution, setBenchmarkResolution] = useState(null);
   const [categoryBenchmark, setCategoryBenchmark] = useState("");
   const [analysisFrequency, setAnalysisFrequency] = useState("daily");
   const [question, setQuestion] = useState("Analyse performance, portfolio holdings and recent events");
@@ -53,6 +54,43 @@ export default function App() {
   const [transactionNav, setTransactionNav] = useState("");
   const [transactionNotes, setTransactionNotes] = useState("");
   const schemeCodes = useMemo(() => codes.split(",").map((x) => Number(x.trim())).filter((x) => Number.isInteger(x) && x > 0), [codes]);
+
+  async function resolveBenchmarkForCodes(targetCodes, asOf, override = "") {
+    if (override.trim()) {
+      const result = { availability: "overridden", benchmark: { code: override.trim(), source: "niftyindices", source_key: null }, mappings: [] };
+      setBenchmarkResolution(result);
+      return result;
+    }
+    if (!targetCodes.length) {
+      const result = { availability: "unavailable", benchmark: null, mappings: [] };
+      setBenchmarkResolution(result);
+      return result;
+    }
+    const mappings = await Promise.all(targetCodes.map(async (code) => {
+      const params = asOf ? "?as_of=" + encodeURIComponent(asOf) : "";
+      return request("/fund-intelligence/schemes/" + code + "/benchmark" + params);
+    }));
+    const first = mappings[0]?.benchmark;
+    const common = Boolean(first) && mappings.every((item) =>
+      item.availability === "mapped" && item.benchmark?.code === first.code && item.benchmark?.source === first.source
+    );
+    const result = {
+      availability: common ? "mapped" : mappings.some((item) => item.availability === "mapped") ? "not_common" : "unmapped",
+      benchmark: common ? first : null,
+      mappings,
+    };
+    setBenchmarkResolution(result);
+    return result;
+  }
+  const benchmarkDescription = benchmarkResolution?.benchmark
+    ? "Benchmark " + benchmarkResolution.benchmark.code + " · source " + benchmarkResolution.benchmark.source +
+      " · effective " + (benchmarkResolution.benchmark.effective_from || "unknown") + " to " +
+      (benchmarkResolution.benchmark.effective_to || "open-ended")
+    : benchmarkResolution?.availability === "overridden"
+      ? "User override: " + benchmarkResolution.benchmark.code + " · source " + benchmarkResolution.benchmark.source
+      : benchmarkResolution?.availability === "not_common"
+        ? "Selected schemes do not share one effective benchmark mapping; benchmark metrics will be omitted."
+        : "No valid official effective-dated mapping; fund-only analysis will be used unless you enter an explicit override.";
 
   useEffect(() => { request("/health/live").then(() => setHealth("API connected")).catch(() => setHealth("API offline")); }, []);
   async function run(fn) { setBusy(true); setError(""); setData(null); try { setData(await fn()); } catch (e) { setError(e.message); } finally { setBusy(false); } }
