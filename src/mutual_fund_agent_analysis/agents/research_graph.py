@@ -129,6 +129,7 @@ class ResearchState(TypedDict, total=False):
     answer: str
     citations: list[dict[str, Any]]
     model_used: str | None
+    research_run_id: str
 
 
 def classify_intents(question: str, scheme_codes: list[int] | None = None) -> list[str]:
@@ -192,7 +193,10 @@ def _jsonable(value: Any) -> Any:
 
 def _plan(state: ResearchState) -> dict[str, Any]:
     request = state["request"]
-    return {"intents": classify_intents(request.question, request.scheme_codes)}
+    return {
+        "intents": classify_intents(request.question, request.scheme_codes),
+        "research_run_id": state.get("research_run_id"),
+    }
 
 
 def _run_tools(state: ResearchState) -> dict[str, Any]:
@@ -476,9 +480,31 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             "source_key": item.get("source_key"),
                         }
                     )
+            logger.info(
+                "research.specialist.completed",
+                extra={
+                    "research_run_id": state.get("research_run_id"),
+                    "specialist": intent,
+                    "status": "completed",
+                },
+            )
         except (ValueError, LookupError) as exc:
             errors.append(f"{intent}: {exc}")
-    return {"results": results, "errors": errors, "citations": citations}
+            logger.warning(
+                "research.specialist.limited",
+                extra={
+                    "research_run_id": state.get("research_run_id"),
+                    "specialist": intent,
+                    "status": "limited",
+                    "error_type": type(exc).__name__,
+                },
+            )
+    return {
+        "results": results,
+        "errors": errors,
+        "citations": citations,
+        "research_run_id": state.get("research_run_id"),
+    }
 
 
 def _synthesize(state: ResearchState) -> dict[str, Any]:
@@ -532,7 +558,11 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             )
     if errors:
         answer += "\n\nLimitations: " + "; ".join(errors)
-    return {"answer": answer, "model_used": model_used}
+    return {
+        "answer": answer,
+        "model_used": model_used,
+        "research_run_id": state.get("research_run_id"),
+    }
 
 
 @lru_cache(maxsize=1)
