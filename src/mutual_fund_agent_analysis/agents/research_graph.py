@@ -605,12 +605,16 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
         except (ValueError, LookupError) as exc:
             errors.append(f"{intent}: {exc}")
             logger.warning(
-                "research.specialist.limited",
+                "research.specialist.limited specialist=%s error_type=%s detail=%s",
+                intent,
+                type(exc).__name__,
+                str(exc),
                 extra={
                     "research_run_id": state.get("research_run_id"),
                     "specialist": intent,
                     "status": "limited",
                     "error_type": type(exc).__name__,
+                    "detail": str(exc),
                 },
             )
     return {
