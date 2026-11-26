@@ -20,6 +20,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
 )
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models.category_benchmark import CategoryBenchmarkMapping
+from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
 router = APIRouter(prefix="/fund-intelligence", tags=["advanced-fund-intelligence"])
@@ -44,8 +45,6 @@ def create_category_benchmark(
 ) -> dict:
     if payload.effective_to and payload.effective_to < payload.effective_from:
         raise HTTPException(status_code=422, detail="effective_to cannot precede effective_from.")
-    from mutual_fund_agent_analysis.models.intelligence import DataSource
-
     source = session.get(DataSource, payload.source_key)
     if (
         source is None
