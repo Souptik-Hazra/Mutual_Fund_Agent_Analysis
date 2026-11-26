@@ -19,6 +19,16 @@ DEDUCTIONS = {"redemption", "switch_out"}
 ACCEPTED_NAV_STATUSES = {"single_source", "matched"}
 
 
+def _holding_weight_coverage(holdings: list[PortfolioHolding]) -> tuple[int, Decimal, bool]:
+    missing_count = sum(1 for holding in holdings if holding.weight_pct is None)
+    total_weight = sum(
+        (D(holding.weight_pct) for holding in holdings if holding.weight_pct is not None),
+        D("0"),
+    )
+    is_complete = missing_count == 0 and D("99") <= total_weight <= D("101")
+    return missing_count, total_weight, is_complete
+
+
 def actual_portfolio_exposure(
     session: Session, scheme_codes: list[int], as_of_date: date | None = None
 ) -> dict:
@@ -222,13 +232,8 @@ def actual_portfolio_exposure(
         holdings = session.scalars(
             select(PortfolioHolding).where(PortfolioHolding.snapshot_id == snapshot.snapshot_id)
         ).all()
-        missing_weight_count = sum(1 for holding in holdings if holding.weight_pct is None)
-        disclosed_weight_total = sum(
-            (D(holding.weight_pct) for holding in holdings if holding.weight_pct is not None),
-            D("0"),
-        )
-        weight_complete = missing_weight_count == 0 and D("99") <= disclosed_weight_total <= D(
-            "101"
+        missing_weight_count, disclosed_weight_total, weight_complete = (
+            _holding_weight_coverage(holdings)
         )
         contexts[code].update(
             holdings_snapshot_id=snapshot.snapshot_id,

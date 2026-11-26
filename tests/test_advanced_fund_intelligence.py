@@ -9,7 +9,10 @@ import pytest
 
 import mutual_fund_agent_analysis.analytics.portfolio_intelligence as portfolio_module
 from mutual_fund_agent_analysis.analytics.category_benchmarks import resolve_category_benchmark
-from mutual_fund_agent_analysis.analytics.portfolio_intelligence import actual_portfolio_exposure
+from mutual_fund_agent_analysis.analytics.portfolio_intelligence import (
+    _holding_weight_coverage,
+    actual_portfolio_exposure,
+)
 from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
@@ -535,3 +538,25 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
     assert result["coverage"]["lookthrough_coverage_pct"] == Decimal("100")
     assert result["coverage"]["is_complete"] is False
     assert result["data_quality_warnings"][0]["type"] == "partial_holdings"
+
+def test_complete_snapshot_with_missing_weights_is_not_full_lookthrough():
+    holdings = [
+        SimpleNamespace(weight_pct=Decimal("70")),
+        SimpleNamespace(weight_pct=None),
+        SimpleNamespace(weight_pct=Decimal("20")),
+    ]
+    missing, total, complete = _holding_weight_coverage(holdings)
+    assert missing == 1
+    assert total == Decimal("90")
+    assert complete is False
+
+
+def test_complete_snapshot_requires_approximately_full_weight_total():
+    holdings = [
+        SimpleNamespace(weight_pct=Decimal("50")),
+        SimpleNamespace(weight_pct=Decimal("50")),
+    ]
+    missing, total, complete = _holding_weight_coverage(holdings)
+    assert missing == 0
+    assert total == Decimal("100")
+    assert complete is True

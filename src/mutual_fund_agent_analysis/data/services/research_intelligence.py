@@ -20,15 +20,8 @@ from mutual_fund_agent_analysis.models import (
 D = Decimal
 
 
-def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapshot:
-    """Idempotently persist one disclosure version and its normalized positions."""
-    if session.get(MutualFundScheme, payload.scheme_code) is None:
-        raise ValueError("Unknown scheme_code; ingest the scheme catalogue first.")
-    source = session.get(DataSource, payload.source_key)
-    if source is None or not source.enabled:
-        raise ValueError("Unknown or disabled source_key.")
-    if not source.is_official or source.source_type != "official":
-        raise ValueError("Portfolio disclosures must use an enabled registered official source.")
+def _portfolio_content_hash(payload: Any) -> str:
+    """Hash normalized portfolio content, never a caller-provided digest."""
     canonical_payload = payload.model_dump(mode="json", exclude={"content_hash"})
     canonical_payload["holdings"] = sorted(
         canonical_payload["holdings"],
@@ -38,9 +31,21 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
             (item.get("isin") or "").strip().upper(),
         ),
     )
-    content_hash = hashlib.sha256(
+    return hashlib.sha256(
         json.dumps(canonical_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+
+
+def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapshot:
+    """Idempotently persist one disclosure version and its normalized positions."""
+    if session.get(MutualFundScheme, payload.scheme_code) is None:
+        raise ValueError("Unknown scheme_code; ingest the scheme catalogue first.")
+    source = session.get(DataSource, payload.source_key)
+    if source is None or not source.enabled:
+        raise ValueError("Unknown or disabled source_key.")
+    if not source.is_official or source.source_type != "official":
+        raise ValueError("Portfolio disclosures must use an enabled registered official source.")
+    content_hash = _portfolio_content_hash(payload)
     existing = session.scalar(select(PortfolioSnapshot).where(
         PortfolioSnapshot.scheme_code == payload.scheme_code,
         PortfolioSnapshot.effective_date == payload.effective_date,

@@ -25,6 +25,7 @@ from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
     portfolio_payload,
+    _portfolio_content_hash,
     source_social_retention_days,
     split_document,
 )
@@ -844,3 +845,47 @@ def test_document_delete_removes_vectors_before_lexical_records(monkeypatch):
     result = research_routes.delete_research_document(101, SessionStub())
     assert result["deleted"] is True
     assert order == ["vectors", "lexical_chunks", "document", "commit"]
+
+def test_portfolio_content_hash_ignores_caller_hash_and_holding_order():
+    first = HoldingInput(
+        security_key="INE000A01001",
+        isin="INE000A01001",
+        security_name="Alpha Ltd",
+        weight_pct=Decimal("60"),
+    )
+    second = HoldingInput(
+        security_key="INE000B01001",
+        isin="INE000B01001",
+        security_name="Beta Ltd",
+        weight_pct=Decimal("40"),
+    )
+    common = {
+        "scheme_code": 100,
+        "source_key": "amc_disclosures",
+        "effective_date": date(2026, 10, 31),
+    }
+    left = PortfolioImportRequest(
+        **common, content_hash="a" * 64, holdings=[first, second]
+    )
+    right = PortfolioImportRequest(
+        **common, content_hash="b" * 64, holdings=[second, first]
+    )
+    assert _portfolio_content_hash(left) == _portfolio_content_hash(right)
+
+
+def test_portfolio_import_accepts_server_generated_content_hash():
+    payload = PortfolioImportRequest(
+        scheme_code=100,
+        source_key="amc_disclosures",
+        effective_date=date(2026, 10, 31),
+        holdings=[
+            {
+                "security_key": "INE123A01016",
+                "security_name": "Example Ltd",
+                "asset_class": "equity",
+                "weight_pct": "100",
+            }
+        ],
+    )
+    assert payload.content_hash is None
+    assert len(_portfolio_content_hash(payload)) == 64
