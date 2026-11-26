@@ -334,3 +334,63 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
     assert result["results"]["fund"] == expected_report
     assert result["research_run_id"] == "parity-run-1"
     assert result["citations"][0]["type"] == "financial_data"
+
+
+def test_llm_synthesis_is_skipped_by_default(monkeypatch):
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.agents import research_graph
+
+    def unexpected_model_call(**_kwargs):
+        raise AssertionError("Default research must not call an LLM.")
+
+    monkeypatch.setattr(research_graph, "create_chat_model", unexpected_model_call)
+    result = research_graph._synthesize(
+        {
+            "request": SimpleNamespace(question="Show fund performance"),
+            "intents": ["fund"],
+            "results": {"fund": {"cagr": "0.12"}},
+            "citations": [{"type": "financial_data"}],
+        }
+    )
+
+    assert result["model_used"] is None
+    assert "Retrieved 1 result group(s)" in result["answer"]
+
+
+def test_llm_synthesis_is_opt_in_and_uses_provider_retry_policy(monkeypatch):
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.agents import research_graph
+
+    captured = {}
+
+    class StubModel:
+        def invoke(self, messages):
+            captured["messages"] = messages
+            return SimpleNamespace(
+                content="Evidence summary.",
+                usage_metadata={
+                    "input_tokens": 120,
+                    "output_tokens": 24,
+                    "total_tokens": 144,
+                },
+            )
+
+    monkeypatch.setattr(research_graph, "create_chat_model", lambda **_kwargs: StubModel())
+    result = research_graph._synthesize(
+        {
+            "request": SimpleNamespace(
+                question="Explain the retrieved fund evidence",
+                synthesize=True,
+            ),
+            "intents": ["documents"],
+            "results": {"documents": {"results": [{"text": "Dated evidence"}]}},
+            "citations": [{"type": "document_chunk"}],
+            "research_run_id": "llm-opt-in-test",
+        }
+    )
+
+    assert result["answer"] == "Evidence summary."
+    assert result["model_used"] == "StubModel"
+    assert len(captured["messages"]) == 2

@@ -9,6 +9,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import date
 from decimal import Decimal
 from functools import lru_cache
+from time import perf_counter
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -523,13 +524,16 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
     )
     model_used = None
     answer = fallback
-    if results:
+    synthesis_requested = bool(getattr(request, "synthesize", False))
+
+    if results and synthesis_requested:
+        started_at = perf_counter()
         try:
             model = create_chat_model(temperature=0)
             from langchain_core.messages import HumanMessage, SystemMessage
 
             evidence = json.dumps(_jsonable(results), ensure_ascii=False, default=str)[:18000]
-            response = model.with_retry(stop_after_attempt=2).invoke(
+            response = model.invoke(
                 [
                     SystemMessage(
                         content=(
@@ -545,9 +549,9 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
                     ),
                     HumanMessage(
                         content=(
-                            f"Question: {request.question}\nRetrieved evidence JSON: {evidence}\n"
+                            f"Question: {request.question}\\nRetrieved evidence JSON: {evidence}\\n"
                             "Available source reference IDs: "
-                            f"{json.dumps(citations, default=str)}\n"
+                            f"{json.dumps(citations, default=str)}\\n"
                             "Summarize the evidence concisely. Do not fabricate citation IDs."
                         )
                     ),
@@ -555,20 +559,54 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             )
             answer = str(response.content)
             model_used = type(model).__name__
-        except ValueError as exc:
-            logger.info("LLM synthesis skipped: %s", exc)
+            usage = getattr(response, "usage_metadata", None) or {}
+            logger.info(
+                "research.llm_synthesis.completed",
+                extra={
+                    "research_run_id": state.get("research_run_id"),
+                    "llm_call_count": 1,
+                    "llm_latency_ms": round((perf_counter() - started_at) * 1000, 2),
+                    "input_tokens": usage.get("input_tokens"),
+                    "output_tokens": usage.get("output_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                    "model": model_used,
+                },
+            )
+        except ValueError:
+            logger.info(
+                "research.llm_synthesis.unavailable",
+                extra={
+                    "research_run_id": state.get("research_run_id"),
+                    "llm_call_count": 0,
+                    "reason": "provider_not_configured",
+                },
+            )
         except Exception:
             logger.exception(
-                "Optional LLM synthesis failed; returning deterministic research output."
+                "Optional LLM synthesis failed; returning deterministic research output.",
+                extra={
+                    "research_run_id": state.get("research_run_id"),
+                    "llm_call_count": 1,
+                    "llm_latency_ms": round((perf_counter() - started_at) * 1000, 2),
+                },
             )
+    else:
+        logger.info(
+            "research.llm_synthesis.skipped",
+            extra={
+                "research_run_id": state.get("research_run_id"),
+                "llm_call_count": 0,
+                "reason": "no_results" if not results else "not_requested",
+            },
+        )
+
     if errors:
-        answer += "\n\nLimitations: " + "; ".join(errors)
+        answer += "\\n\\nLimitations: " + "; ".join(errors)
     return {
         "answer": answer,
         "model_used": model_used,
         "research_run_id": state.get("research_run_id"),
     }
-
 
 @lru_cache(maxsize=1)
 def build_research_graph():
