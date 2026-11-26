@@ -252,17 +252,23 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     benchmark_source=request.benchmark_source or "niftyindices",
                 )
                 results[intent] = _jsonable(report)
+                selected_fund = report.get("selected_fund", {})
                 citations.append(
                     {
                         "type": "category_peer_analysis",
                         "scheme_code": codes[0],
-                        "category": report.get("category"),
-                        "start_date": report.get("start_date"),
-                        "end_date": report.get("end_date"),
-                        "observation_dates": report.get("observation_dates"),
-                        "return_basis": report.get("return_basis"),
+                        "peer_definition": report.get("peer_definition"),
+                        "comparison_window": report.get("comparison_window"),
+                        "return_basis": selected_fund.get("return_basis"),
+                        "distribution_coverage_status": selected_fund.get(
+                            "distribution_coverage_status"
+                        ),
                         "peer_count": report.get("peer_count"),
-                        "excluded_peer_count": len(report.get("excluded_peers", [])),
+                        "peer_limit": report.get("peer_limit"),
+                        "cohort_truncated": report.get("cohort_truncated"),
+                        "excluded_peers": report.get("excluded_peers", []),
+                        "benchmark_code": report.get("benchmark_code"),
+                        "benchmark_source": report.get("benchmark_source"),
                         "source": (
                             "canonical reconciled NAV and applicable distribution methodology"
                         ),
