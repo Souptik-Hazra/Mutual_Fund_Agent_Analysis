@@ -33,7 +33,8 @@ class DistributionSession:
                 coverage_complete=True,
                 verification_status="verified",
             )
-            if attestation else None
+            if attestation
+            else None
         )
         self.distribution = (
             SimpleNamespace(
@@ -45,7 +46,8 @@ class DistributionSession:
                 status="active",
                 verification_status="verified",
             )
-            if distribution else None
+            if distribution
+            else None
         )
 
     def get(self, model, key):
@@ -102,7 +104,11 @@ def test_idcw_nav_only_does_not_calculate_benchmark_relative_metrics(monkeypatch
         service,
         "load_fund_return_prices",
         lambda *_args, **_kwargs: (
-            NAVS, (), "nav_only_excludes_idcw", "incomplete", "Official coverage is missing."
+            NAVS,
+            (),
+            "nav_only_excludes_idcw",
+            "incomplete",
+            "Official coverage is missing.",
         ),
     )
 
@@ -113,8 +119,11 @@ def test_idcw_nav_only_does_not_calculate_benchmark_relative_metrics(monkeypatch
 
     monkeypatch.setattr(service, "load_benchmark_prices", unexpected_benchmark_load)
     report = service.analyze_fund(
-        SimpleNamespace(), 77, benchmark_code="NIFTY TRI",
-        start_date=NAVS[0].date, end_date=NAVS[-1].date,
+        SimpleNamespace(),
+        77,
+        benchmark_code="NIFTY TRI",
+        start_date=NAVS[0].date,
+        end_date=NAVS[-1].date,
     )
     assert report.benchmark is None
     assert report.benchmark_code is None
@@ -128,9 +137,7 @@ def test_growth_scheme_uses_nav_series_against_tri(monkeypatch):
     monkeypatch.setattr(
         service,
         "load_fund_return_prices",
-        lambda *_args, **_kwargs: (
-            NAVS, (), "growth_nav_total_return", "not_required", None
-        ),
+        lambda *_args, **_kwargs: (NAVS, (), "growth_nav_total_return", "not_required", None),
     )
     benchmark = [
         service.PricePoint(date(2024, 1, 1), Decimal("100")),
