@@ -66,7 +66,7 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 - [x] Implement a documented reinvested-distribution total-return methodology using the ex-date NAV convention and reconciled NAVs; source coverage attestation is a separate gate.
 - [x] Keep Growth NAV returns, IDCW payout cash-flow indices, and reinvested IDCW total returns distinct, with separate basis labels and methodology.
 - [x] Document taxes/exit loads and investor timing as excluded from the scheme-level index; support revised/cancelled distribution records. Investor-specific tax outcomes are not assumed.
-- [ ] Add fund/benchmark comparison safeguards so a price/NAV-only series is not mislabelled as total return.
+- [x] Add fund/benchmark comparison safeguards so a price/NAV-only series is not mislabelled as total return. Growth/IDCW option mixtures are rejected; IDCW comparisons require one verified common return basis; category peers require identical actual observation dates and matching return bases.
 - [x] Surface missing distribution coverage and reject total-return requests without a stored verified official-source attestation covering the requested interval.
 
 **Exit criteria:** Independently calculated test cases validate ex-date adjustments and reinvestment; all API/UI labels state the return basis.
@@ -221,3 +221,13 @@ Two local, bounded CSV commands now import effective-dated scheme metadata and v
 ### Local source registry CLI
 
 `mfa-register-source` is available for adding/updating source registry rows without manual SQL. Official and enabled states are explicit required flags; each AMC should have a distinct source key/base URL. This improves local source onboarding but does not itself verify that a domain is authoritative or that its terms permit collection.
+
+### P0-01 to P0-04 reliability delivery (2026-11-26)
+
+The following work is now merged into `main` (PRs #19–#21):
+
+- P0-01: Qdrant backup and restore scripts no longer publish Qdrant's port; a short-lived curl container uses the private Compose network. Archives validate PostgreSQL dump readability, payload checksums and archive structure. A disposable PostgreSQL/Qdrant restore drill is still required before claiming recoverability.
+- P0-02/03: Growth, IDCW payout, and IDCW reinvestment returns have distinct basis labels. IDCW distribution adjustments require a verified, complete coverage attestation from an enabled official source of type `official`, covering the full actual NAV window. Benchmark-relative metrics and active-risk calculations are suppressed/rejected when the IDCW total-return basis cannot be verified. Multi-fund comparisons reject Growth/IDCW mixtures and inconsistent return bases. Category rankings require the exact category/type/plan/option cohort, identical actual observation dates, common boundaries, and a common return basis; excluded peers include reasons.
+- P0-04: The frontend no longer assumes NIFTY 50. It resolves effective-dated official category benchmark mappings for each selected scheme and only applies a common mapping across a multi-fund selection. Twelve Data quote ingestion requires an explicit ISIN, exact NSE/BSE symbol and exchange match, and unique effective-dated official identifier mappings to one active canonical entity. Missing, ambiguous, stale or unofficial mappings fail closed.
+
+Supporting methodology is documented in `docs/financial-return-methodology.md` and `docs/security-identity-mapping.md`. CI passed for the merged P0-02/03 and P0-04 pull requests on the supported Python matrix, including frontend tests/build and offline agent evaluation. Source onboarding and live-data verification remain separate acceptance gates; no live provider data or complete IDCW coverage is implied by these code changes.
