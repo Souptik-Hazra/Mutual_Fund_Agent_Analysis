@@ -5,14 +5,12 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import mutual_fund_agent_analysis.analytics.portfolio_intelligence as portfolio_module
-from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
-from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
-
-import pytest
-
 from mutual_fund_agent_analysis.analytics.category_benchmarks import resolve_category_benchmark
 from mutual_fund_agent_analysis.analytics.portfolio_intelligence import actual_portfolio_exposure
+from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
+from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
+import pytest
 
 
 def test_quote_parser_requires_timestamp():
