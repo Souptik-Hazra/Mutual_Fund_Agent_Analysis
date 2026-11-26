@@ -9,7 +9,9 @@ import pytest
 
 service = importlib.import_module("mutual_fund_agent_analysis.analytics.service")
 DataSource = importlib.import_module("mutual_fund_agent_analysis.models.intelligence").DataSource
-MutualFundScheme = importlib.import_module("mutual_fund_agent_analysis.models.scheme").MutualFundScheme
+MutualFundScheme = importlib.import_module(
+    "mutual_fund_agent_analysis.models.scheme"
+).MutualFundScheme
 
 
 NAVS = [
