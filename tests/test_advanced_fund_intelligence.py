@@ -233,7 +233,6 @@ def test_security_history_rejects_unbounded_or_unknown_filters():
 
 def test_indian_as_of_day_includes_late_evening_exchange_observation():
     from datetime import datetime, timezone
-    from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
     from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 
     india_late = datetime(2026, 11, 25, 23, 45, tzinfo=ZoneInfo("Asia/Kolkata"))
