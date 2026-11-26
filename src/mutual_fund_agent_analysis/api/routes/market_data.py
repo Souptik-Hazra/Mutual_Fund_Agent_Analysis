@@ -110,7 +110,7 @@ def _resolve_security_identity(
             (EntityIdentifier.valid_to.is_(None) | (EntityIdentifier.valid_to >= observed_on)),
         ).limit(2)
     ).all()
-    if len(symbol_rows) != 1:
+    if len(symbol_rows) != 1 or symbol_rows[0].entity_id != entity.entity_id:
         raise HTTPException(
             status_code=422 if not symbol_rows else 409,
             detail=f"No unique {namespace} mapping exists for the supplied security identity.",
