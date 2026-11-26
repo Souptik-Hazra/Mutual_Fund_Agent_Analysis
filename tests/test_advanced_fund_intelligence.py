@@ -345,6 +345,7 @@ def test_exposure_math():
         isin="INE000A",
         security_key="INE000A",
         security_name="Example Bank",
+        asset_class="equity",
         sector="Banks",
         weight_pct=Decimal("40"),
     )
@@ -500,6 +501,7 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
         isin="INE002B",
         security_key="INE002B",
         security_name="Example Co",
+        asset_class="equity",
         sector="IT",
         weight_pct=Decimal("25"),
     )
@@ -570,6 +572,7 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
         isin="INE003C",
         security_key="INE003C",
         security_name="Partial Co",
+        asset_class="equity",
         sector="Health",
         weight_pct=Decimal("50"),
     )
