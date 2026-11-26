@@ -907,3 +907,123 @@ def test_portfolio_import_accepts_server_generated_content_hash():
     )
     assert payload.content_hash is None
     assert len(_portfolio_content_hash(payload)) == 64
+
+
+def _approved_social_source(source_key="reddit", enabled=True):
+    return DataSource(
+        source_key=source_key,
+        display_name=source_key.title(),
+        source_type="social",
+        authority_tier=5,
+        is_official=False,
+        enabled=enabled,
+        terms_url=f"https://terms.example/{source_key}",
+        metadata_json={
+            "terms_reviewed": True,
+            "access_confirmed": True,
+            "reviewed_at": "2026-11-25",
+            "retention_days": 14,
+        },
+    )
+
+
+def test_social_provider_status_never_exposes_credentials(monkeypatch):
+    source = _approved_social_source(enabled=False)
+
+    class StubSession:
+        def get(self, _model, key):
+            return source if key == "reddit" else None
+
+    monkeypatch.setattr(
+        research_routes, "social_provider_credentials", lambda: {"reddit": False, "x": False}
+    )
+    result = research_routes.get_social_provider_status(StubSession())
+    assert result["providers"]["reddit"]["status"] == "not_configured"
+    assert result["providers"]["reddit"]["can_collect"] is False
+    assert result["providers"]["reddit"]["can_import"] is False
+    assert result["providers"]["x"]["status"] == "not_configured"
+    assert "client_secret" not in str(result).lower()
+
+
+def test_social_collection_returns_actionable_status_when_credentials_missing(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def get(self, _model, _key):
+            return source
+
+    monkeypatch.setattr(
+        research_routes, "social_provider_credentials", lambda: {"reddit": False, "x": False}
+    )
+    with pytest.raises(HTTPException) as exc:
+        research_routes.collect_social_posts(
+            source="reddit", q="mutual funds", session=StubSession(), limit=1
+        )
+    assert exc.value.status_code == 409
+    assert "authorized CSV/JSON export" in exc.value.detail
+
+
+def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def __init__(self):
+            self.committed = False
+            self.rolled_back = False
+
+        def get(self, _model, _key):
+            return source
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            self.rolled_back = True
+
+    captured = []
+    monkeypatch.setattr(
+        research_routes, "create_social_post", lambda _session, payload: captured.append(payload)
+    )
+    monkeypatch.setattr(
+        research_routes, "get_settings", lambda: SimpleNamespace(social_retention_days=30)
+    )
+    session = StubSession()
+    upload = UploadFile(
+        filename="reddit-export.csv",
+        file=io.BytesIO(b"external_id,text_excerpt,canonical_url\\npost-1,Market discussion,https://www.reddit.com/r/example/comments/post-1/\\n"),
+    )
+    result = asyncio.run(
+        research_routes.import_social_dataset(session=session, source="reddit", file=upload)
+    )
+    assert result["imported"] == 1
+    assert result["retention_days"] == 14
+    assert session.committed is True
+    assert captured[0].content_hash == __import__("hashlib").sha256(
+        b"Market discussion"
+    ).hexdigest()
+    remaining = captured[0].expires_at - datetime.now(UTC)
+    assert timedelta(days=14) - timedelta(seconds=2) < remaining <= timedelta(days=14)
+    assert captured[0].text_excerpt == "Market discussion"
+
+
+def test_social_import_rejects_unreviewed_or_disabled_source():
+    source = _approved_social_source(enabled=False)
+
+    class StubSession:
+        def get(self, _model, _key):
+            return source
+
+        def rollback(self):
+            self.rolled_back = True
+
+    upload = UploadFile(
+        filename="reddit-export.json",
+        file=io.BytesIO(b'[{"external_id":"post-1","text":"discussion"}]'),
+    )
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            research_routes.import_social_dataset(
+                session=StubSession(), source="reddit", file=upload
+            )
+        )
+    assert exc.value.status_code == 403
