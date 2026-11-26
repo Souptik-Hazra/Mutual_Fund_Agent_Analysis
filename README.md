@@ -543,7 +543,9 @@ After applying database migrations, populate the searchable scheme directory onc
 python -m mutual_fund_agent_analysis.cli.sync_catalogue
 ```
 
-This imports the paginated MFAPI scheme directory (names, scheme codes and available ISINs) into PostgreSQL. It skips the import when the local catalogue already contains at least 30,000 schemes, avoiding a full download on every backend start while still repairing small or partially populated catalogues. To refresh it explicitly, add `--force`. The backend launcher runs this initialization automatically after migrations. Scheme metadata discovery does not download every scheme's full NAV history; NAV history is synchronized separately when needed.
+This imports the paginated MFAPI scheme directory (names, scheme codes and available ISINs) into PostgreSQL. The importer uses small pages, waits between requests, retries rate-limit responses with exponential backoff, and saves each page before continuing. If the upstream API still returns HTTP 429 after retries, run the same command again; it resumes from the last saved page using the local checkpoint in the ignored `data/cache` directory.
+
+It skips the import when the local catalogue already contains at least 30,000 schemes, avoiding a full download on every backend start while still repairing small or partially populated catalogues. To refresh it explicitly, add `--force`. The backend launcher runs this initialization automatically after migrations. Scheme metadata discovery does not download every scheme's full NAV history; NAV history is synchronized separately when needed.
 
 ### Sync a scheme's NAV history
 
