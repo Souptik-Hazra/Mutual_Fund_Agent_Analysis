@@ -177,7 +177,7 @@ export default function App() {
   };
   const runEquityStatus = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
-    return run(() => request(`/fund-intelligence/schemes/${schemeCodes[0]}/equity-status`));
+    return run(() => request(`/fund-intelligence/schemes/${schemeCodes[0]}/equity-status?as_of=${encodeURIComponent(dateTo)}`));
   };
   const runEquityComparison = () => {
     if (schemeCodes.length < 2 || schemeCodes.length > 5) return setError("Enter two to five scheme codes.");
