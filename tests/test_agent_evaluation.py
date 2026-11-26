@@ -284,3 +284,53 @@ def test_research_run_id_flows_through_graph_nodes():
     assert plan["research_run_id"] == run_id
     assert tools["research_run_id"] == run_id
     assert synthesis["research_run_id"] == run_id
+
+
+def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
+    from decimal import Decimal
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.agents import research_graph
+
+    expected_report = {
+        "cagr": "0.123456",
+        "volatility": "0.087654",
+        "as_of": "2026-11-25",
+        "return_basis": "growth_nav",
+    }
+    captured = {}
+
+    def deterministic_analysis(session, scheme_code, *args, **kwargs):
+        captured["session"] = session
+        captured["scheme_code"] = scheme_code
+        captured["kwargs"] = kwargs
+        return expected_report
+
+    monkeypatch.setattr(research_graph, "analyze_fund", deterministic_analysis)
+    session = object()
+    request = SimpleNamespace(
+        question="Show fund CAGR and risk",
+        scheme_codes=[125497],
+        benchmark_code=None,
+        start_date=None,
+        end_date=None,
+        annual_risk_free_rate=Decimal("0"),
+        periods_per_year=252,
+        benchmark_source="niftyindices",
+        top_k=6,
+    )
+
+    result = research_graph._run_tools(
+        {
+            "request": request,
+            "session": session,
+            "intents": ["fund"],
+            "research_run_id": "parity-run-1",
+        }
+    )
+
+    assert captured["session"] is session
+    assert captured["scheme_code"] == 125497
+    assert result["results"]["fund"] == expected_report
+    assert result["research_run_id"] == "parity-run-1"
+    assert result["citations"][0]["type"] == "financial_data"
