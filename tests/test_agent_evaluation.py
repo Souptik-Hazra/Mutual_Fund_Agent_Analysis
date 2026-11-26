@@ -213,3 +213,41 @@ def test_langgraph_compiles_with_explicit_start_and_end_nodes():
     assert "__start__" in nodes
     assert "__end__" in nodes
     assert {"plan", "specialist_agents", "synthesize"}.issubset(nodes)
+
+
+def test_grounding_contract_covers_category_and_actual_investor_exposure_specialists():
+    from mutual_fund_agent_analysis.evaluation.runner import evaluate_grounding_contract
+
+    response = {
+        "answer": "Both analyses are grounded in dated source data.",
+        "results": {
+            "category": {"peer_count": 12, "comparison_window": {"start": "2025-01-01"}},
+            "actual_exposure": {"valuation_basis": "latest reconciled NAV"},
+        },
+        "citations": [
+            {"type": "category_peer_analysis"},
+            {"type": "actual_investor_exposure"},
+        ],
+    }
+    assert evaluate_grounding_contract(response)["grounding_contract_passed"] is True
+
+    response["citations"] = [{"type": "category_peer_analysis"}]
+    result = evaluate_grounding_contract(response)
+    assert result["grounding_contract_passed"] is False
+    assert result["missing_citation_groups"] == ["actual_exposure"]
+
+
+def test_routing_dataset_covers_all_eight_specialists():
+    result = load_and_evaluate(Path("evaluation/research-routing.json"))
+    expected_specialists = {
+        "fund",
+        "category",
+        "actual_exposure",
+        "portfolio",
+        "security",
+        "events",
+        "social",
+        "documents",
+    }
+    assert expected_specialists.issubset(result["per_intent"])
+    assert result["exact_match_accuracy"] >= 0.90

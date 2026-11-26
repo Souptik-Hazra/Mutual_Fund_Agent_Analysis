@@ -144,5 +144,43 @@
     "expected_intents": [
       "events"
     ]
+  },
+  {
+    "question": "Rank my selected scheme against its category peers",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "category"
+    ]
+  },
+  {
+    "question": "Show my ledger exposure after partial redemptions",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "actual_exposure"
+    ]
+  },
+  {
+    "question": "Compare category peers and underlying stock valuations",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "category",
+      "security"
+    ]
+  },
+  {
+    "question": "Show my actual exposure and underlying stock fundamentals",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "actual_exposure",
+      "security"
+    ]
   }
 ]

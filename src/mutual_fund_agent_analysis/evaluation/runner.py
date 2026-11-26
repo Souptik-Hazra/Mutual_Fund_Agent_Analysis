@@ -78,6 +78,8 @@ def evaluate_grounding_contract(response: dict[str, Any]) -> dict[str, Any]:
     citations = response.get("citations") or []
     expected_types = {
         "fund": {"financial_data"},
+        "category": {"category_peer_analysis"},
+        "actual_exposure": {"actual_investor_exposure"},
         "portfolio": {"portfolio_disclosure"},
         "security": {
             "security_market_observation",
