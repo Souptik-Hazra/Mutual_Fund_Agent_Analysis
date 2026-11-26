@@ -33,7 +33,14 @@ from mutual_fund_agent_analysis.llm.providers import create_chat_model
 logger = logging.getLogger(__name__)
 
 KEYWORDS = {
-    "category": ("category", "peer", "peers", "ranking", "rankings", "category position"),
+    "category": (
+        "category",
+        "peer",
+        "peers",
+        "ranking",
+        "rankings",
+        "category position",
+    ),
     "actual_exposure": ("actual exposure", "my exposure", "my portfolio exposure", "investor exposure", "ledger exposure"),
     "fund": (
         "return",
@@ -251,7 +258,9 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "observation_dates": report.get("observation_dates"),
                         "return_basis": report.get("return_basis"),
                         "peer_count": report.get("peer_count"),
-                        "excluded_peer_count": len(report.get("excluded_peers", [])),
+                        "excluded_peer_count": len(
+                            report.get("excluded_peers", [])
+                        ),
                         "source": "canonical reconciled NAV and applicable distribution methodology",
                     }
                 )
@@ -265,8 +274,12 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "type": "actual_investor_exposure",
                         "scheme_codes": codes,
                         "valuation_basis": exposure.get("valuation_basis"),
-                        "valued_fund_count": exposure.get("coverage", {}).get("valued_fund_count"),
-                        "selected_fund_count": exposure.get("coverage", {}).get("selected_fund_count"),
+                        "valued_fund_count": exposure.get("coverage", {}).get(
+                            "valued_fund_count"
+                        ),
+                        "selected_fund_count": exposure.get("coverage", {}).get(
+                            "selected_fund_count"
+                        ),
                         "valuation_dates": [
                             {"scheme_code": item.get("scheme_code"), "nav_date": item.get("nav_date")}
                             for item in exposure.get("valued_funds", [])
