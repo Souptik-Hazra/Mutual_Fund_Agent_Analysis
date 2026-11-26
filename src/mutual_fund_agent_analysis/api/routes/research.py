@@ -4,6 +4,7 @@
 import csv
 import hashlib
 import io
+import json
 import zipfile
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -27,6 +28,7 @@ from mutual_fund_agent_analysis.data.providers.social import (
     SocialProviderError,
     search_reddit,
     search_x,
+    social_provider_credentials,
 )
 from mutual_fund_agent_analysis.data.services.document_vectors import delete_document_chunks
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
@@ -756,6 +758,130 @@ def ingest_social_post(
         "sentiment_score": row.sentiment_score,
         "published_at": row.published_at,
     }
+
+
+@router.get("/social/providers")
+def get_social_provider_status(session: Annotated[Session, Depends(get_db)]) -> dict:
+    """Report provider readiness without exposing credentials or enabling collection."""
+    credentials = social_provider_credentials()
+    providers = {}
+    for source_key in ("reddit", "x"):
+        registry = session.get(DataSource, source_key)
+        metadata = registry.metadata_json if registry and isinstance(registry.metadata_json, dict) else {}
+        reviewed = bool(
+            registry
+            and registry.terms_url
+            and metadata.get("terms_reviewed") is True
+            and metadata.get("access_confirmed") is True
+            and metadata.get("reviewed_at")
+        )
+        enabled = bool(registry and registry.enabled and registry.source_type == "social")
+        configured = credentials[source_key]
+        if not configured:
+            state = "not_configured"
+        elif not enabled:
+            state = "disabled"
+        elif not reviewed:
+            state = "review_required"
+        else:
+            state = "ready"
+        providers[source_key] = {
+            "configured": configured,
+            "enabled": enabled,
+            "terms_reviewed": reviewed,
+            "can_collect": configured and enabled and reviewed,
+            "can_import": enabled and reviewed,
+            "status": state,
+        }
+    return {"providers": providers}
+
+
+@router.post("/social/import-file")
+async def import_social_dataset(
+    session: Annotated[Session, Depends(get_db)],
+    source: str = Form(...),
+    file: UploadFile = File(...),
+) -> dict:
+    """Import authorized social metadata from a bounded CSV or JSON export."""
+    if source not in {"reddit", "x"}:
+        raise HTTPException(status_code=422, detail="source must be reddit or x.")
+    content = await file.read(5 * 1024 * 1024 + 1)
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Social import file exceeds 5 MB.")
+    filename = (file.filename or "").lower()
+    try:
+        if filename.endswith(".csv"):
+            rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+        elif filename.endswith(".json"):
+            parsed = json.loads(content)
+            rows = parsed.get("posts", []) if isinstance(parsed, dict) else parsed
+        else:
+            raise HTTPException(status_code=415, detail="Only CSV and JSON social exports are supported.")
+        if not isinstance(rows, list) or not rows or len(rows) > 500:
+            raise ValueError("Import must contain between 1 and 500 post records.")
+        registry = session.get(DataSource, source)
+        metadata = registry.metadata_json if registry and isinstance(registry.metadata_json, dict) else {}
+        if (
+            registry is None or not registry.enabled or registry.source_type != "social"
+            or not registry.terms_url or metadata.get("terms_reviewed") is not True
+            or metadata.get("access_confirmed") is not True or not metadata.get("reviewed_at")
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Import requires an enabled social source with reviewed terms and confirmed permission for this dataset.",
+            )
+        retention_days = source_social_retention_days(
+            registry, get_settings().social_retention_days
+        )
+        imported = 0
+        for index, item in enumerate(rows, start=1):
+            if not isinstance(item, dict):
+                raise ValueError(f"Record {index} must be a JSON object.")
+            if item.get("source_key") not in (None, "", source):
+                raise ValueError(f"Record {index} has a source_key that does not match the selected source.")
+            excerpt = str(item.get("text_excerpt") or item.get("text") or "")[:2000]
+            canonical_url = item.get("canonical_url") or item.get("url") or None
+            external_id = str(item.get("external_id") or item.get("id") or "").strip()
+            digest_input = excerpt or str(canonical_url or external_id)
+            if not external_id or not digest_input:
+                raise ValueError(f"Record {index} requires an external_id and text or canonical URL.")
+            raw_metadata = item.get("metadata") or {}
+            if isinstance(raw_metadata, str):
+                raw_metadata = json.loads(raw_metadata) if raw_metadata.strip() else {}
+            if not isinstance(raw_metadata, dict):
+                raise ValueError(f"Record {index} metadata must be a JSON object.")
+            payload = SocialPostInput.model_validate({
+                "source_key": source,
+                "external_id": external_id,
+                "related_entity_id": item.get("related_entity_id") or None,
+                "canonical_url": canonical_url,
+                "text_excerpt": excerpt or None,
+                "content_hash": hashlib.sha256(digest_input.encode("utf-8")).hexdigest(),
+                "published_at": item.get("published_at") or None,
+                "engagement_count": item.get("engagement_count") or 0,
+                "sentiment_label": item.get("sentiment_label") or None,
+                "sentiment_score": item.get("sentiment_score") or None,
+                "sentiment_model": item.get("sentiment_model") or None,
+                "is_spam": item.get("is_spam") or False,
+                "expires_at": datetime.now(UTC) + timedelta(days=retention_days),
+                "metadata": raw_metadata,
+            })
+            create_social_post(session, payload)
+            imported += 1
+        session.commit()
+        return {
+            "source": source, "imported": imported, "retention_days": retention_days,
+            "sentiment_status": "partially_scored" if metadata.get("evaluated_sentiment_models") else "not_scored",
+            "note": "Imported records retain provider provenance and source retention rules; only allowlisted evaluated sentiment models are accepted.",
+        }
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as exc:
+        session.rollback()
+        if isinstance(exc, ValueError):
+            raise _domain_error(exc) from exc
+        raise HTTPException(status_code=422, detail="Unable to validate the social import file.") from exc
 
 
 @router.get("/social/collect")
