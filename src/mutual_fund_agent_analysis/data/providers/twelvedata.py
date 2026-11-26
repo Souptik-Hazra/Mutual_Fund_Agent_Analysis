@@ -94,9 +94,13 @@ class TwelveDataClient:
         returned_symbol = payload.get("symbol")
         returned_exchange = payload.get("exchange")
         if not isinstance(returned_symbol, str) or not returned_symbol.strip():
-            raise ValueError("Provider quote omitted the returned symbol; identity cannot be verified.")
+            raise ValueError(
+                "Provider quote omitted the returned symbol; identity cannot be verified."
+            )
         if not isinstance(returned_exchange, str) or not returned_exchange.strip():
-            raise ValueError("Provider quote omitted the returned exchange; identity cannot be verified.")
+            raise ValueError(
+                "Provider quote omitted the returned exchange; identity cannot be verified."
+            )
         if returned_symbol.strip().upper() != ticker:
             raise ValueError("Provider returned a different symbol; quote rejected.")
         if returned_exchange.strip().upper() != venue:
