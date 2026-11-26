@@ -53,6 +53,7 @@ class GraphSession:
             return SimpleNamespace(base_url="https://www.amfiindia.com")
         if model.__name__ == "EvidenceRecord":
             return SimpleNamespace(
+                evidence_id=10,
                 canonical_url="https://www.reddit.com/r/example/comments/1",
                 retrieved_at=datetime(2026, 11, 26, tzinfo=UTC),
                 verification_status="unverified",
@@ -255,7 +256,9 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
     )
     assert captured["codes"] == [125497, 120503]
     assert captured["as_of_date"] == date(2026, 11, 20)
-    assert result["citations"][0]["valuation_dates"][0]["nav_date"] == date(2026, 11, 25)
+    assert result["citations"][0]["type"] == "actual_investor_exposure"
+    assert result["citations"][0]["data_scope"] == "nav_valuation"
+    assert result["citations"][0]["scheme_code"] == 125497
 
 
 def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
