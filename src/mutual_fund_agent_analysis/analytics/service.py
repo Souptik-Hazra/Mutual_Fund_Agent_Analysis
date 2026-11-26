@@ -119,8 +119,11 @@ def load_fund_prices(
 
 
 def load_fund_return_prices(
-    session: Session, scheme_code: int, start_date: date | None = None,
-    end_date: date | None = None, allow_nav_conflicts: bool = False,
+    session: Session,
+    scheme_code: int,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    allow_nav_conflicts: bool = False,
 ) -> tuple[list[PricePoint], tuple[date, ...], str, str, str | None]:
     """Use IDCW total returns only when an official verified attestation covers the window."""
     prices, conflicts = load_fund_prices(
@@ -132,19 +135,27 @@ def load_fund_return_prices(
     if scheme.option_type == "growth":
         return prices, conflicts, "growth_nav_total_return", "not_required", None
     if scheme.option_type not in {"idcw_payout", "idcw_reinvestment"}:
-        return prices, conflicts, "nav_only_excludes_idcw", "unavailable", (
-            "Scheme option is not explicitly classified as Growth, IDCW payout "
-            "or IDCW reinvestment."
+        return (
+            prices,
+            conflicts,
+            "nav_only_excludes_idcw",
+            "unavailable",
+            (
+                "Scheme option is not explicitly classified as Growth, IDCW payout "
+                "or IDCW reinvestment."
+            ),
         )
 
     attestations = session.scalars(
-        select(DistributionCoverageAttestation).where(
+        select(DistributionCoverageAttestation)
+        .where(
             DistributionCoverageAttestation.scheme_code == scheme_code,
             DistributionCoverageAttestation.coverage_complete.is_(True),
             DistributionCoverageAttestation.verification_status == "verified",
             DistributionCoverageAttestation.start_date <= prices[0].date,
             DistributionCoverageAttestation.end_date >= prices[-1].date,
-        ).order_by(DistributionCoverageAttestation.attested_at.desc())
+        )
+        .order_by(DistributionCoverageAttestation.attested_at.desc())
     ).all()
     attestation = None
     for item in attestations:
@@ -158,20 +169,28 @@ def load_fund_return_prices(
             attestation = item
             break
     if attestation is None:
-        return prices, conflicts, "nav_only_excludes_idcw", "incomplete", (
-            "No verified, complete, enabled official-source attestation covers "
-            "the full observed NAV window."
+        return (
+            prices,
+            conflicts,
+            "nav_only_excludes_idcw",
+            "incomplete",
+            (
+                "No verified, complete, enabled official-source attestation covers "
+                "the full observed NAV window."
+            ),
         )
 
     rows = session.scalars(
-        select(DistributionObservation).where(
+        select(DistributionObservation)
+        .where(
             DistributionObservation.scheme_code == scheme_code,
             DistributionObservation.source_key == attestation.source_key,
             DistributionObservation.option_type == scheme.option_type,
             DistributionObservation.status == "active",
             DistributionObservation.ex_date > prices[0].date,
             DistributionObservation.ex_date <= prices[-1].date,
-        ).order_by(DistributionObservation.ex_date, DistributionObservation.revision)
+        )
+        .order_by(DistributionObservation.ex_date, DistributionObservation.revision)
     ).all()
     distributions: dict[date, Decimal] = {}
     for item in rows:
@@ -183,11 +202,15 @@ def load_fund_return_prices(
             or not source.is_official
             or source.source_type != "official"
         ):
-            return prices, conflicts, "nav_only_excludes_idcw", "incomplete", (
-                "An in-range distribution is not verified against an enabled official source."
+            return (
+                prices,
+                conflicts,
+                "nav_only_excludes_idcw",
+                "incomplete",
+                "An in-range distribution is not verified against an enabled official source.",
             )
-        distributions[item.ex_date] = (
-            distributions.get(item.ex_date, Decimal("0")) + Decimal(item.amount_per_unit)
+        distributions[item.ex_date] = distributions.get(item.ex_date, Decimal("0")) + Decimal(
+            item.amount_per_unit
         )
 
     builder = (
@@ -198,8 +221,12 @@ def load_fund_return_prices(
     try:
         index = builder([(point.date, point.value) for point in prices], distributions)
     except ValueError as exc:
-        return prices, conflicts, "nav_only_excludes_idcw", "incomplete", (
-            f"IDCW total-return series could not be constructed: {exc}"
+        return (
+            prices,
+            conflicts,
+            "nav_only_excludes_idcw",
+            "incomplete",
+            f"IDCW total-return series could not be constructed: {exc}",
         )
     basis = (
         "idcw_payout_total_return"
@@ -213,6 +240,7 @@ def load_fund_return_prices(
         "verified_complete",
         None,
     )
+
 
 def load_benchmark_prices(
     session: Session,
@@ -432,9 +460,7 @@ def compare_funds(
         )
 
     loaded = {
-        code: load_fund_return_prices(
-            session, code, start_date, end_date, allow_nav_conflicts
-        )
+        code: load_fund_return_prices(session, code, start_date, end_date, allow_nav_conflicts)
         for code in codes
     }
     bases = {item[2] for item in loaded.values()}
@@ -455,8 +481,7 @@ def compare_funds(
     if any(option in {None, "unknown"} for option in options):
         effective_benchmark = None
         warnings.append(
-            "Scheme option metadata is unclassified; benchmark-relative "
-            "comparison is suppressed."
+            "Scheme option metadata is unclassified; benchmark-relative comparison is suppressed."
         )
     if "nav_only_excludes_idcw" in bases:
         warnings.append(
@@ -485,19 +510,31 @@ def compare_funds(
     date_set = set(ordered_dates)
     aligned_benchmark = (
         [point for point in benchmark_prices if point.date in date_set]
-        if benchmark_prices is not None else None
+        if benchmark_prices is not None
+        else None
     )
     reports = []
     for code in codes:
         source_prices, conflicts, basis, coverage_status, coverage_reason = loaded[code]
         aligned_prices = [point for point in source_prices if point.date in date_set]
         aligned_conflicts = tuple(day for day in conflicts if day in date_set)
-        reports.append(_build_report(
-            code, aligned_prices, aligned_conflicts, effective_benchmark,
-            benchmark_source, aligned_benchmark, annual_risk_free_rate,
-            periods_per_year, calendar_year_as_of_date, frequency,
-            basis, coverage_status, coverage_reason,
-        ))
+        reports.append(
+            _build_report(
+                code,
+                aligned_prices,
+                aligned_conflicts,
+                effective_benchmark,
+                benchmark_source,
+                aligned_benchmark,
+                annual_risk_free_rate,
+                periods_per_year,
+                calendar_year_as_of_date,
+                frequency,
+                basis,
+                coverage_status,
+                coverage_reason,
+            )
+        )
 
     return FundComparisonReport(
         scheme_codes=codes,
