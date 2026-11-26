@@ -349,6 +349,14 @@ def test_exposure_math():
         sector="Banks",
         weight_pct=Decimal("40"),
     )
+    debt_holding = SimpleNamespace(
+        isin=None,
+        security_key="DEBT-1",
+        security_name="Government Securities",
+        asset_class="debt",
+        sector="Government Bonds",
+        weight_pct=Decimal("60"),
+    )
 
     class Rows:
         def __init__(self, rows):
@@ -372,7 +380,7 @@ def test_exposure_math():
                 )
                 return Rows([transaction])
             if entity is portfolio_module.PortfolioHolding:
-                return Rows([holding])
+                return Rows([holding, debt_holding])
             raise AssertionError(entity)
 
         def get(self, model, _key):
@@ -642,7 +650,7 @@ def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
     result = actual_portfolio_exposure(Session(), [204], as_of)
     assert result["total_valued_portfolio_inr"] == Decimal("100")
     assert result["equity_exposure"][0]["actual_exposure_inr"] == Decimal("50")
-    assert result["coverage"]["lookthrough_coverage_pct"] == Decimal("100")
+    assert result["coverage"]["lookthrough_coverage_pct"] == Decimal("0")
     assert result["coverage"]["is_complete"] is False
     assert result["data_quality_warnings"][0]["type"] == "partial_holdings"
 
