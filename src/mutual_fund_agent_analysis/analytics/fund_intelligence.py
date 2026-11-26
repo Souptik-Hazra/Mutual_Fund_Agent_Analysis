@@ -88,6 +88,19 @@ def analyze_category_peers(
 
     if scheme_code not in aligned_reports:
         raise ValueError("Selected scheme cannot satisfy the common category observation window.")
+    selected_basis = aligned_reports[scheme_code].return_basis
+    for code, report in list(aligned_reports.items()):
+        if report.return_basis != selected_basis:
+            excluded.append({
+                "scheme_code": code,
+                "reason": (
+                    f"Return basis {report.return_basis} differs from selected scheme basis "
+                    f"{selected_basis}; category rankings require one common basis."
+                ),
+            })
+            del aligned_reports[code]
+    if scheme_code not in aligned_reports:
+        raise ValueError("Selected scheme has no eligible peer with the same return basis.")
     reference_dates = tuple(day for day, _ in aligned_reports[scheme_code].base100_series)
     ranked = []
     for code, report in aligned_reports.items():
