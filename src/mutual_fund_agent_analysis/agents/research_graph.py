@@ -41,7 +41,13 @@ KEYWORDS = {
         "rankings",
         "category position",
     ),
-    "actual_exposure": ("actual exposure", "my exposure", "my portfolio exposure", "investor exposure", "ledger exposure"),
+    "actual_exposure": (
+        "actual exposure",
+        "my exposure",
+        "my portfolio exposure",
+        "investor exposure",
+        "ledger exposure",
+    ),
     "fund": (
         "return",
         "returns",
@@ -261,7 +267,9 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "excluded_peer_count": len(
                             report.get("excluded_peers", [])
                         ),
-                        "source": "canonical reconciled NAV and applicable distribution methodology",
+                        "source": (
+                            "canonical reconciled NAV and applicable distribution methodology"
+                        ),
                     }
                 )
             elif intent == "actual_exposure":
@@ -281,7 +289,10 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             "selected_fund_count"
                         ),
                         "valuation_dates": [
-                            {"scheme_code": item.get("scheme_code"), "nav_date": item.get("nav_date")}
+                            {
+                                "scheme_code": item.get("scheme_code"),
+                                "nav_date": item.get("nav_date"),
+                            }
                             for item in exposure.get("valued_funds", [])
                         ],
                         "holdings_effective_dates": sorted({
