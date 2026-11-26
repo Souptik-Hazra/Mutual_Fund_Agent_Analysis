@@ -106,8 +106,18 @@ def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypa
                 return Rows([SimpleNamespace(scheme_code=101, scheme_name="Redeemed")])
             if entity is module.InvestorTransaction:
                 return Rows([
-                    SimpleNamespace(transaction_type="purchase", units=Decimal("10"), transaction_date=date(2024,1,1), transaction_id=1),
-                    SimpleNamespace(transaction_type="redemption", units=Decimal("10"), transaction_date=date(2024,2,1), transaction_id=2),
+                    SimpleNamespace(
+                        transaction_type="purchase",
+                        units=Decimal("10"),
+                        transaction_date=date(2024, 1, 1),
+                        transaction_id=1,
+                    ),
+                    SimpleNamespace(
+                        transaction_type="redemption",
+                        units=Decimal("10"),
+                        transaction_date=date(2024, 2, 1),
+                        transaction_id=2,
+                    ),
                 ])
             raise AssertionError("A zero-unit position must not query NAV or holdings.")
 
@@ -134,8 +144,18 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
                 return Rows([SimpleNamespace(scheme_code=102, scheme_name="Partial")])
             if entity is module.InvestorTransaction:
                 return Rows([
-                    SimpleNamespace(transaction_type="purchase", units=Decimal("10"), transaction_date=date(2024,1,1), transaction_id=1),
-                    SimpleNamespace(transaction_type="redemption", units=Decimal("4"), transaction_date=date(2024,2,1), transaction_id=2),
+                    SimpleNamespace(
+                        transaction_type="purchase",
+                        units=Decimal("10"),
+                        transaction_date=date(2024, 1, 1),
+                        transaction_id=1,
+                    ),
+                    SimpleNamespace(
+                        transaction_type="redemption",
+                        units=Decimal("4"),
+                        transaction_date=date(2024, 2, 1),
+                        transaction_id=2,
+                    ),
                 ])
             raise AssertionError("Unexpected holdings query for no disclosed portfolio.")
 
@@ -212,7 +232,9 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
     from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 
     india_late = datetime(2026, 11, 25, 23, 45, tzinfo=ZoneInfo("Asia/Kolkata"))
-    expected_cutoff = datetime(2026, 11, 25, 23, 59, 59, 999999, tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(timezone.utc)
+    expected_cutoff = datetime(
+        2026, 11, 25, 23, 59, 59, 999999, tzinfo=ZoneInfo("Asia/Kolkata")
+    ).astimezone(timezone.utc)
     observed = SimpleNamespace(
         observed_at=india_late,
         observation_id=1,
