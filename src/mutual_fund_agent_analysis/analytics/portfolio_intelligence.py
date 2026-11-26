@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.investor import InvestorTransaction
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
+from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
@@ -171,10 +172,14 @@ def actual_portfolio_exposure(
             continue
         snapshot = session.scalar(
             select(PortfolioSnapshot)
+            .join(DataSource, DataSource.source_key == PortfolioSnapshot.source_key)
             .where(
                 PortfolioSnapshot.scheme_code == code,
                 PortfolioSnapshot.status.in_(["complete", "partial"]),
                 PortfolioSnapshot.effective_date <= as_of_date,
+                DataSource.enabled.is_(True),
+                DataSource.is_official.is_(True),
+                DataSource.source_type == "official",
             )
             .order_by(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc())
             .limit(1)
@@ -190,7 +195,27 @@ def actual_portfolio_exposure(
             continue
 
         holdings_fund_codes.add(code)
-        lookthrough_value += value
+        holdings = session.scalars(
+            select(PortfolioHolding).where(PortfolioHolding.snapshot_id == snapshot.snapshot_id)
+        ).all()
+        missing_weight_count = sum(1 for holding in holdings if holding.weight_pct is None)
+        disclosed_weight_total = sum(
+            (D(holding.weight_pct) for holding in holdings if holding.weight_pct is not None),
+            D("0"),
+        )
+        weight_complete = missing_weight_count == 0 and D("99") <= disclosed_weight_total <= D("101")
+        if snapshot.status == "complete" and not weight_complete:
+            reason = (
+                f"Complete disclosure effective {snapshot.effective_date} has "
+                f"{missing_weight_count} holding(s) without weights and total disclosed "
+                f"weight {disclosed_weight_total}%; look-through coverage is incomplete."
+            )
+            warnings.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "missing_holding_weights", "reason": reason}
+            )
+        if snapshot.status == "complete" and weight_complete:
+            lookthrough_value += value
         if snapshot.status != "complete":
             reason = (
                 f"Holdings disclosure effective {snapshot.effective_date} is partial; "
@@ -201,14 +226,9 @@ def actual_portfolio_exposure(
                 {"scheme_code": code, "type": "partial_holdings", "reason": reason}
             )
 
-        holdings = session.scalars(
-            select(PortfolioHolding).where(
-                PortfolioHolding.snapshot_id == snapshot.snapshot_id,
-                PortfolioHolding.asset_class == "equity",
-                PortfolioHolding.weight_pct.is_not(None),
-            )
-        ).all()
         for holding in holdings:
+            if holding.asset_class != "equity" or holding.weight_pct is None:
+                continue
             key = holding.isin or holding.security_key
             amount = value * D(holding.weight_pct) / D("100")
             row = stocks[key]

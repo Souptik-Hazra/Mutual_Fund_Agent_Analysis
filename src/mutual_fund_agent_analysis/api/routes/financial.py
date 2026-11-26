@@ -7,7 +7,7 @@ import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated, Any
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -73,20 +73,23 @@ def _validate_source_url(
     *,
     require_registered_host: bool = False,
 ) -> None:
-    if not source.base_url:
+    supplied = urlsplit(source_url)
+    registered = urlsplit(source.base_url or "")
+    try:
+        supplied_port = supplied.port or 443
+        registered_port = registered.port or 443
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="The evidence URL has an invalid port.") from exc
+    supplied_host = (supplied.hostname or "").lower().rstrip(".")
+    registered_host = (registered.hostname or "").lower().rstrip(".")
+    if supplied.scheme.lower() != "https" or not supplied_host or supplied.username is not None or supplied.password is not None:
+        raise HTTPException(status_code=422, detail="Evidence URLs must use HTTPS without embedded credentials.")
+    if not registered_host:
         if require_registered_host:
-            raise HTTPException(
-                status_code=422,
-                detail="A verified record requires a registered source base_url for host validation.",
-            )
+            raise HTTPException(status_code=422, detail="A verified record requires a registered HTTPS source host.")
         return
-    expected = (urlparse(source.base_url).hostname or "").lower()
-    actual = (urlparse(source_url).hostname or "").lower()
-    if expected and actual and actual != expected and not actual.endswith("." + expected):
-        raise HTTPException(
-            status_code=422,
-            detail="The evidence URL host does not match the registered source host.",
-        )
+    if registered.scheme.lower() != "https" or supplied_port != registered_port or not (supplied_host == registered_host or supplied_host.endswith("." + registered_host)):
+        raise HTTPException(status_code=422, detail="The evidence URL must use HTTPS on the registered data-source host and port.")
 
 
 def _scheme_or_404(session: Session, scheme_code: int) -> MutualFundScheme:
@@ -207,7 +210,12 @@ def add_scheme_metadata_observation(
     )
     session.add(record)
 
-    if request.verification_status == "verified":
+    today = datetime.now(UTC).date()
+    observation_is_current = request.verification_status == "verified" and (
+        (request.valid_from is None or request.valid_from <= today)
+        and (request.valid_to is None or request.valid_to >= today)
+    )
+    if observation_is_current:
         if request.plan_type is not None:
             scheme.plan_type = request.plan_type
         if request.option_type is not None:
@@ -218,7 +226,7 @@ def add_scheme_metadata_observation(
             scheme.launch_date = request.launch_date
         if request.closure_date is not None:
             scheme.closure_date = request.closure_date
-        if request.expense_ratio is not None:
+        if request.expense_ratio is not None and request.expense_ratio_effective_date is not None and request.expense_ratio_effective_date <= today:
             scheme.effective_expense_ratio = request.expense_ratio
             scheme.expense_ratio_effective_date = request.expense_ratio_effective_date
             scheme.expense_ratio_source_key = request.source_key
@@ -381,11 +389,6 @@ def add_distribution_observation(
                 status_code=422,
                 detail="A correction must retain the source/external ID and increase the revision.",
             )
-        if previous.status != "active":
-            raise HTTPException(
-                status_code=409, detail="Only an active distribution can be superseded."
-            )
-
     payload = request.model_dump(mode="json")
     payload_hash = _hash_payload(payload)
     duplicate = session.scalar(
@@ -403,6 +406,28 @@ def add_distribution_observation(
                 detail="The same distribution revision was submitted with different content.",
             )
         return DistributionObservationResponse.model_validate(duplicate)
+
+    latest_revision = session.scalar(
+        select(DistributionObservation)
+        .where(
+            DistributionObservation.scheme_code == scheme_code,
+            DistributionObservation.source_key == request.source_key,
+            DistributionObservation.external_id == request.external_id,
+        )
+        .order_by(DistributionObservation.revision.desc())
+        .limit(1)
+    )
+    if latest_revision is None:
+        if previous is not None or request.revision != 1:
+            raise HTTPException(status_code=409, detail="The first distribution revision must be revision 1 and cannot supersede another record.")
+    elif (
+        previous is None
+        or previous.distribution_id != latest_revision.distribution_id
+        or latest_revision.status != "active"
+    ):
+        raise HTTPException(status_code=409, detail="A new distribution revision must explicitly supersede the latest active revision.")
+    elif request.revision != latest_revision.revision + 1:
+        raise HTTPException(status_code=422, detail="Distribution revisions must increase sequentially.")
 
     record = DistributionObservation(
         scheme_code=scheme_code,
@@ -644,20 +669,21 @@ def get_idcw_total_return(
             DistributionObservation.scheme_code == scheme_code,
             DistributionObservation.source_key == attestation.source_key,
             DistributionObservation.option_type == scheme.option_type,
+            DistributionObservation.status == "active",
             DistributionObservation.ex_date > nav_rows[0].nav_date,
             DistributionObservation.ex_date <= nav_rows[-1].nav_date,
         )
         .order_by(DistributionObservation.ex_date, DistributionObservation.revision)
     ).all()
-    active_rows = [item for item in distribution_rows if item.status == "active"]
     distributions: dict[date, Decimal] = {}
-    for item in active_rows:
+    for item in distribution_rows:
         source = session.get(DataSource, item.source_key)
         if (
             item.verification_status != "verified"
             or source is None
             or not source.enabled
             or not source.is_official
+            or source.source_type != "official"
         ):
             return blocked(
                 "At least one in-range distribution is not verified against an enabled official source."
@@ -704,12 +730,17 @@ def get_idcw_total_return(
 def get_portfolio_quality(
     scheme_code: int,
     session: Annotated[Session, Depends(get_db)],
+    as_of: date | None = None,
 ) -> dict[str, Any]:
     """Expose holdings resolution, weight completeness, and disclosure freshness."""
     _scheme_or_404(session, scheme_code)
     snapshot = session.scalars(
         select(PortfolioSnapshot)
-        .where(PortfolioSnapshot.scheme_code == scheme_code)
+        .where(
+            PortfolioSnapshot.scheme_code == scheme_code,
+            PortfolioSnapshot.status.in_(["complete", "partial"]),
+            PortfolioSnapshot.effective_date <= (as_of or date.max),
+        )
         .order_by(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc())
         .limit(1)
     ).first()

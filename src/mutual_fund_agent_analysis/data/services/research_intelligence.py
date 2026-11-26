@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections import defaultdict
 from datetime import date, datetime, timezone
@@ -26,16 +27,22 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
     source = session.get(DataSource, payload.source_key)
     if source is None or not source.enabled:
         raise ValueError("Unknown or disabled source_key.")
+    if not source.is_official or source.source_type != "official":
+        raise ValueError("Portfolio disclosures must use an enabled registered official source.")
+    canonical_payload = payload.model_dump(mode="json", exclude={"content_hash"})
+    content_hash = hashlib.sha256(
+        json.dumps(canonical_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     existing = session.scalar(select(PortfolioSnapshot).where(
         PortfolioSnapshot.scheme_code == payload.scheme_code,
         PortfolioSnapshot.effective_date == payload.effective_date,
         PortfolioSnapshot.source_key == payload.source_key,
-        PortfolioSnapshot.content_hash == payload.content_hash,
+        PortfolioSnapshot.content_hash == content_hash,
     ))
     if existing:
         return existing
     evidence_external_id = (
-        f"portfolio:{payload.scheme_code}:{payload.effective_date}:{payload.content_hash}"
+        f"portfolio:{payload.scheme_code}:{payload.effective_date}:{content_hash}"
     )
     evidence = session.scalar(select(EvidenceRecord).where(
         EvidenceRecord.source_key == payload.source_key,
@@ -47,7 +54,7 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
             canonical_url=str(payload.document_url) if payload.document_url else None,
             title=f"Portfolio disclosure for scheme {payload.scheme_code}",
             published_at=payload.published_at, effective_from=payload.effective_date,
-            content_hash=payload.content_hash, verification_status="unverified",
+            content_hash=content_hash, verification_status="unverified",
             metadata_json={"scheme_code": payload.scheme_code, "ingestion": "portfolio_snapshot"},
         )
         session.add(evidence)
@@ -57,7 +64,7 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
         evidence_id=evidence.evidence_id, effective_date=payload.effective_date,
         published_at=payload.published_at,
         document_url=str(payload.document_url) if payload.document_url else None,
-        content_hash=payload.content_hash, total_market_value=payload.total_market_value,
+        content_hash=content_hash, total_market_value=payload.total_market_value,
         status=payload.status, metadata_json=payload.metadata,
     )
     session.add(snapshot)
@@ -88,10 +95,24 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
 
 
 def latest_snapshot(session: Session, scheme_code: int, as_of: date | None = None) -> PortfolioSnapshot | None:
-    stmt = select(PortfolioSnapshot).where(PortfolioSnapshot.scheme_code == scheme_code)
+    stmt = (
+        select(PortfolioSnapshot)
+        .join(DataSource, DataSource.source_key == PortfolioSnapshot.source_key)
+        .where(
+            PortfolioSnapshot.scheme_code == scheme_code,
+            PortfolioSnapshot.status.in_(["complete", "partial"]),
+            DataSource.enabled.is_(True),
+            DataSource.is_official.is_(True),
+            DataSource.source_type == "official",
+        )
+    )
     if as_of:
         stmt = stmt.where(PortfolioSnapshot.effective_date <= as_of)
-    return session.scalar(stmt.order_by(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc()).limit(1))
+    return session.scalar(
+        stmt.order_by(
+            PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc()
+        ).limit(1)
+    )
 
 
 def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str, Any]:
@@ -174,8 +195,9 @@ def compare_portfolios(
         maps[code] = {}
         for row in rows:
             if row.weight_pct is not None:
-                maps[code][row.security_key] = row.weight_pct
-                names[row.security_key] = row.security_name
+                identity = (row.isin or row.security_key).strip().upper()
+                maps[code][identity] = row.weight_pct
+                names[identity] = row.security_name
     pairwise = []
     for i, left in enumerate(scheme_codes):
         for right in scheme_codes[i + 1:]:

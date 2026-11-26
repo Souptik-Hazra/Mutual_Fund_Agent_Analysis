@@ -165,7 +165,8 @@ def analyze_category_peers(
             key=lambda row: row[metric],
             reverse=True,
         )
-        for rank, row in enumerate(valid, start=1):
+        for row in valid:
+            rank = 1 + sum(1 for candidate in valid if candidate[metric] > row[metric])
             row[f"{metric}_rank"] = rank
             row[f"{metric}_percentile"] = (
                 Decimal(len(valid) - rank + 1) / Decimal(len(valid)) * Decimal("100")
