@@ -10,6 +10,7 @@ and React/Vite workspace rather than introducing duplicate persistence models or
 - Validates timezone-aware observation timestamps, positive prices, date ordering, bounded corporate-event lists, allowed fundamental metric names, and finite decimal values.
 - Stores fundamentals and corporate events in the existing immutable `security_market_observations` record. Operator-submitted events are explicitly marked unverified.
 - Added `GET /api/v1/market-data/securities/{security_key}` with quote freshness, fundamentals as-of/freshness, observation history, corporate events, and matching positions from the latest eligible AMC disclosure per scheme.
+- Quote history, fundamentals, and corporate-event observations are queried independently so frequent quote-only syncs cannot evict slower fundamentals or event disclosures from the security profile. Historical security profiles and fund equity-status views constrain provider observations to the requested `as_of` date and calculate freshness relative to that date.
 - Missing fundamentals and market data remain unavailable; they are not inferred from NAV or fund returns.
 
 ## Phase 18 — LangGraph research orchestration

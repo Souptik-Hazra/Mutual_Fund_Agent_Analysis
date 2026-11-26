@@ -39,27 +39,39 @@ def security_profile(
     as_of: date | None = None,
     scheme_codes: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Return a source-attributed security profile without manufacturing missing fundamentals."""
+    """Return independent, source-attributed quote, fundamentals and event timelines."""
     key = security_key.strip().upper()
     if len(key) < 2:
         raise ValueError("security_key must contain at least two characters.")
 
-    statement = select(SecurityMarketObservation).where(
-        or_(
-            SecurityMarketObservation.security_key == key,
-            SecurityMarketObservation.isin == key,
-        )
+    observation_filter = or_(
+        SecurityMarketObservation.security_key == key,
+        SecurityMarketObservation.isin == key,
     )
+    base_statement = select(SecurityMarketObservation).where(observation_filter)
     if as_of:
         cutoff = datetime.combine(as_of, time.max, tzinfo=UTC)
-        statement = statement.where(SecurityMarketObservation.observed_at <= cutoff)
-    observations = session.scalars(
-        statement.order_by(
-            SecurityMarketObservation.observed_at.desc(),
-            SecurityMarketObservation.observation_id.desc(),
-        ).limit(20)
-    ).all()
-    latest = observations[0] if observations else None
+        base_statement = base_statement.where(SecurityMarketObservation.observed_at <= cutoff)
+
+    ordering = (
+        SecurityMarketObservation.observed_at.desc(),
+        SecurityMarketObservation.observation_id.desc(),
+    )
+    latest = session.scalars(base_statement.order_by(*ordering).limit(1)).first()
+    observations = session.scalars(base_statement.order_by(*ordering).limit(100)).all()
+
+    # Quote-only syncs are frequent. Do not let them evict the latest dated
+    # fundamentals or event payload from the bounded quote-history window.
+    fundamentals_observation = session.scalars(
+        base_statement.where(SecurityMarketObservation.fundamentals_json != {})
+        .order_by(*ordering)
+        .limit(1)
+    ).first()
+    event_observation = session.scalars(
+        base_statement.where(SecurityMarketObservation.corporate_events_json != [])
+        .order_by(*ordering)
+        .limit(1)
+    ).first()
 
     snapshot_statement = select(PortfolioSnapshot).where(
         PortfolioSnapshot.effective_date <= (as_of or date.max),
@@ -105,8 +117,6 @@ def security_profile(
             for row in holdings
         ]
 
-    event_observation = next((row for row in observations if row.corporate_events_json), None)
-
     corporate_events = (
         [
             {
@@ -144,7 +154,6 @@ def security_profile(
         if quote_age_hours is not None and quote_age_hours <= 24
         else "stale"
     )
-    fundamentals_observation = next((row for row in observations if row.fundamentals_json), None)
     fundamentals_as_of = (
         fundamentals_observation.fundamentals_as_of if fundamentals_observation else None
     )
@@ -161,6 +170,7 @@ def security_profile(
 
     return {
         "security_key": key,
+        "as_of": as_of,
         "availability": "available" if latest else "no_market_observation",
         "identity": {
             "security_name": latest.security_name
@@ -189,6 +199,9 @@ def security_profile(
         "fundamentals": {
             "availability": "available" if fundamentals_observation else "unavailable",
             "as_of": fundamentals_as_of,
+            "observed_at": fundamentals_observation.observed_at
+            if fundamentals_observation
+            else None,
             "freshness": fundamentals_freshness,
             "metrics": fundamentals_observation.fundamentals_json
             if fundamentals_observation
@@ -207,6 +220,10 @@ def security_profile(
             else None,
         },
         "corporate_events": corporate_events,
+        "corporate_events_observed_at": (
+            event_observation.observed_at if event_observation else None
+        ),
+        "corporate_events_source_key": event_observation.source_key if event_observation else None,
         "portfolio_positions": positions,
         "portfolio_coverage": {
             "matched_scheme_count": len({row["scheme_code"] for row in positions}),
@@ -225,6 +242,7 @@ def security_profile(
             }
             for row in observations
         ],
+        "observation_history_limit": 100,
         "freshness_policy": {
             "quote_fresh_hours": 24,
             "fundamentals_fresh_days": 180,
