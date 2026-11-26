@@ -698,7 +698,9 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
     return event
 
 
-def create_social_post(session: Session, payload: Any) -> SocialPost:
+def create_social_post(
+    session: Session, payload: Any, *, commit: bool = True
+) -> SocialPost:
     """Persist only minimal social metadata under an enforced source retention policy."""
     from datetime import timedelta
     from mutual_fund_agent_analysis.core.config import get_settings
@@ -823,8 +825,11 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
         evidence.verification_status = "unverified"
         evidence.retrieved_at = now
     row.evidence_id = evidence.evidence_id
-    session.commit()
-    session.refresh(row)
+    if commit:
+        session.commit()
+        session.refresh(row)
+    else:
+        session.flush()
     return row
 
 def social_analytics(
