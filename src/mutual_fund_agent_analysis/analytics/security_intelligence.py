@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -56,7 +57,9 @@ def security_profile(
     )
     base_statement = select(SecurityMarketObservation).where(observation_filter)
     if as_of:
-        cutoff = datetime.combine(as_of, time.max, tzinfo=UTC)
+        cutoff = datetime.combine(
+            as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")
+        ).astimezone(UTC)
         base_statement = base_statement.where(SecurityMarketObservation.observed_at <= cutoff)
 
     ordering = (
@@ -156,7 +159,9 @@ def security_profile(
 
     freshness_reference_date = as_of or date.today()
     freshness_reference_time = (
-        datetime.combine(freshness_reference_date, time.max, tzinfo=UTC)
+        datetime.combine(
+            freshness_reference_date, time.max, tzinfo=ZoneInfo("Asia/Kolkata")
+        ).astimezone(UTC)
         if as_of
         else datetime.now(UTC)
     )
