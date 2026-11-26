@@ -11,3 +11,9 @@
 .event-row a{display:inline-block;margin-top:7px;color:#c5f06b;font-size:10px;text-decoration:none}.event-row a:hover{text-decoration:underline}.event-row small+small{margin-top:4px}.loading{display:flex;align-items:center;gap:8px}.loading span{flex:0 0 7px}
 
 .field .toggle-label{display:flex;align-items:center;gap:9px;font-size:11px;color:#9aaab2}.field .toggle-input{width:auto;padding:0;accent-color:#c5f06b}
+
+
+/* Dashboard layout refinements */
+@media(min-width:901px){.sidebar{position:sticky;top:0;height:100vh;min-height:0;overflow-y:auto;overscroll-behavior:contain}.stat-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:651px) and (max-width:900px){.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.sidebar{position:static;height:auto;overflow:visible}.stat-grid{grid-template-columns:1fr}}
