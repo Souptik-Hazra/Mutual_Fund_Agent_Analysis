@@ -723,14 +723,16 @@ def test_actual_exposure_coverage_requires_complete_weighted_verified_disclosure
             if entity is portfolio_module.MutualFundScheme:
                 return Rows([SimpleNamespace(scheme_code=299, scheme_name="Coverage Fund")])
             if entity is portfolio_module.InvestorTransaction:
-                return Rows([
-                    SimpleNamespace(
-                        transaction_type="purchase",
-                        units=Decimal("4"),
-                        transaction_date=date(2026, 1, 1),
-                        transaction_id=1,
-                    )
-                ])
+                return Rows(
+                    [
+                        SimpleNamespace(
+                            transaction_type="purchase",
+                            units=Decimal("4"),
+                            transaction_date=date(2026, 1, 1),
+                            transaction_id=1,
+                        )
+                    ]
+                )
             if entity is portfolio_module.PortfolioHolding:
                 return Rows(holdings)
             raise AssertionError(entity)
