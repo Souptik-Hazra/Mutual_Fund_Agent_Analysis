@@ -483,11 +483,11 @@ Only configure providers that are actually used. Keep `.env` out of version cont
 
 ### Requirements
 
-- Python 3.11, 3.12, or 3.13.
+- Python 3.11 (the backend CI and documented development baseline).
 - Docker Engine with Docker Compose.
 - Git.
 
-### Setup
+### CI validation\n\nPull requests targeting `main` run one backend job on Python 3.11 (dependency installation, Ruff lint/format, backup/restore shell validation, Docker Compose validation, API image build, the PostgreSQL-backed pytest suite, and offline agent evaluation) plus the existing Node.js 22 frontend tests and Vite production build. The backend suite is not duplicated across Python versions.\n\n### Setup
 
 ```bash
 git clone https://github.com/Souptik-Hazra/Mutual_Fund_Agent_Analysis.git
