@@ -91,13 +91,27 @@ class TwelveDataClient:
         if not ticker or not venue or len(ticker) > 40 or len(venue) > 12:
             raise ValueError("A valid symbol and explicit exchange are required.")
         payload = self._get("quote", {"symbol": ticker, "exchange": venue})
+        returned_symbol = payload.get("symbol")
+        returned_exchange = payload.get("exchange")
+        if not isinstance(returned_symbol, str) or not returned_symbol.strip():
+            raise ValueError(
+                "Provider quote omitted the returned symbol; identity cannot be verified."
+            )
+        if not isinstance(returned_exchange, str) or not returned_exchange.strip():
+            raise ValueError(
+                "Provider quote omitted the returned exchange; identity cannot be verified."
+            )
+        if returned_symbol.strip().upper() != ticker:
+            raise ValueError("Provider returned a different symbol; quote rejected.")
+        if returned_exchange.strip().upper() != venue:
+            raise ValueError("Provider returned a different exchange; quote rejected.")
         price = self._decimal(payload, "close", "price")
         if price is None or price <= 0:
             raise ValueError("Provider quote has no positive last price.")
         state = payload.get("is_market_open")
         return EquityQuote(
-            symbol=str(payload.get("symbol") or ticker).upper(),
-            exchange=str(payload.get("exchange") or venue).upper(),
+            symbol=returned_symbol.strip().upper(),
+            exchange=returned_exchange.strip().upper(),
             observed_at=self._timestamp(payload),
             price=price,
             change_pct=self._decimal(payload, "percent_change"),

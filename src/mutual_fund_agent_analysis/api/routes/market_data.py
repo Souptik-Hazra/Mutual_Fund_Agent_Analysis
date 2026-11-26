@@ -6,10 +6,12 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,7 +19,11 @@ from mutual_fund_agent_analysis.analytics.security_intelligence import security_
 from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.database.session import get_db
-from mutual_fund_agent_analysis.models.intelligence import DataSource
+from mutual_fund_agent_analysis.models.intelligence import (
+    DataSource,
+    EntityIdentifier,
+    ResearchEntity,
+)
 from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
@@ -28,7 +34,94 @@ class QuoteSyncRequest(BaseModel):
     security_name: str = Field(min_length=1, max_length=300)
     symbol: str = Field(min_length=1, max_length=40)
     exchange: str = Field(min_length=2, max_length=12)
-    isin: str | None = Field(default=None, max_length=20)
+    isin: str = Field(min_length=12, max_length=12)
+
+    @model_validator(mode="after")
+    def normalize_identity(self) -> "QuoteSyncRequest":
+        self.security_key = self.security_key.strip().upper()
+        self.symbol = self.symbol.strip().upper()
+        self.exchange = self.exchange.strip().upper()
+        self.isin = self.isin.strip().upper()
+        if self.exchange not in {"NSE", "BSE"}:
+            raise ValueError("exchange must be NSE or BSE.")
+        if len(self.isin) != 12 or not self.isin.startswith("IN") or not self.isin[2:].isalnum():
+            raise ValueError("A valid 12-character Indian ISIN is required.")
+        if self.security_key not in {self.isin, self.symbol}:
+            raise ValueError(
+                "security_key must exactly match the supplied ISIN or exchange symbol."
+            )
+        if not self.symbol or not self.security_name.strip():
+            raise ValueError("Security symbol and name cannot be blank.")
+        return self
+
+
+def _verified_identity_source(session: Session, source_key: str | None) -> bool:
+    if not source_key:
+        return False
+    source = session.get(DataSource, source_key)
+    return bool(
+        source and source.enabled and source.is_official and source.source_type == "official"
+    )
+
+
+def _resolve_security_identity(
+    session: Session, payload: QuoteSyncRequest, observed_on: date
+) -> ResearchEntity:
+    """Resolve exact ISIN and exchange-symbol identifiers to one verified canonical entity."""
+    isin_rows = session.scalars(
+        select(EntityIdentifier)
+        .where(
+            EntityIdentifier.namespace == "ISIN",
+            EntityIdentifier.normalized_value == payload.isin,
+            (EntityIdentifier.valid_from.is_(None) | (EntityIdentifier.valid_from <= observed_on)),
+            (EntityIdentifier.valid_to.is_(None) | (EntityIdentifier.valid_to >= observed_on)),
+        )
+        .limit(2)
+    ).all()
+    if len(isin_rows) != 1:
+        raise HTTPException(
+            status_code=422 if not isin_rows else 409,
+            detail="No unique effective-dated canonical entity mapping exists for this ISIN.",
+        )
+    isin_identifier = isin_rows[0]
+    entity = session.get(ResearchEntity, isin_identifier.entity_id)
+    if (
+        entity is None
+        or entity.status != "active"
+        or entity.entity_type not in {"company", "security"}
+        or not _verified_identity_source(session, isin_identifier.source_key)
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "The ISIN mapping is not backed by an enabled official source "
+                "and active security entity."
+            ),
+        )
+
+    namespace = f"{payload.exchange}_SYMBOL"
+    symbol_rows = session.scalars(
+        select(EntityIdentifier)
+        .where(
+            EntityIdentifier.entity_id == entity.entity_id,
+            EntityIdentifier.namespace == namespace,
+            EntityIdentifier.normalized_value == payload.symbol,
+            (EntityIdentifier.valid_from.is_(None) | (EntityIdentifier.valid_from <= observed_on)),
+            (EntityIdentifier.valid_to.is_(None) | (EntityIdentifier.valid_to >= observed_on)),
+        )
+        .limit(2)
+    ).all()
+    if len(symbol_rows) != 1 or symbol_rows[0].entity_id != entity.entity_id:
+        raise HTTPException(
+            status_code=422 if not symbol_rows else 409,
+            detail=f"No unique {namespace} mapping exists for the supplied security identity.",
+        )
+    if not _verified_identity_source(session, symbol_rows[0].source_key):
+        raise HTTPException(
+            status_code=422,
+            detail="The exchange-symbol mapping is not backed by an enabled official source.",
+        )
+    return entity
 
 
 @router.post("/twelvedata/quote", status_code=201)
@@ -66,8 +159,11 @@ def sync_twelvedata_quote(
         )
         session.add(source)
         session.flush()
-    elif not source.enabled:
-        raise HTTPException(status_code=409, detail="The Twelve Data source is disabled.")
+    elif not source.enabled or source.source_type != "provider":
+        raise HTTPException(
+            status_code=409,
+            detail="The Twelve Data provider source is disabled or misregistered.",
+        )
     client = TwelveDataClient(settings.twelve_data_api_key.get_secret_value())
     try:
         quote = client.get_quote(payload.symbol, payload.exchange)
@@ -79,8 +175,12 @@ def sync_twelvedata_quote(
         ) from exc
     finally:
         client.close()
+    canonical_entity = _resolve_security_identity(
+        session, payload, quote.observed_at.astimezone(ZoneInfo("Asia/Kolkata")).date()
+    )
     canonical = {
-        "security_key": payload.security_key.strip().upper(),
+        "security_key": payload.isin,
+        "canonical_entity_id": canonical_entity.entity_id,
         "symbol": quote.symbol,
         "exchange": quote.exchange,
         "observed_at": quote.observed_at.isoformat(),
@@ -93,9 +193,9 @@ def sync_twelvedata_quote(
     }
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
     row = SecurityMarketObservation(
-        security_key=payload.security_key.strip().upper(),
-        isin=payload.isin.strip().upper() if payload.isin else None,
-        security_name=payload.security_name.strip(),
+        security_key=payload.isin,
+        isin=payload.isin,
+        security_name=canonical_entity.canonical_name,
         symbol=quote.symbol,
         exchange=quote.exchange,
         source_key="twelvedata",

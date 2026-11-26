@@ -10,6 +10,7 @@ class ResearchAssistantRequest(BaseModel):
     question: str = Field(min_length=5, max_length=1500)
     scheme_codes: list[int] = Field(default_factory=list, max_length=5)
     benchmark_code: str | None = Field(default=None, min_length=1, max_length=80)
+    benchmark_source: str | None = Field(default=None, min_length=1, max_length=40)
     start_date: date | None = None
     end_date: date | None = None
     annual_risk_free_rate: Decimal = Decimal("0")

@@ -41,3 +41,47 @@ def test_actual_exposure_rejects_invalid_selection():
         actual_portfolio_exposure(None, [1, 1])
     with pytest.raises(ValueError, match="one and twenty"):
         actual_portfolio_exposure(None, [])
+
+
+def test_benchmark_resolver_requires_enabled_official_source():
+    mapping = SimpleNamespace(
+        source_key="unverified", benchmark_code="NIFTY100", benchmark_source="niftyindices"
+    )
+
+    class Rows:
+        def all(self):
+            return [mapping]
+
+    class Session:
+        def scalars(self, _query):
+            return Rows()
+
+        def get(self, _model, _key):
+            return SimpleNamespace(enabled=True, is_official=False, source_type="provider")
+
+    scheme = SimpleNamespace(
+        scheme_category="Large Cap", scheme_type="Equity", plan_type="direct", option_type="growth"
+    )
+    assert resolve_category_benchmark(Session(), scheme, date(2026, 11, 26)) is None
+
+
+def test_benchmark_resolver_accepts_effective_mapping_with_official_registry_source():
+    mapping = SimpleNamespace(
+        source_key="nifty_official", benchmark_code="NIFTY100", benchmark_source="niftyindices"
+    )
+
+    class Rows:
+        def all(self):
+            return [mapping]
+
+    class Session:
+        def scalars(self, _query):
+            return Rows()
+
+        def get(self, _model, _key):
+            return SimpleNamespace(enabled=True, is_official=True, source_type="official")
+
+    scheme = SimpleNamespace(
+        scheme_category="Large Cap", scheme_type="Equity", plan_type="direct", option_type="growth"
+    )
+    assert resolve_category_benchmark(Session(), scheme, date(2026, 11, 26)) is mapping
