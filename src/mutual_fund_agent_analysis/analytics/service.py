@@ -133,7 +133,8 @@ def load_fund_return_prices(
         return prices, conflicts, "growth_nav_total_return", "not_required", None
     if scheme.option_type not in {"idcw_payout", "idcw_reinvestment"}:
         return prices, conflicts, "nav_only_excludes_idcw", "unavailable", (
-            "Scheme option is not explicitly classified as Growth, IDCW payout or IDCW reinvestment."
+            "Scheme option is not explicitly classified as Growth, IDCW payout "
+            "or IDCW reinvestment."
         )
 
     attestations = session.scalars(
@@ -153,7 +154,8 @@ def load_fund_return_prices(
             break
     if attestation is None:
         return prices, conflicts, "nav_only_excludes_idcw", "incomplete", (
-            "No verified, complete, enabled official-source attestation covers the full observed NAV window."
+            "No verified, complete, enabled official-source attestation covers "
+            "the full observed NAV window."
         )
 
     rows = session.scalars(
@@ -248,7 +250,8 @@ def _build_report(
     benchmark_unavailable_reason = None
     if return_basis == "nav_only_excludes_idcw" and benchmark_code is not None:
         benchmark_unavailable_reason = distribution_unavailable_reason or (
-            "Benchmark-relative metrics are suppressed because verified IDCW total-return coverage is unavailable."
+            "Benchmark-relative metrics are suppressed because verified IDCW "
+            "total-return coverage is unavailable."
         )
         benchmark_code = None
         benchmark_prices = None
