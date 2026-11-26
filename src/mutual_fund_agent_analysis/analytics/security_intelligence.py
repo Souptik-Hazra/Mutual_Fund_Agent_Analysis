@@ -57,9 +57,7 @@ def security_profile(
     )
     base_statement = select(SecurityMarketObservation).where(observation_filter)
     if as_of:
-        cutoff = datetime.combine(
-            as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")
-        ).astimezone(UTC)
+        cutoff = datetime.combine(as_of, time.max, tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(UTC)
         base_statement = base_statement.where(SecurityMarketObservation.observed_at <= cutoff)
 
     ordering = (
@@ -80,9 +78,7 @@ def security_profile(
         history_statement = history_statement.where(
             SecurityMarketObservation.last_price.is_not(None)
         )
-    observations = session.scalars(
-        history_statement.order_by(*ordering).limit(history_limit)
-    ).all()
+    observations = session.scalars(history_statement.order_by(*ordering).limit(history_limit)).all()
 
     # Quote-only syncs are frequent. Do not let them evict the latest dated
     # fundamentals or event payload from the bounded quote-history window.
