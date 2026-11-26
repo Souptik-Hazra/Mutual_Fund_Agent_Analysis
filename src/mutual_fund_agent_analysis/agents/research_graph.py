@@ -144,8 +144,6 @@ def classify_intents(question: str, scheme_codes: list[int] | None = None) -> li
     # the investor's own units, ledger or actual allocation.
     if "actual_exposure" in selected:
         selected = [intent for intent in selected if intent != "portfolio"]
-    if "category" in selected and "fund" not in selected:
-        selected.insert(0, "category")
     if (
         "events" in selected
         and "portfolio" in selected
