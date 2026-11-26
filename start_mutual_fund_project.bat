@@ -1,6 +1,12 @@
 @echo off
 setlocal EnableExtensions
 
+REM Relaunch inside a persistent Command Prompt so double-click never closes the window.
+if /i not "%~1"=="__keep_open" (
+    start "Mutual Fund Agent Analysis" "%ComSpec%" /k ""%~f0" __keep_open"
+    exit /b
+)
+
 title Mutual Fund Agent Analysis - Launcher
 
 REM Resolve the repository directory from this script's location.
@@ -93,7 +99,7 @@ echo.
 echo Keep all three terminals open while developing.
 echo.
 echo This launcher window will remain open. Press any key to close it.
-pause >nul
+pause
 exit /b 0
 
 :fail
