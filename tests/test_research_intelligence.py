@@ -24,8 +24,8 @@ from mutual_fund_agent_analysis.api.schemas.research import (
 from mutual_fund_agent_analysis.data.providers.rss import fetch_feed
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.data.services.research_intelligence import (
-    portfolio_payload,
     _portfolio_content_hash,
+    portfolio_payload,
     source_social_retention_days,
     split_document,
 )
