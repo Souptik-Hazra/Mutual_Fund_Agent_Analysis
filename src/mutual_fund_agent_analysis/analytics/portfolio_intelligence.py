@@ -1,6 +1,7 @@
 """Investor-weighted multi-fund look-through exposure analytics."""
 
 from collections import defaultdict
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -14,12 +15,25 @@ from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 D = Decimal
 ADDITIONS = {"purchase", "sip", "additional_purchase", "switch_in"}
 DEDUCTIONS = {"redemption", "switch_out"}
+ACCEPTED_NAV_STATUSES = {"single_source", "matched"}
 
 
-def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict:
-    """Use ledger units x latest accepted NAV; disclose every coverage gap."""
+def actual_portfolio_exposure(
+    session: Session, scheme_codes: list[int], as_of_date: date | None = None
+) -> dict:
+    """Value dated investor units and look through the latest eligible disclosure.
+
+    The newest NAV row on or before the valuation date is inspected before its
+    status is checked. A conflict therefore blocks valuation instead of causing
+    an unnoticed fallback to an older accepted NAV.
+    """
     if not 1 <= len(scheme_codes) <= 20 or len(set(scheme_codes)) != len(scheme_codes):
         raise ValueError("Select between one and twenty distinct scheme codes.")
+    if as_of_date is None:
+        as_of_date = date.today()
+    if type(as_of_date) is not date:
+        raise ValueError("as_of_date must be a calendar date.")
+
     schemes = {
         x.scheme_code: x
         for x in session.scalars(
@@ -29,16 +43,24 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
     missing = sorted(set(scheme_codes) - set(schemes))
     if missing:
         raise ValueError(f"Unknown scheme code(s): {missing}.")
+
     values, contexts, excluded = {}, {}, []
+    data_quality_warnings = []
     for code in scheme_codes:
         txns = session.scalars(
             select(InvestorTransaction)
-            .where(InvestorTransaction.scheme_code == code)
+            .where(
+                InvestorTransaction.scheme_code == code,
+                InvestorTransaction.transaction_date <= as_of_date,
+            )
             .order_by(InvestorTransaction.transaction_date, InvestorTransaction.transaction_id)
         ).all()
         if not txns:
-            excluded.append({"scheme_code": code, "reason": "No investor transactions recorded."})
+            excluded.append(
+                {"scheme_code": code, "reason": f"No investor transactions on or before {as_of_date}."}
+            )
             continue
+
         units, invalid = D("0"), False
         for item in txns:
             if item.transaction_type in ADDITIONS:
@@ -50,33 +72,69 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
                 break
         if invalid:
             excluded.append(
-                {"scheme_code": code, "reason": "Recorded redemptions exceed accumulated units."}
+                {"scheme_code": code, "reason": "Recorded redemptions exceed accumulated units as of the valuation date."}
             )
             continue
         if units == 0:
             excluded.append(
                 {
                     "scheme_code": code,
-                    "reason": "No remaining units after recorded redemptions and switches.",
+                    "reason": "No remaining units after recorded redemptions and switches as of the valuation date.",
                 }
             )
             continue
+
+        # Do not filter by status before choosing the newest row: a conflict on
+        # that date must prevent an implicit fallback to an older accepted NAV.
         nav = session.scalar(
             select(NavReconciliation)
             .where(
                 NavReconciliation.scheme_code == code,
-                NavReconciliation.status.in_(["single_source", "matched"]),
+                NavReconciliation.nav_date <= as_of_date,
             )
             .order_by(NavReconciliation.nav_date.desc())
             .limit(1)
         )
         if nav is None:
             excluded.append(
-                {"scheme_code": code, "reason": "No accepted NAV is available for valuation."}
+                {"scheme_code": code, "reason": f"No reconciled NAV exists on or before {as_of_date}."}
             )
             continue
-        values[code] = units * D(nav.canonical_nav)
-        contexts[code] = {"units": units, "nav": D(nav.canonical_nav), "nav_date": nav.nav_date}
+        if nav.status == "conflict":
+            reason = (
+                f"Latest NAV on or before {as_of_date} is conflicted ({nav.nav_date}); "
+                "valuation is blocked rather than falling back to an older NAV."
+            )
+            excluded.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "nav_conflict", "reason": reason}
+            )
+            continue
+        if nav.status not in ACCEPTED_NAV_STATUSES or nav.canonical_nav is None:
+            reason = f"Latest NAV on or before {as_of_date} ({nav.nav_date}) is not accepted for valuation."
+            excluded.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "nav_unaccepted", "reason": reason}
+            )
+            continue
+        nav_value = D(nav.canonical_nav)
+        if not nav_value.is_finite() or nav_value <= 0:
+            reason = f"Latest accepted NAV on {nav.nav_date} is not a positive finite value."
+            excluded.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "invalid_nav", "reason": reason}
+            )
+            continue
+
+        values[code] = units * nav_value
+        contexts[code] = {
+            "units": units,
+            "nav": nav_value,
+            "nav_date": nav.nav_date,
+            "nav_status": nav.status,
+            "valuation_age_days": (as_of_date - nav.nav_date).days,
+        }
+
     total = sum(values.values(), D("0"))
     stocks = defaultdict(
         lambda: {
@@ -89,6 +147,8 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
         }
     )
     sectors, warnings = defaultdict(lambda: D("0")), []
+    lookthrough_value = D("0")
+    holdings_fund_codes = set()
     for code, value in values.items():
         if value <= 0:
             continue
@@ -97,20 +157,31 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
             .where(
                 PortfolioSnapshot.scheme_code == code,
                 PortfolioSnapshot.status.in_(["complete", "partial"]),
+                PortfolioSnapshot.effective_date <= as_of_date,
             )
             .order_by(PortfolioSnapshot.effective_date.desc(), PortfolioSnapshot.snapshot_id.desc())
             .limit(1)
         )
         if snapshot is None:
-            warnings.append({"scheme_code": code, "reason": "No portfolio disclosure."})
-            continue
-        if snapshot.status != "complete":
-            warnings.append(
-                {
-                    "scheme_code": code,
-                    "reason": "Partial disclosure; look-through exposure is a lower bound.",
-                }
+            reason = f"No complete or partial holdings disclosure effective on or before {as_of_date}."
+            warnings.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "missing_holdings", "reason": reason}
             )
+            continue
+
+        holdings_fund_codes.add(code)
+        lookthrough_value += value
+        if snapshot.status != "complete":
+            reason = (
+                f"Holdings disclosure effective {snapshot.effective_date} is partial; "
+                "look-through exposure is a lower bound."
+            )
+            warnings.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "partial_holdings", "reason": reason}
+            )
+
         holdings = session.scalars(
             select(PortfolioHolding).where(
                 PortfolioHolding.snapshot_id == snapshot.snapshot_id,
@@ -138,6 +209,7 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
                 }
             )
             sectors[holding.sector or "Unclassified"] += amount
+
     items = []
     for key, row in stocks.items():
         row["actual_portfolio_weight_pct"] = (
@@ -154,10 +226,13 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
         for k, v in sectors.items()
     ]
     sector_rows.sort(key=lambda x: x["exposure_inr"], reverse=True)
+
     return {
         "scheme_codes": scheme_codes,
+        "as_of_date": as_of_date,
         "valuation_basis": (
-            "Investor transaction units multiplied by latest accepted reconciled NAV."
+            "Investor transaction units on or before as_of_date multiplied by the latest "
+            "accepted reconciled NAV on or before as_of_date; a latest NAV conflict blocks valuation."
         ),
         "total_valued_portfolio_inr": total,
         "valued_funds": [
@@ -167,6 +242,8 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
                 "units": contexts[c]["units"],
                 "latest_nav": contexts[c]["nav"],
                 "nav_date": contexts[c]["nav_date"],
+                "nav_status": contexts[c]["nav_status"],
+                "valuation_age_days": contexts[c]["valuation_age_days"],
                 "market_value_inr": v,
                 "portfolio_weight_pct": v / total * D("100") if total > 0 else None,
             }
@@ -177,14 +254,20 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
         "equity_exposure": items,
         "sector_exposure": sector_rows,
         "disclosure_warnings": warnings,
+        "data_quality_warnings": data_quality_warnings,
         "coverage": {
             "valued_fund_count": sum(1 for value in values.values() if value > 0),
             "selected_fund_count": len(scheme_codes),
-            "is_complete": not excluded and not warnings,
+            "holdings_fund_count": len(holdings_fund_codes),
+            "lookthrough_covered_value_inr": lookthrough_value,
+            "lookthrough_coverage_pct": (
+                lookthrough_value / total * D("100") if total > 0 else D("0")
+            ),
+            "is_complete": not excluded and not warnings and not data_quality_warnings,
         },
         "warning": (
-            "Equity look-through uses dated AMC disclosures and investor-ledger-derived "
-            "fund values. It is not a live holdings feed; missing or partial disclosures "
-            "understate exposure."
+            "Equity look-through uses the latest eligible dated AMC disclosures and "
+            "investor-ledger-derived fund values. It is not a live holdings feed; missing "
+            "or partial disclosures understate exposure. NAV dates can differ by scheme."
         ),
     }
