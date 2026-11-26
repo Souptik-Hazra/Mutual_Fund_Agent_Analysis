@@ -17,18 +17,29 @@ router = APIRouter(prefix="/assistant", tags=["research-assistant"])
 logger = logging.getLogger(__name__)
 
 
+CAPABILITY_REGISTRY = {
+    "fund": "Scheme discovery, performance, risk, returns and multi-fund comparison.",
+    "category": "Exact-cohort category peers, common observation windows and comparable return bases.",
+    "portfolio": "Dated AMC holdings, sector allocation, concentration and portfolio overlap.",
+    "actual_exposure": "Ledger-derived units, reconciled NAV valuation, redemption-aware exposure and XIRR context.",
+    "security": "Underlying equity quotes, dated fundamentals, corporate observations and source provenance.",
+    "events": "Source-attributed events, publication/effective dates, corrections and historical exposure.",
+    "social": "Permitted Reddit/X collection, retention-aware discussion volume and sentiment.",
+    "documents": "Lexical and optional Qdrant retrieval with document/chunk citations.",
+}
+
+
 @router.get("/capabilities")
 def assistant_capabilities() -> dict[str, Any]:
+    """Return the capability registry used by the API and frontend Overview."""
     return {
         "orchestration": "LangGraph",
         "langgraph_runtime": "1.x; step updates via Server-Sent Events",
         "langchain_model_api": "init_chat_model",
-        "agents": [
-            "fund_research",
-            "portfolio_intelligence",
-            "news_event",
-            "social_intelligence",
-            "document_research",
+        "agents": list(CAPABILITY_REGISTRY),
+        "capabilities": [
+            {"id": capability_id, "description": description}
+            for capability_id, description in CAPABILITY_REGISTRY.items()
         ],
         "llm_synthesis": "optional; configured provider required",
         "financial_calculations": "deterministic analytics services",
