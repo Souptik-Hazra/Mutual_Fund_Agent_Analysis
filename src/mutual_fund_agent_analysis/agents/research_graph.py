@@ -264,9 +264,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "observation_dates": report.get("observation_dates"),
                         "return_basis": report.get("return_basis"),
                         "peer_count": report.get("peer_count"),
-                        "excluded_peer_count": len(
-                            report.get("excluded_peers", [])
-                        ),
+                        "excluded_peer_count": len(report.get("excluded_peers", [])),
                         "source": (
                             "canonical reconciled NAV and applicable distribution methodology"
                         ),
@@ -282,9 +280,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         "type": "actual_investor_exposure",
                         "scheme_codes": codes,
                         "valuation_basis": exposure.get("valuation_basis"),
-                        "valued_fund_count": exposure.get("coverage", {}).get(
-                            "valued_fund_count"
-                        ),
+                        "valued_fund_count": exposure.get("coverage", {}).get("valued_fund_count"),
                         "selected_fund_count": exposure.get("coverage", {}).get(
                             "selected_fund_count"
                         ),
@@ -295,12 +291,14 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             }
                             for item in exposure.get("valued_funds", [])
                         ],
-                        "holdings_effective_dates": sorted({
-                            item.get("holdings_as_of")
-                            for security in exposure.get("equity_exposure", [])
-                            for item in security.get("fund_exposures", [])
-                            if item.get("holdings_as_of") is not None
-                        }),
+                        "holdings_effective_dates": sorted(
+                            {
+                                item.get("holdings_as_of")
+                                for security in exposure.get("equity_exposure", [])
+                                for item in security.get("fund_exposures", [])
+                                if item.get("holdings_as_of") is not None
+                            }
+                        ),
                         "excluded_funds": exposure.get("excluded_funds", []),
                         "limitations": exposure.get("warning"),
                     }
