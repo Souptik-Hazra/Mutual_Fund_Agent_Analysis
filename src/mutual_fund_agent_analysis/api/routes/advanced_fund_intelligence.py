@@ -34,7 +34,7 @@ class CategoryBenchmarkCreate(BaseModel):
     benchmark_source: str = Field(default="niftyindices", min_length=1, max_length=40)
     effective_from: date
     effective_to: date | None = None
-    source_key: str | None = Field(default=None, max_length=60)
+    source_key: str = Field(min_length=2, max_length=60)
     rationale: str = Field(min_length=10, max_length=1000)
 
 
@@ -44,14 +44,19 @@ def create_category_benchmark(
 ) -> dict:
     if payload.effective_to and payload.effective_to < payload.effective_from:
         raise HTTPException(status_code=422, detail="effective_to cannot precede effective_from.")
-    if payload.source_key:
-        from mutual_fund_agent_analysis.models.intelligence import DataSource
+    from mutual_fund_agent_analysis.models.intelligence import DataSource
 
-        source = session.get(DataSource, payload.source_key)
-        if source is None or not source.enabled:
-            raise HTTPException(
-                status_code=422, detail="source_key must reference an enabled source."
-            )
+    source = session.get(DataSource, payload.source_key)
+    if (
+        source is None
+        or not source.enabled
+        or not source.is_official
+        or source.source_type != "official"
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="source_key must reference an enabled official source.",
+        )
     exact = (
         CategoryBenchmarkMapping.scheme_category == payload.scheme_category.strip(),
         CategoryBenchmarkMapping.scheme_type.is_(None)
@@ -108,6 +113,7 @@ def get_scheme_benchmark(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if mapping is None:
         return {"scheme_code": scheme_code, "availability": "unmapped", "benchmark": None}
+    source = session.get(DataSource, mapping.source_key)
     return {
         "scheme_code": scheme_code,
         "availability": "mapped",
@@ -118,6 +124,8 @@ def get_scheme_benchmark(
             "effective_to": mapping.effective_to,
             "rationale": mapping.rationale,
             "source_key": mapping.source_key,
+            "source_name": source.display_name if source else None,
+            "source_is_official": bool(source and source.is_official and source.enabled),
         },
     }
 
@@ -158,6 +166,11 @@ def fund_research_profile(
                 "effective_from": mapping.effective_from,
                 "effective_to": mapping.effective_to,
                 "rationale": mapping.rationale,
+                "source_key": mapping.source_key,
+                "source_name": (
+                    session.get(DataSource, mapping.source_key).display_name
+                    if session.get(DataSource, mapping.source_key) else None
+                ),
             },
         }
     except ValueError as exc:
