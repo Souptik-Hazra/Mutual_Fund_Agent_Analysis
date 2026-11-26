@@ -194,6 +194,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         request.end_date,
                         request.annual_risk_free_rate,
                         request.periods_per_year,
+                        benchmark_source=request.benchmark_source or "niftyindices",
                     )
                 else:
                     report = analyze_fund(
@@ -204,6 +205,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         request.end_date,
                         request.annual_risk_free_rate,
                         request.periods_per_year,
+                        benchmark_source=request.benchmark_source or "niftyindices",
                     )
                 results[intent] = _jsonable(report)
                 citations.append(
