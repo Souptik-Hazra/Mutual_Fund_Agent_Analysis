@@ -197,8 +197,8 @@ def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
     from decimal import Decimal
 
     expected = {
-        "cagr": Decimal("0.1250"),
-        "volatility": Decimal("0.0825"),
+        "cagr": "0.1250",
+        "volatility": "0.0825",
         "observation_count": 240,
         "return_basis": "growth_nav",
     }
