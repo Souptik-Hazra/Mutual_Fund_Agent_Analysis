@@ -7,7 +7,10 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from mutual_fund_agent_analysis.api.routes.market_data import (\n    QuoteSyncRequest,\n    _resolve_security_identity,\n)
+from mutual_fund_agent_analysis.api.routes.market_data import (
+    QuoteSyncRequest,
+    _resolve_security_identity,
+)
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
 from mutual_fund_agent_analysis.models.intelligence import DataSource, ResearchEntity
 
@@ -100,7 +103,9 @@ def test_quote_parser_rejects_mismatched_or_missing_identity(overrides, message)
 
 
 def test_security_identity_requires_unique_official_isin_and_exchange_symbol_mappings():
-    entity = SimpleNamespace(\n        entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited"\n    )
+    entity = SimpleNamespace(
+        entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited"
+    )
     isin_mapping = SimpleNamespace(entity_id=44, source_key="official_registry")
     symbol_mapping = SimpleNamespace(entity_id=44, source_key="official_registry")
 
