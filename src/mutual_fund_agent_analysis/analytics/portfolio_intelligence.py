@@ -57,7 +57,10 @@ def actual_portfolio_exposure(
         ).all()
         if not txns:
             excluded.append(
-                {"scheme_code": code, "reason": f"No investor transactions on or before {as_of_date}."}
+                {
+                    "scheme_code": code,
+                    "reason": f"No investor transactions on or before {as_of_date}.",
+                }
             )
             continue
 
@@ -72,14 +75,22 @@ def actual_portfolio_exposure(
                 break
         if invalid:
             excluded.append(
-                {"scheme_code": code, "reason": "Recorded redemptions exceed accumulated units as of the valuation date."}
+                {
+                    "scheme_code": code,
+                    "reason": (
+                        "Recorded redemptions exceed accumulated units as of the valuation date."
+                    ),
+                }
             )
             continue
         if units == 0:
             excluded.append(
                 {
                     "scheme_code": code,
-                    "reason": "No remaining units after recorded redemptions and switches as of the valuation date.",
+                    "reason": (
+                        "No remaining units after recorded redemptions and switches as of the "
+                        "valuation date."
+                    ),
                 }
             )
             continue
@@ -97,7 +108,10 @@ def actual_portfolio_exposure(
         )
         if nav is None:
             excluded.append(
-                {"scheme_code": code, "reason": f"No reconciled NAV exists on or before {as_of_date}."}
+                {
+                    "scheme_code": code,
+                    "reason": f"No reconciled NAV exists on or before {as_of_date}.",
+                }
             )
             continue
         if nav.status == "conflict":
@@ -111,7 +125,10 @@ def actual_portfolio_exposure(
             )
             continue
         if nav.status not in ACCEPTED_NAV_STATUSES or nav.canonical_nav is None:
-            reason = f"Latest NAV on or before {as_of_date} ({nav.nav_date}) is not accepted for valuation."
+            reason = (
+                f"Latest NAV on or before {as_of_date} ({nav.nav_date}) is not accepted "
+                "for valuation."
+            )
             excluded.append({"scheme_code": code, "reason": reason})
             data_quality_warnings.append(
                 {"scheme_code": code, "type": "nav_unaccepted", "reason": reason}
@@ -163,7 +180,10 @@ def actual_portfolio_exposure(
             .limit(1)
         )
         if snapshot is None:
-            reason = f"No complete or partial holdings disclosure effective on or before {as_of_date}."
+            reason = (
+                "No complete or partial holdings disclosure effective on or before "
+                f"{as_of_date}."
+            )
             warnings.append({"scheme_code": code, "reason": reason})
             data_quality_warnings.append(
                 {"scheme_code": code, "type": "missing_holdings", "reason": reason}
@@ -232,7 +252,8 @@ def actual_portfolio_exposure(
         "as_of_date": as_of_date,
         "valuation_basis": (
             "Investor transaction units on or before as_of_date multiplied by the latest "
-            "accepted reconciled NAV on or before as_of_date; a latest NAV conflict blocks valuation."
+            "accepted reconciled NAV on or before as_of_date; a latest NAV conflict "
+            "blocks valuation."
         ),
         "total_valued_portfolio_inr": total,
         "valued_funds": [
