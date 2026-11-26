@@ -9,6 +9,57 @@ from mutual_fund_agent_analysis.agents.research_graph import build_research_grap
 from mutual_fund_agent_analysis.api.schemas.assistant import ResearchAssistantRequest
 
 
+class _Rows:
+    def __init__(self, rows=()):
+        self.rows = list(rows)
+
+    def all(self):
+        return self.rows
+
+    def first(self):
+        return self.rows[0] if self.rows else None
+
+
+class GraphSession:
+    """Minimal SQLAlchemy-shaped session for specialist citation integration tests."""
+
+    def scalar(self, _statement):
+        return SimpleNamespace(
+            canonical_source="amfi",
+            evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
+            nav_date=date(2026, 11, 25),
+            canonical_nav="123.45",
+            source_values={"amfi": "123.45"},
+        )
+
+    def scalars(self, statement):
+        entity = statement.column_descriptions[0].get("entity")
+        if entity is research_graph.SocialPost:
+            return _Rows(
+                [
+                    SimpleNamespace(
+                        post_id=1,
+                        source_key="reddit",
+                        evidence_id=10,
+                        canonical_url=None,
+                        published_at=datetime(2026, 11, 25, tzinfo=UTC),
+                    )
+                ]
+            )
+        return _Rows()
+
+    def get(self, model, _key):
+        if model.__name__ == "DataSource":
+            return SimpleNamespace(base_url="https://www.amfiindia.com")
+        if model.__name__ == "EvidenceRecord":
+            return SimpleNamespace(
+                canonical_url="https://www.reddit.com/r/example/comments/1",
+                retrieved_at=datetime(2026, 11, 26, tzinfo=UTC),
+                verification_status="unverified",
+            )
+        return None
+
+
 def test_router_selects_fund_analysis_for_performance_question():
     assert classify_intents("Show CAGR and risk for this fund", [125497]) == ["fund"]
 
@@ -73,7 +124,7 @@ def test_portfolio_comparison_respects_requested_end_date(monkeypatch):
         end_date=requested_end,
     )
 
-    research_graph._run_tools({"request": request, "session": object(), "intents": ["portfolio"]})
+    research_graph._run_tools({"request": request, "session": GraphSession(), "intents": ["portfolio"]})
 
     assert captured == {"codes": [125497, 120503], "as_of": requested_end}
 
@@ -178,7 +229,14 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
         return {
             "valuation_basis": "ledger units x reconciled NAV",
             "coverage": {"valued_fund_count": 1, "selected_fund_count": 2},
-            "valued_funds": [{"scheme_code": 125497, "nav_date": date(2026, 11, 25)}],
+            "valued_funds": [
+                {
+                    "scheme_code": 125497,
+                    "nav_date": date(2026, 11, 25),
+                    "nav_source_key": "amfi",
+                    "nav_retrieved_at": datetime(2026, 11, 26, tzinfo=UTC),
+                }
+            ],
             "excluded_funds": [{"scheme_code": 120503, "reason": "No units"}],
             "equity_exposure": [],
             "warning": "Dated holdings disclosures only.",
