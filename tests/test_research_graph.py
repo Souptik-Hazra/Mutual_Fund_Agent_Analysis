@@ -110,6 +110,7 @@ def test_global_social_research_is_explicitly_labelled(monkeypatch):
     assert result["results"]["social"]["aggregation"]["post_count"] == 3
     assert result["citations"][0]["scope"] == "global"
 
+
 def test_router_selects_category_specialist_for_peer_rankings():
     assert classify_intents("Rank this fund against category peers", [125497]) == ["category"]
 
