@@ -28,6 +28,6 @@ def test_backup_and_restore_use_private_compose_network():
     for name in ("backup-local.sh", "restore-local.sh"):
         source = (ROOT / "scripts" / name).read_text(encoding="utf-8")
         assert "docker inspect" in source
-        assert "--network \"$QDRANT_NETWORK\"" in source
+        assert '--network "$QDRANT_NETWORK"' in source
         assert "curlimages/curl:8.12.1" in source
         assert "http://localhost:6333" not in source
