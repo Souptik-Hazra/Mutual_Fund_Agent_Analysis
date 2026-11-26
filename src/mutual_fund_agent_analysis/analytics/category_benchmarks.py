@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.category_benchmark import CategoryBenchmarkMapping
+from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
 
@@ -40,4 +41,10 @@ def resolve_category_benchmark(
     rows = session.scalars(query.limit(2)).all()
     if len(rows) > 1:
         raise ValueError("Multiple active benchmark mappings overlap for this scheme cohort.")
-    return rows[0] if rows else None
+    if not rows:
+        return None
+    mapping = rows[0]
+    source = session.get(DataSource, mapping.source_key) if mapping.source_key else None
+    if source is None or not source.enabled or not source.is_official or source.source_type != "official":
+        return None
+    return mapping
