@@ -15,7 +15,7 @@ Phase 12 adds three deterministic research surfaces on top of the existing recon
 - `POST /api/v1/fund-intelligence/compare`
   - JSON body: `{"scheme_codes":[10001,10002]}`; accepts 2–5 distinct schemes.
 - `GET /api/v1/fund-intelligence/schemes/{scheme_code}/equity-status`
-  - Optional `as_of` date. Returns disclosed equity holdings joined to latest stored market observations.
+  - Optional `as_of` date. Returns disclosed equity holdings joined to stored market observations no later than that date.
 - `GET /api/v1/fund-intelligence/securities/{security_key}/market-status?isin=...`
   - Returns the latest stored observation and freshness state.
 - `POST /api/v1/fund-intelligence/market-observations`
@@ -40,3 +40,11 @@ The default freshness window is 72 hours. This is a coarse data-age signal, not 
 ## Migration
 
 Alembic revision: `0011_security_market_obs`, following `0010_market_event_revisions`.
+
+## P1 completion notes
+
+- The LangGraph supervisor has dedicated `category` and `actual_exposure` specialist routes. Both reuse the existing deterministic category and ledger valuation services; they do not replace calculations with LLM-generated figures.
+- Actual exposure is ledger units multiplied by the latest accepted reconciled NAV. Fully redeemed zero-unit schemes are excluded from current valuation totals and listed among exclusions. Positive balances after partial redemptions continue to be valued; invalid negative-unit histories remain excluded.
+- `GET /api/v1/market-data/securities/{security_key}` accepts bounded `history_limit` (1–500) and `history_type` (`quotes`, `fundamentals`, `events`, `all`). History is returned oldest-first and includes source key/URL, observed and retrieved times, content hash, and typed payloads.
+- Historical equity status retains `as_of` as a calendar date and selects the latest eligible holdings disclosure and security observation no later than the requested date. The React workspace sends the selected `dateTo` as `as_of`; this contract is guarded by a frontend test.
+- Stored market/provider observations remain source-dependent, dated snapshots and are not represented as live exchange prices. Holdings remain dated AMC disclosures.
