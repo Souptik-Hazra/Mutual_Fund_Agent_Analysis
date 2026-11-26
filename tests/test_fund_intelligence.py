@@ -296,6 +296,7 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
             if model.__name__ == "DataSource":
                 return SimpleNamespace(
                     display_name="AMC Disclosures",
+                    source_key="amc_disclosures",
                     enabled=True,
                     is_official=True,
                     source_type="official",
@@ -303,6 +304,7 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
                 )
             if model.__name__ == "EvidenceRecord":
                 return SimpleNamespace(
+                    evidence_id=1,
                     canonical_url="https://amc.example/portfolio.pdf",
                     verification_status="verified",
                     retrieved_at=datetime(2026, 11, 1, tzinfo=UTC),
