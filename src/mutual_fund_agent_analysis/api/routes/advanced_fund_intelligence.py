@@ -226,8 +226,9 @@ def fund_research_profile(
 def get_actual_portfolio_exposure(
     session: Annotated[Session, Depends(get_db)],
     scheme_codes: Annotated[list[int], Query(min_length=1, max_length=20)],
+    as_of_date: date | None = Query(default=None),
 ) -> dict:
     try:
-        return actual_portfolio_exposure(session, scheme_codes)
+        return actual_portfolio_exposure(session, scheme_codes, as_of_date)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
