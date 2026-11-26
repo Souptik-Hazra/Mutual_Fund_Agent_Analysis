@@ -167,8 +167,14 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
             raise AssertionError("Unexpected holdings query for no disclosed portfolio.")
 
         def scalar(self, query):
-            assert query.column_descriptions[0]["entity"] is portfolio_module.NavReconciliation
-            return SimpleNamespace(canonical_nav=Decimal("20"), nav_date=date(2026, 11, 25))
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.NavReconciliation:
+                return SimpleNamespace(
+                    canonical_nav=Decimal("20"),
+                    nav_date=date(2026, 11, 25),
+                )
+            assert entity is portfolio_module.PortfolioSnapshot
+            return None
 
     result = portfolio_module.actual_portfolio_exposure(Session(), [102])
     assert result["total_valued_portfolio_inr"] == Decimal("120")
