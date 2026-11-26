@@ -380,28 +380,24 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         continue
                     payload = portfolio_payload(session, snapshot)
                     snapshots.append(_jsonable(payload))
-                    citations.append(
-                        {
-                            "type": "portfolio_disclosure",
-                            "scheme_code": code,
-                            "source_key": getattr(snapshot, "source_key", None),
-                            "canonical_url": (
-                                (payload.get("evidence") or {}).get("canonical_url")
-                                or (payload.get("source") or {}).get("base_url")
-                            ),
-                            "retrieved_at": (
-                                (payload.get("evidence") or {}).get("retrieved_at")
-                                or getattr(snapshot, "retrieved_at", None)
-                            ),
-                            "verification_status": (
-                                (payload.get("evidence") or {}).get(
-                                    "verification_status", "unverified"
-                                )
-                            ),
-                            "effective_date": snapshot.effective_date,
-                            "content_hash": snapshot.content_hash,
-                        }
+                    evidence = payload.get("evidence") or {}
+                    citation = _provenance_citation(
+                        session,
+                        snapshot.source_key,
+                        evidence.get("canonical_url")
+                        or (payload.get("source") or {}).get("base_url"),
+                        evidence.get("retrieved_at") or getattr(snapshot, "retrieved_at", None),
+                        evidence.get("verification_status", "unverified"),
+                        type="portfolio_disclosure",
+                        scheme_code=code,
+                        snapshot_id=snapshot.snapshot_id,
+                        effective_date=snapshot.effective_date,
+                        content_hash=snapshot.content_hash,
+                        source_type=(payload.get("source") or {}).get("source_type"),
+                        authority_tier=(payload.get("source") or {}).get("authority_tier"),
                     )
+                    if citation:
+                        citations.append(citation)
                 results[intent] = {
                     "snapshots": snapshots,
                     "comparison": _jsonable(compare_portfolios(session, codes, request.end_date))

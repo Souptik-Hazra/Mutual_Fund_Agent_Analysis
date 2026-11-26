@@ -113,9 +113,13 @@ def test_graph_compiles_with_supervisor_and_specialist_nodes():
 def test_portfolio_comparison_respects_requested_end_date(monkeypatch):
     requested_end = date(2025, 12, 31)
     snapshot = SimpleNamespace(
+        snapshot_id=31,
+        scheme_code=125497,
+        source_key="amc_disclosures",
         effective_date=date(2025, 12, 1),
         content_hash="a" * 64,
         document_url=None,
+        retrieved_at=datetime(2025, 12, 2, tzinfo=UTC),
     )
     captured = {}
 
@@ -290,11 +294,13 @@ def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
 
 def test_portfolio_specialist_preserves_disclosure_allocation_and_overlap(monkeypatch):
     snapshot = SimpleNamespace(
+        snapshot_id=32,
+        scheme_code=125497,
         effective_date=date(2026, 10, 31),
         content_hash="d" * 64,
         document_url="https://amc.example/portfolio.pdf",
         source_key="amc_disclosures",
-        retrieved_at=None,
+        retrieved_at=datetime(2026, 11, 1, tzinfo=UTC),
     )
     expected_snapshot = {
         "holdings": [{"security_key": "INE1", "weight_pct": "12.5"}],
@@ -487,3 +493,80 @@ def test_compiled_graph_returns_provenance_complete_fund_citation(monkeypatch):
     assert citation["canonical_url"] == "https://www.amfiindia.com"
     assert citation["retrieved_at"] == nav.evaluated_at
     assert citation["verification_status"] == "unverified"
+
+
+def test_compiled_graph_returns_portfolio_citation_with_complete_provenance(monkeypatch):
+    retrieved_at = datetime(2026, 11, 26, 10, 0, tzinfo=UTC)
+    snapshot = SimpleNamespace(
+        snapshot_id=41,
+        scheme_code=125497,
+        source_key="amfi",
+        effective_date=date(2026, 10, 31),
+        retrieved_at=retrieved_at,
+        content_hash="a" * 64,
+    )
+    monkeypatch.setattr(research_graph, "latest_snapshot", lambda *_args: snapshot)
+    monkeypatch.setattr(
+        research_graph,
+        "portfolio_payload",
+        lambda *_args: {
+            "holdings": [],
+            "evidence": {
+                "canonical_url": "https://www.amfiindia.com/disclosures/portfolio.pdf",
+                "retrieved_at": retrieved_at,
+                "verification_status": "verified",
+            },
+            "source": {
+                "base_url": "https://www.amfiindia.com",
+                "source_type": "official",
+                "authority_tier": 1,
+            },
+        },
+    )
+    request = ResearchAssistantRequest(
+        question="Show portfolio holdings",
+        scheme_codes=[125497],
+        synthesize=False,
+    )
+
+    result = build_research_graph().invoke({"request": request, "session": GraphSession()})
+
+    citation = next(item for item in result["citations"] if item["type"] == "portfolio_disclosure")
+    assert citation["source_key"] == "amfi"
+    assert citation["canonical_url"] == "https://www.amfiindia.com/disclosures/portfolio.pdf"
+    assert citation["retrieved_at"] == retrieved_at
+    assert citation["verification_status"] == "verified"
+    assert citation["snapshot_id"] == 41
+    assert citation["content_hash"] == "a" * 64
+    assert citation["source_type"] == "official"
+    assert citation["authority_tier"] == 1
+
+
+def test_portfolio_citation_is_omitted_when_retrieval_provenance_is_missing(monkeypatch):
+    snapshot = SimpleNamespace(
+        snapshot_id=42,
+        scheme_code=125497,
+        source_key="amfi",
+        effective_date=date(2026, 10, 31),
+        retrieved_at=None,
+        content_hash="b" * 64,
+    )
+    monkeypatch.setattr(research_graph, "latest_snapshot", lambda *_args: snapshot)
+    monkeypatch.setattr(
+        research_graph,
+        "portfolio_payload",
+        lambda *_args: {
+            "holdings": [],
+            "evidence": {"canonical_url": "https://www.amfiindia.com/disclosures/portfolio.pdf"},
+            "source": {"base_url": "https://www.amfiindia.com"},
+        },
+    )
+    request = ResearchAssistantRequest(
+        question="Show portfolio holdings",
+        scheme_codes=[125497],
+        synthesize=False,
+    )
+
+    result = build_research_graph().invoke({"request": request, "session": GraphSession()})
+
+    assert not any(item["type"] == "portfolio_disclosure" for item in result["citations"])
