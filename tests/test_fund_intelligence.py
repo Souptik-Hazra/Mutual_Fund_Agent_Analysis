@@ -240,16 +240,21 @@ def test_category_ranking_excludes_peer_outside_common_observation_window(monkey
     from types import SimpleNamespace
 
     selected = SimpleNamespace(
-        scheme_code=1, scheme_category="Large Cap", scheme_type="Open Ended",
-        plan_type="direct", option_type="growth",
+        scheme_code=1,
+        scheme_category="Large Cap",
+        scheme_type="Open Ended",
+        plan_type="direct",
+        option_type="growth",
     )
     peers = [
         SimpleNamespace(
             scheme_code=1, scheme_name="Selected", fund_house="AMC A", scheme_category="Large Cap"
         ),
         SimpleNamespace(
-            scheme_code=2, scheme_name="Short history", fund_house="AMC B",
-            scheme_category="Large Cap"
+            scheme_code=2,
+            scheme_name="Short history",
+            fund_house="AMC B",
+            scheme_category="Large Cap",
         ),
     ]
 
@@ -266,13 +271,17 @@ def test_category_ranking_excludes_peer_outside_common_observation_window(monkey
 
     def report(code, start, end):
         return SimpleNamespace(
-            cagr=Decimal("0.1"), absolute_return=Decimal("0.1"),
+            cagr=Decimal("0.1"),
+            absolute_return=Decimal("0.1"),
             risk=SimpleNamespace(annualized_volatility=Decimal("0.1"), sharpe_ratio=Decimal("0.5")),
             drawdown=SimpleNamespace(maximum_drawdown=Decimal("-0.1")),
-            benchmark=None, benchmark_unavailable_reason=None,
+            benchmark=None,
+            benchmark_unavailable_reason=None,
             return_basis="growth_nav_total_return",
             distribution_coverage_status="not_required",
-            observation_count=2, start_date=start, end_date=end,
+            observation_count=2,
+            start_date=start,
+            end_date=end,
             base100_series=((start, Decimal("100")), (end, Decimal("110"))),
         )
 
