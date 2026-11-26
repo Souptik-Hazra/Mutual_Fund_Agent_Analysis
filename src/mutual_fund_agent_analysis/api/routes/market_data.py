@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -156,7 +157,7 @@ def sync_twelvedata_quote(
         ) from exc
     finally:
         client.close()
-    canonical_entity = _resolve_security_identity(session, payload, quote.observed_at.date())
+    canonical_entity = _resolve_security_identity(\n        session, payload, quote.observed_at.astimezone(ZoneInfo("Asia/Kolkata")).date()\n    )
     canonical = {
         "security_key": payload.isin,
         "canonical_entity_id": canonical_entity.entity_id,
