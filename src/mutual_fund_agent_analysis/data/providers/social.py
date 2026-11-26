@@ -90,6 +90,11 @@ def social_provider_credentials() -> dict[str, bool]:
     """Return credential readiness only; never expose configured secret values."""
     settings = get_settings()
     return {
-        "reddit": bool(settings.reddit_client_id and settings.reddit_client_secret),
-        "x": bool(settings.x_bearer_token),
+        "reddit": bool(
+            settings.reddit_client_id
+            and settings.reddit_client_id.get_secret_value().strip()
+            and settings.reddit_client_secret
+            and settings.reddit_client_secret.get_secret_value().strip()
+        ),
+        "x": bool(settings.x_bearer_token and settings.x_bearer_token.get_secret_value().strip()),
     }
