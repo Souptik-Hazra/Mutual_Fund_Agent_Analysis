@@ -1,8 +1,12 @@
 """Regression tests for advanced fund intelligence foundations."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
+
+import mutual_fund_agent_analysis.analytics.portfolio_intelligence as portfolio_module
+from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
+from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
 
 import pytest
 
@@ -90,7 +94,6 @@ def test_benchmark_resolver_accepts_effective_mapping_with_official_registry_sou
 
 def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypatch):
     from decimal import Decimal
-    import mutual_fund_agent_analysis.analytics.portfolio_intelligence as module
 
     class Rows:
         def __init__(self, rows):
@@ -102,9 +105,9 @@ def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypa
     class Session:
         def scalars(self, query):
             entity = getattr(query, "column_descriptions", [{}])[0].get("entity")
-            if entity is module.MutualFundScheme:
+            if entity is portfolio_module.MutualFundScheme:
                 return Rows([SimpleNamespace(scheme_code=101, scheme_name="Redeemed")])
-            if entity is module.InvestorTransaction:
+            if entity is portfolio_module.InvestorTransaction:
                 return Rows([
                     SimpleNamespace(
                         transaction_type="purchase",
@@ -121,7 +124,7 @@ def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypa
                 ])
             raise AssertionError("A zero-unit position must not query NAV or holdings.")
 
-    result = module.actual_portfolio_exposure(Session(), [101])
+    result = portfolio_module.actual_portfolio_exposure(Session(), [101])
     assert result["total_valued_portfolio_inr"] == Decimal("0")
     assert result["valued_funds"] == []
     assert result["coverage"]["valued_fund_count"] == 0
@@ -160,8 +163,8 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
             raise AssertionError("Unexpected holdings query for no disclosed portfolio.")
 
         def scalar(self, query):
-            assert query.column_descriptions[0]["entity"] is module.NavReconciliation
-            return SimpleNamespace(canonical_nav=Decimal("20"), nav_date=date(2026,11,25))
+            assert query.column_descriptions[0]["entity"] is portfolio_module.NavReconciliation
+            return SimpleNamespace(canonical_nav=Decimal("20"), nav_date=date(2026, 11, 25))
 
     result = module.actual_portfolio_exposure(Session(), [102])
     assert result["total_valued_portfolio_inr"] == Decimal("120")
@@ -170,11 +173,8 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
     assert result["valued_funds"][0]["market_value_inr"] == Decimal("120")
 
 def test_security_history_contract_is_bounded_typed_and_chronological():
-    from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
-    from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
-
     older = SimpleNamespace(
-        observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 1, 1, tzinfo=UTC),
         observation_id=1,
         last_price=10,
         change_pct=1,
@@ -232,9 +232,6 @@ def test_security_history_rejects_unbounded_or_unknown_filters():
 
 
 def test_indian_as_of_day_includes_late_evening_exchange_observation():
-    from datetime import datetime, timezone
-    from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
-
     india_late = datetime(2026, 11, 25, 23, 45, tzinfo=ZoneInfo("Asia/Kolkata"))
     expected_cutoff = datetime(
         2026, 11, 25, 23, 59, 59, 999999, tzinfo=ZoneInfo("Asia/Kolkata")
