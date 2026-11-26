@@ -157,7 +157,6 @@ def test_social_retention_rejects_invalid_global_fallback():
 
 
 def test_social_collection_applies_source_specific_expiry(monkeypatch):
-    from datetime import timedelta
     from types import SimpleNamespace
 
     source = DataSource(
