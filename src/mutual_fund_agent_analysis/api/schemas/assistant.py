@@ -13,6 +13,7 @@ class ResearchAssistantRequest(BaseModel):
     benchmark_source: str | None = Field(default=None, min_length=1, max_length=40)
     start_date: date | None = None
     end_date: date | None = None
+    as_of_date: date | None = None
     annual_risk_free_rate: Decimal = Decimal("0")
     periods_per_year: int = Field(default=252, ge=1, le=366)
     top_k: int = Field(default=6, ge=1, le=15)
@@ -30,6 +31,8 @@ class ResearchAssistantRequest(BaseModel):
     def validate_dates(self) -> "ResearchAssistantRequest":
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("start_date must be on or before end_date.")
+        if self.end_date and self.as_of_date and self.as_of_date > self.end_date:
+            raise ValueError("as_of_date cannot be later than end_date.")
         if not self.annual_risk_free_rate.is_finite() or self.annual_risk_free_rate <= -1:
             raise ValueError("annual_risk_free_rate must be finite and greater than -1.")
         return self
