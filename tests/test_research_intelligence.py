@@ -1003,10 +1003,7 @@ def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
     assert result["imported"] == 1
     assert result["retention_days"] == 14
     assert session.committed is True
-    assert (
-        captured[0].content_hash
-        == __import__("hashlib").sha256(b"Market discussion").hexdigest()
-    )
+    assert captured[0].content_hash == __import__("hashlib").sha256(b"Market discussion").hexdigest()
     remaining = captured[0].expires_at - datetime.now(UTC)
     assert timedelta(days=14) - timedelta(seconds=2) < remaining <= timedelta(days=14)
     assert captured[0].text_excerpt == "Market discussion"
@@ -1045,9 +1042,7 @@ def test_social_import_rolls_back_all_records_when_a_later_record_fails(monkeypa
     upload = UploadFile(
         filename="reddit-export.csv",
         file=io.BytesIO(
-            b"external_id,text_excerpt\n"
-            b"post-1,First discussion\n"
-            b"post-2,Second discussion\n"
+            b"external_id,text_excerpt\npost-1,First discussion\npost-2,Second discussion\n"
         ),
     )
     session = StubSession()
