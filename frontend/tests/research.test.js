@@ -55,3 +55,13 @@ test("research stream consumes progress and final SSE events", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("workspace does not assume NIFTY 50 and resolves effective benchmark mappings", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.equal(app.includes('useState("NIFTY 50")'), false);
+  assert.match(app, /\/fund-intelligence\/schemes\/.*\/benchmark/);
+  assert.match(app, /Benchmark TRI override \(optional\)/);
+  assert.match(app, /selection\.benchmark\?\.code \|\| null/);
+});
