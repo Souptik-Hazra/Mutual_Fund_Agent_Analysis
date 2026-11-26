@@ -11,3 +11,10 @@ export function eventRows(payload) {
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
 }
+
+
+export function isBenchmarkObservationUnavailable(error) {
+  return error?.status === 422 &&
+    typeof error.message === "string" &&
+    /No TRI observations returned for .+ between .+ and .+\. Check the canonical index name and published history coverage\./i.test(error.message);
+}
