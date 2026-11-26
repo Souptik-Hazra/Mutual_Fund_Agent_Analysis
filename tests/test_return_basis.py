@@ -182,6 +182,7 @@ def test_multi_idcw_comparison_rejects_mixed_verified_and_nav_only_bases(monkeyp
                         SimpleNamespace(scheme_code=1, option_type="idcw_reinvestment"),
                         SimpleNamespace(scheme_code=2, option_type="idcw_reinvestment"),
                     ]
+
             return Result()
 
     def fake_loader(_session, code, *_args, **_kwargs):
