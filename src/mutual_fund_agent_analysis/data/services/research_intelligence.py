@@ -45,6 +45,24 @@ def import_portfolio_snapshot(session: Session, payload: Any) -> PortfolioSnapsh
         raise ValueError("Unknown or disabled source_key.")
     if not source.is_official or source.source_type != "official":
         raise ValueError("Portfolio disclosures must use an enabled registered official source.")
+    if payload.document_url:
+        document_url = urlparse(str(payload.document_url))
+        registered_url = urlparse(source.base_url or "")
+        if (
+            document_url.scheme != "https"
+            or not document_url.hostname
+            or document_url.username is not None
+            or document_url.password is not None
+        ):
+            raise ValueError("Portfolio document_url must be HTTPS and must not contain credentials.")
+        if registered_url.hostname:
+            document_host = document_url.hostname.lower().rstrip(".")
+            source_host = registered_url.hostname.lower().rstrip(".")
+            if not (
+                document_host == source_host
+                or document_host.endswith("." + source_host)
+            ):
+                raise ValueError("Portfolio document_url must match the registered official source host.")
     content_hash = _portfolio_content_hash(payload)
     existing = session.scalar(select(PortfolioSnapshot).where(
         PortfolioSnapshot.scheme_code == payload.scheme_code,
