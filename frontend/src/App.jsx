@@ -68,9 +68,7 @@ export default function App() {
     }
     const mappings = await Promise.all(targetCodes.map(async (code) => {
       const params = asOf ? "?as_of=" + encodeURIComponent(asOf) : "";
-      try {
-        return await request("/fund-intelligence/schemes/" + code + "/benchmark" + params);
-      }
+      return await request("/fund-intelligence/schemes/" + code + "/benchmark" + params);
     }));
     const first = mappings[0]?.benchmark;
     const common = Boolean(first) && mappings.every((item) =>
