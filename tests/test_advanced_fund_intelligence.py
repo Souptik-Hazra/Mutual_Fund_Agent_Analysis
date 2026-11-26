@@ -106,20 +106,22 @@ def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypa
             if entity is portfolio_module.MutualFundScheme:
                 return Rows([SimpleNamespace(scheme_code=101, scheme_name="Redeemed")])
             if entity is portfolio_module.InvestorTransaction:
-                return Rows([
-                    SimpleNamespace(
-                        transaction_type="purchase",
-                        units=Decimal("10"),
-                        transaction_date=date(2024, 1, 1),
-                        transaction_id=1,
-                    ),
-                    SimpleNamespace(
-                        transaction_type="redemption",
-                        units=Decimal("10"),
-                        transaction_date=date(2024, 2, 1),
-                        transaction_id=2,
-                    ),
-                ])
+                return Rows(
+                    [
+                        SimpleNamespace(
+                            transaction_type="purchase",
+                            units=Decimal("10"),
+                            transaction_date=date(2024, 1, 1),
+                            transaction_id=1,
+                        ),
+                        SimpleNamespace(
+                            transaction_type="redemption",
+                            units=Decimal("10"),
+                            transaction_date=date(2024, 2, 1),
+                            transaction_id=2,
+                        ),
+                    ]
+                )
             raise AssertionError("A zero-unit position must not query NAV or holdings.")
 
     result = portfolio_module.actual_portfolio_exposure(Session(), [101])
@@ -134,8 +136,11 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
     from decimal import Decimal
 
     class Rows:
-        def __init__(self, rows): self.rows = rows
-        def all(self): return self.rows
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
 
     class Session:
         def scalars(self, query):
@@ -143,20 +148,22 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
             if entity is portfolio_module.MutualFundScheme:
                 return Rows([SimpleNamespace(scheme_code=102, scheme_name="Partial")])
             if entity is portfolio_module.InvestorTransaction:
-                return Rows([
-                    SimpleNamespace(
-                        transaction_type="purchase",
-                        units=Decimal("10"),
-                        transaction_date=date(2024, 1, 1),
-                        transaction_id=1,
-                    ),
-                    SimpleNamespace(
-                        transaction_type="redemption",
-                        units=Decimal("4"),
-                        transaction_date=date(2024, 2, 1),
-                        transaction_id=2,
-                    ),
-                ])
+                return Rows(
+                    [
+                        SimpleNamespace(
+                            transaction_type="purchase",
+                            units=Decimal("10"),
+                            transaction_date=date(2024, 1, 1),
+                            transaction_id=1,
+                        ),
+                        SimpleNamespace(
+                            transaction_type="redemption",
+                            units=Decimal("4"),
+                            transaction_date=date(2024, 2, 1),
+                            transaction_id=2,
+                        ),
+                    ]
+                )
             raise AssertionError("Unexpected holdings query for no disclosed portfolio.")
 
         def scalar(self, query):
@@ -267,9 +274,7 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
             if "security_market_observations" in rendered:
                 # SQL bind parameters carry the date cutoff for all quote/history selectors.
                 params = query.compile().params
-                cutoff_values = [
-                    value for value in params.values() if isinstance(value, datetime)
-                ]
+                cutoff_values = [value for value in params.values() if isinstance(value, datetime)]
                 assert expected_cutoff in cutoff_values
                 return ScalarRows()
             return ScalarRowsEmpty()
