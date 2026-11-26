@@ -539,8 +539,10 @@ def collect_official_events(
     try:
         return collect_rss_events(session, source_key, feed_url)
     except ValueError as exc:
+        session.rollback()
         raise _domain_error(exc) from exc
     except Exception as exc:
+        session.rollback()
         raise HTTPException(
             status_code=502, detail="Official event feed could not be retrieved."
         ) from exc
