@@ -607,6 +607,58 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
     }
 
 
+def _bounded_evidence(results: dict[str, Any], max_chars: int = 18000) -> str:
+    """Keep evidence valid JSON while allocating a bounded budget across specialists."""
+    omitted: list[str] = []
+
+    def encoded(value: Any) -> str:
+        return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))
+
+    def trim(value: Any, budget: int, path: str) -> Any:
+        if len(encoded(value)) <= budget:
+            return value
+        if isinstance(value, dict):
+            output = {}
+            for key, item in value.items():
+                remaining = budget - len(encoded(output)) - len(encoded(str(key))) - 4
+                if remaining < 24:
+                    omitted.append(f"{path}.{key}")
+                    continue
+                output[key] = trim(item, remaining, f"{path}.{key}")
+            return output
+        if isinstance(value, list):
+            output = []
+            for index, item in enumerate(value):
+                remaining = budget - len(encoded(output)) - 4
+                if remaining < 24:
+                    omitted.append(f"{path}[{index}:]")
+                    break
+                candidate = trim(item, remaining, f"{path}[{index}]")
+                if len(encoded(output + [candidate])) > budget:
+                    omitted.append(f"{path}[{index}:]")
+                    break
+                output.append(candidate)
+            return output
+        if isinstance(value, str):
+            omitted.append(path)
+            return value[: max(0, budget - 16)] + "…[truncated]"
+        omitted.append(path)
+        return "[omitted: evidence budget]"
+
+    groups = list(results.items())
+    per_group = max(64, (max_chars - 400) // max(1, len(groups)))
+    bounded = {
+        key: trim(value, per_group, key)
+        for key, value in groups
+    }
+    payload = {
+        "results": bounded,
+        "truncated": bool(omitted),
+        "omitted_paths": omitted[:100],
+    }
+    return encoded(payload)
+
+
 def _synthesize(state: ResearchState) -> dict[str, Any]:
     request = state["request"]
     results = state.get("results", {})
@@ -626,7 +678,14 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
             model = create_chat_model(temperature=0)
             from langchain_core.messages import HumanMessage, SystemMessage
 
-            evidence = json.dumps(_jsonable(results), ensure_ascii=False, default=str)[:18000]
+            evidence = _bounded_evidence(_jsonable(results))
+            evidence_payload = json.loads(evidence)
+            truncation_note = (
+                "Evidence was selectively truncated to fit the context budget. "
+                "Do not infer omitted details; state the limitation when material. "
+                if evidence_payload["truncated"]
+                else ""
+            )
             response = model.invoke(
                 [
                     SystemMessage(
@@ -643,7 +702,8 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
                     ),
                     HumanMessage(
                         content=(
-                            f"Question: {request.question}\nRetrieved evidence JSON: {evidence}\n"
+                            f"Question: {request.question}\n{truncation_note}"
+                            f"Retrieved evidence JSON: {evidence}\n"
                             "Available source reference IDs: "
                             f"{json.dumps(citations, default=str)}\n"
                             "Summarize the evidence concisely. Do not fabricate citation IDs."

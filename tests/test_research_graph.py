@@ -1,5 +1,6 @@
 """Tests for the LangGraph supervisor and its deterministic routing layer."""
 
+import json
 from datetime import date
 from types import SimpleNamespace
 
@@ -360,3 +361,17 @@ def test_assistant_request_rejects_as_of_date_after_end_date():
             end_date=date(2026, 6, 30),
             as_of_date=date(2026, 7, 1),
         )
+
+def test_llm_evidence_budget_preserves_valid_json_and_reports_omissions():
+    payload = research_graph._bounded_evidence(
+        {
+            "fund": {"metrics": {"cagr": "0.12"}, "long_text": "x" * 5000},
+            "portfolio": {"holdings": [{"name": f"Security {i}", "weight": i} for i in range(100)]},
+        },
+        max_chars=1200,
+    )
+    parsed = json.loads(payload)
+    assert len(payload) <= 1200
+    assert set(parsed["results"]) == {"fund", "portfolio"}
+    assert parsed["truncated"] is True
+    assert parsed["omitted_paths"]

@@ -549,7 +549,6 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
         raise ValueError("Event source_key must match the linked evidence source.")
     if payload.canonical_url:
         parsed_url = urlparse(str(payload.canonical_url))
-        registered_url = urlparse(source.base_url or "")
         if (
             parsed_url.scheme != "https"
             or not parsed_url.hostname
@@ -557,11 +556,6 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
             or parsed_url.password is not None
         ):
             raise ValueError("Event canonical_url must be HTTPS and must not contain credentials.")
-        if registered_url.hostname:
-            event_host = parsed_url.hostname.lower().rstrip(".")
-            source_host = registered_url.hostname.lower().rstrip(".")
-            if not (event_host == source_host or event_host.endswith("." + source_host)):
-                raise ValueError("Event canonical_url must match the registered source host.")
     if payload.published_at is not None and (
         payload.published_at.tzinfo is None or payload.published_at.utcoffset() is None
     ):

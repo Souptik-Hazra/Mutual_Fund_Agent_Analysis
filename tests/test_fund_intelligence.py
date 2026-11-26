@@ -169,6 +169,71 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
     assert limited["peer_count"] == 1
 
 
+def test_category_rank_assigns_equal_metrics_the_same_rank(monkeypatch):
+    selected = SimpleNamespace(
+        scheme_code=1,
+        scheme_category="Large Cap",
+        scheme_type="Open Ended",
+        plan_type="direct",
+        option_type="growth",
+    )
+    peers = [
+        SimpleNamespace(
+            scheme_code=code,
+            scheme_name=f"Fund {code}",
+            fund_house="AMC",
+            scheme_category="Large Cap",
+        )
+        for code in (1, 2)
+    ]
+
+    class Rows:
+        def all(self):
+            return peers
+
+    class Session:
+        def get(self, _model, _key):
+            return selected
+
+        def scalars(self, _statement):
+            return Rows()
+
+        def execute(self, _statement):
+            class Bounds:
+                @staticmethod
+                def all():
+                    return [
+                        (1, date(2025, 1, 1), date(2026, 1, 1)),
+                        (2, date(2025, 1, 1), date(2026, 1, 1)),
+                    ]
+
+            return Bounds()
+
+    def tied_report(_session, _code, **_kwargs):
+        return SimpleNamespace(
+            cagr=Decimal("0.10"),
+            absolute_return=Decimal("0.10"),
+            risk=SimpleNamespace(
+                annualized_volatility=Decimal("0.10"),
+                sharpe_ratio=Decimal("0.50"),
+            ),
+            drawdown=SimpleNamespace(maximum_drawdown=Decimal("-0.10")),
+            benchmark=None,
+            benchmark_unavailable_reason=None,
+            return_basis="growth_nav_total_return",
+            distribution_coverage_status="not_required",
+            observation_count=2,
+            start_date=date(2025, 1, 1),
+            end_date=date(2026, 1, 1),
+            base100_series=((date(2025, 1, 1), Decimal("100")), (date(2026, 1, 1), Decimal("110"))),
+        )
+
+    monkeypatch.setattr(fund_intelligence, "analyze_fund", tied_report)
+    result = fund_intelligence.analyze_category_peers(Session(), 1)
+    assert {row["cagr_rank"] for row in result["peers"]} == {1}
+    assert {row["sharpe_ratio_rank"] for row in result["peers"]} == {1}
+
+
 def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
     from types import SimpleNamespace
 
