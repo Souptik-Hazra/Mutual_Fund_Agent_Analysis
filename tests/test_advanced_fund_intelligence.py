@@ -676,3 +676,112 @@ def test_complete_snapshot_requires_approximately_full_weight_total():
     assert missing == 0
     assert total == Decimal("100")
     assert complete is True
+
+
+@pytest.mark.parametrize(
+    ("snapshot_status", "evidence_status", "weights", "expected_coverage"),
+    [
+        ("complete", "verified", [Decimal("70"), None, Decimal("20")], Decimal("0")),
+        ("complete", "unverified", [Decimal("100")], Decimal("0")),
+        ("partial", "verified", [Decimal("100")], Decimal("0")),
+        ("complete", "verified", [Decimal("100")], Decimal("100")),
+    ],
+)
+def test_actual_exposure_coverage_requires_complete_weighted_verified_disclosure(
+    snapshot_status, evidence_status, weights, expected_coverage
+):
+    as_of = date(2026, 6, 30)
+    snapshot = SimpleNamespace(
+        snapshot_id=99,
+        source_key="amfi_official",
+        evidence_id=99,
+        status=snapshot_status,
+        effective_date=date(2026, 5, 31),
+    )
+    holdings = [
+        SimpleNamespace(
+            isin=f"INE000{index}A",
+            security_key=f"INE000{index}A",
+            security_name=f"Coverage Holding {index}",
+            asset_class="equity",
+            sector="Financials",
+            weight_pct=weight,
+        )
+        for index, weight in enumerate(weights)
+    ]
+
+    class Rows:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
+
+    class Session:
+        def scalars(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.MutualFundScheme:
+                return Rows([SimpleNamespace(scheme_code=299, scheme_name="Coverage Fund")])
+            if entity is portfolio_module.InvestorTransaction:
+                return Rows([
+                    SimpleNamespace(
+                        transaction_type="purchase",
+                        units=Decimal("4"),
+                        transaction_date=date(2026, 1, 1),
+                        transaction_id=1,
+                    )
+                ])
+            if entity is portfolio_module.PortfolioHolding:
+                return Rows(holdings)
+            raise AssertionError(entity)
+
+        def get(self, model, _key):
+            if model is portfolio_module.DataSource:
+                return SimpleNamespace(
+                    enabled=True,
+                    source_key="amfi_official",
+                    is_official=True,
+                    source_type="official",
+                    base_url="https://www.amfiindia.com",
+                )
+            if model is portfolio_module.EvidenceRecord:
+                return SimpleNamespace(
+                    evidence_id=99,
+                    verification_status=evidence_status,
+                    canonical_url="https://www.amfiindia.com/disclosures",
+                    retrieved_at=datetime(2026, 6, 30, tzinfo=UTC),
+                )
+            return None
+
+        def scalar(self, query):
+            entity = query.column_descriptions[0]["entity"]
+            if entity is portfolio_module.NavReconciliation:
+                return SimpleNamespace(
+                    status="matched",
+                    canonical_nav=Decimal("25"),
+                    nav_date=date(2026, 6, 29),
+                    canonical_source="amfi",
+                    evaluated_at=datetime(2026, 6, 30, tzinfo=UTC),
+                )
+            if entity is portfolio_module.PortfolioSnapshot:
+                return snapshot
+            raise AssertionError(entity)
+
+    result = actual_portfolio_exposure(Session(), [299], as_of)
+    assert result["total_valued_portfolio_inr"] == Decimal("100")
+    assert result["coverage"]["lookthrough_coverage_pct"] == expected_coverage
+    assert result["coverage"]["lookthrough_eligible_fund_count"] == int(
+        expected_coverage == Decimal("100")
+    )
+    assert result["coverage"]["lookthrough_incomplete_fund_count"] == int(
+        expected_coverage == Decimal("0")
+    )
+    assert result["coverage"]["disclosed_weight_pct_by_fund"]["299"] == sum(
+        (weight for weight in weights if weight is not None), Decimal("0")
+    )
+    assert bool(result["equity_exposure"]) is True
+    assert result["coverage"]["is_complete"] is (
+        snapshot_status == "complete"
+        and evidence_status == "verified"
+        and weights == [Decimal("100")]
+    )
