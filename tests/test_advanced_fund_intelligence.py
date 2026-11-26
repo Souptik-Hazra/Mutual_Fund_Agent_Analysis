@@ -327,7 +327,7 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
 
 def test_exposure_math():
     as_of = date(2026, 6, 30)
-    snapshot = SimpleNamespace(snapshot_id=4, status="complete", effective_date=date(2026, 6, 1))
+    snapshot = SimpleNamespace(snapshot_id=4, source_key="amfi_official", evidence_id=1, status="complete", effective_date=date(2026, 6, 1))
     nav = SimpleNamespace(
         status="matched",
         canonical_nav=Decimal("20"),
@@ -476,7 +476,7 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
             transaction_id=3,
         ),
     ]
-    snapshot = SimpleNamespace(snapshot_id=5, status="complete", effective_date=date(2026, 6, 1))
+    snapshot = SimpleNamespace(snapshot_id=5, source_key="amfi_official", evidence_id=1, status="complete", effective_date=date(2026, 6, 1))
     nav = SimpleNamespace(
         status="single_source",
         canonical_nav=Decimal("10"),
@@ -547,7 +547,7 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
 
 def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
     as_of = date(2026, 6, 30)
-    snapshot = SimpleNamespace(snapshot_id=6, status="partial", effective_date=date(2026, 5, 31))
+    snapshot = SimpleNamespace(snapshot_id=6, source_key="amfi_official", evidence_id=1, status="partial", effective_date=date(2026, 5, 31))
     holding = SimpleNamespace(
         isin="INE003C",
         security_key="INE003C",
