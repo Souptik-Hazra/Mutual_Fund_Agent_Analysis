@@ -54,8 +54,12 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
             )
             continue
         if units == 0:
-            values[code] = D("0")
-            contexts[code] = {"units": units, "nav": None, "nav_date": None}
+            excluded.append(
+                {
+                    "scheme_code": code,
+                    "reason": "No remaining units after recorded redemptions and switches.",
+                }
+            )
             continue
         nav = session.scalar(
             select(NavReconciliation)
@@ -167,13 +171,14 @@ def actual_portfolio_exposure(session: Session, scheme_codes: list[int]) -> dict
                 "portfolio_weight_pct": v / total * D("100") if total > 0 else None,
             }
             for c, v in values.items()
+            if contexts[c]["units"] > 0 and v > 0
         ],
         "excluded_funds": excluded,
         "equity_exposure": items,
         "sector_exposure": sector_rows,
         "disclosure_warnings": warnings,
         "coverage": {
-            "valued_fund_count": len(values),
+            "valued_fund_count": sum(1 for value in values.values() if value > 0),
             "selected_fund_count": len(scheme_codes),
             "is_complete": not excluded and not warnings,
         },
