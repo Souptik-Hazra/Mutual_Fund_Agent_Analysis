@@ -243,7 +243,7 @@ def record_evidence(
         raise ValueError("confidence must be between 0 and 1.")
     if canonical_url:
         parsed = urlparse(canonical_url)
-        allowed_schemes = {"https"} if verification_status == "verified" else {"http", "https"}
+        allowed_schemes = {"https"}
         if (
             parsed.scheme not in allowed_schemes
             or not parsed.hostname
@@ -251,7 +251,7 @@ def record_evidence(
             or parsed.password is not None
         ):
             raise ValueError("canonical_url must be an absolute HTTPS URL without credentials when verified.")
-        if verification_status == "verified" and source.base_url:
+        if source.base_url:
             registered = urlparse(source.base_url)
             try:
                 actual_port = parsed.port or 443

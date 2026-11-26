@@ -547,6 +547,21 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
         raise ValueError("Unknown evidence_id.")
     if evidence is not None and evidence.source_key != payload.source_key:
         raise ValueError("Event source_key must match the linked evidence source.")
+    if payload.canonical_url:
+        parsed_url = urlparse(str(payload.canonical_url))
+        registered_url = urlparse(source.base_url or "")
+        if (
+            parsed_url.scheme != "https"
+            or not parsed_url.hostname
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+        ):
+            raise ValueError("Event canonical_url must be HTTPS and must not contain credentials.")
+        if registered_url.hostname:
+            event_host = parsed_url.hostname.lower().rstrip(".")
+            source_host = registered_url.hostname.lower().rstrip(".")
+            if not (event_host == source_host or event_host.endswith("." + source_host)):
+                raise ValueError("Event canonical_url must match the registered source host.")
     if payload.published_at is not None and (
         payload.published_at.tzinfo is None or payload.published_at.utcoffset() is None
     ):
@@ -559,11 +574,48 @@ def create_market_event(session: Session, payload: Any) -> MarketEvent:
         evidence is None or evidence.verification_status not in {"verified", "corroborated"}
     ):
         raise ValueError("Confirmed or scheduled events require verified or corroborated evidence.")
-    if payload.status == "scheduled" and not source.is_official:
-        raise ValueError("Scheduled events must originate from an official source.")
+    if payload.status in {"scheduled", "confirmed"} and (
+        not source.is_official or source.source_type != "official"
+    ):
+        raise ValueError("Scheduled or confirmed events must originate from an official source.")
+    if evidence is None and payload.canonical_url:
+        evidence_external_id = (
+            "event:"
+            + hashlib.sha256(
+                f"{payload.source_key}:{payload.external_id or payload.title}".encode("utf-8")
+            ).hexdigest()
+        )
+        evidence = session.scalar(
+            select(EvidenceRecord).where(
+                EvidenceRecord.source_key == payload.source_key,
+                EvidenceRecord.external_id == evidence_external_id,
+            )
+        )
+        if evidence is None:
+            evidence = EvidenceRecord(
+                source_key=payload.source_key,
+                external_id=evidence_external_id,
+                canonical_url=str(payload.canonical_url),
+                title=payload.title,
+                published_at=payload.published_at,
+                content_hash=hashlib.sha256(
+                    f"{payload.title}:{payload.summary or ''}".encode("utf-8")
+                ).hexdigest(),
+                verification_status="unverified",
+                metadata_json={"ingestion": "market_event"},
+            )
+            session.add(evidence)
+            session.flush()
+        else:
+            evidence.canonical_url = str(payload.canonical_url)
+            evidence.title = payload.title
+            evidence.published_at = payload.published_at
+            evidence.retrieved_at = datetime.now(UTC)
+            evidence.verification_status = "unverified"
+    evidence_id = evidence.evidence_id if evidence is not None else None
     event = MarketEvent(
         source_key=payload.source_key, external_id=payload.external_id,
-        related_entity_id=payload.related_entity_id, evidence_id=payload.evidence_id,
+        related_entity_id=payload.related_entity_id, evidence_id=evidence_id,
         title=payload.title, summary=payload.summary, event_type=payload.event_type,
         status=payload.status, event_date=payload.event_date, published_at=payload.published_at,
         canonical_url=str(payload.canonical_url) if payload.canonical_url else None,
