@@ -151,6 +151,8 @@ def actual_portfolio_exposure(
             "nav_date": nav.nav_date,
             "nav_status": nav.status,
             "valuation_age_days": (as_of_date - nav.nav_date).days,
+            "nav_source_key": nav.canonical_source,
+            "nav_retrieved_at": nav.evaluated_at,
         }
 
     total = sum(values.values(), D("0"))
@@ -219,6 +221,14 @@ def actual_portfolio_exposure(
             D("0"),
         )
         weight_complete = missing_weight_count == 0 and D("99") <= disclosed_weight_total <= D("101")
+        contexts[code].update(
+            holdings_snapshot_id=snapshot.snapshot_id,
+            holdings_as_of=snapshot.effective_date,
+            holdings_source_key=snapshot.source_key,
+            holdings_url=evidence.canonical_url if evidence else (source.base_url if source else None),
+            holdings_retrieved_at=evidence.retrieved_at if evidence else snapshot.retrieved_at,
+            holdings_verification_status=evidence.verification_status if evidence else "unverified",
+        )
         if snapshot.status == "complete" and not weight_complete:
             reason = (
                 f"Complete disclosure effective {snapshot.effective_date} has "
@@ -299,6 +309,14 @@ def actual_portfolio_exposure(
                 "nav_date": contexts[c]["nav_date"],
                 "nav_status": contexts[c]["nav_status"],
                 "valuation_age_days": contexts[c]["valuation_age_days"],
+                "nav_source_key": contexts[c]["nav_source_key"],
+                "nav_retrieved_at": contexts[c]["nav_retrieved_at"],
+                "holdings_snapshot_id": contexts[c].get("holdings_snapshot_id"),
+                "holdings_as_of": contexts[c].get("holdings_as_of"),
+                "holdings_source_key": contexts[c].get("holdings_source_key"),
+                "holdings_url": contexts[c].get("holdings_url"),
+                "holdings_retrieved_at": contexts[c].get("holdings_retrieved_at"),
+                "holdings_verification_status": contexts[c].get("holdings_verification_status", "unverified"),
                 "market_value_inr": v,
                 "portfolio_weight_pct": v / total * D("100") if total > 0 else None,
             }

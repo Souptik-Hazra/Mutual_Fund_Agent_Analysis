@@ -289,27 +289,28 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                 )
                 results[intent] = _jsonable(report)
                 selected_fund = report.get("selected_fund", {})
-                citations.append(
-                    {
-                        "type": "category_peer_analysis",
-                        "scheme_code": codes[0],
-                        "peer_definition": report.get("peer_definition"),
-                        "comparison_window": report.get("comparison_window"),
-                        "return_basis": selected_fund.get("return_basis"),
-                        "distribution_coverage_status": selected_fund.get(
-                            "distribution_coverage_status"
-                        ),
-                        "peer_count": report.get("peer_count"),
-                        "peer_limit": report.get("peer_limit"),
-                        "cohort_truncated": report.get("cohort_truncated"),
-                        "excluded_peers": report.get("excluded_peers", []),
-                        "benchmark_code": report.get("benchmark_code"),
-                        "benchmark_source": report.get("benchmark_source"),
-                        "source": (
-                            "canonical reconciled NAV and applicable distribution methodology"
-                        ),
-                    }
+                nav = session.scalar(
+                    select(NavReconciliation)
+                    .where(NavReconciliation.scheme_code == codes[0])
+                    .where(NavReconciliation.status.in_(["single_source", "matched"]))
+                    .order_by(NavReconciliation.nav_date.desc())
+                    .limit(1)
                 )
+                citation = _provenance_citation(
+                    session, nav.canonical_source if nav else None, None,
+                    nav.evaluated_at if nav else None, "unverified",
+                    type="category_peer_analysis", scheme_code=codes[0],
+                    peer_definition=report.get("peer_definition"),
+                    comparison_window=report.get("comparison_window"),
+                    return_basis=selected_fund.get("return_basis"),
+                    distribution_coverage_status=selected_fund.get("distribution_coverage_status"),
+                    peer_count=report.get("peer_count"), peer_limit=report.get("peer_limit"),
+                    cohort_truncated=report.get("cohort_truncated"),
+                    benchmark_code=report.get("benchmark_code"),
+                    benchmark_source=report.get("benchmark_source"),
+                )
+                if citation:
+                    citations.append(citation)
             elif intent == "actual_exposure":
                 if not codes:
                     raise ValueError("Actual investor exposure requires one or more scheme_codes.")
@@ -318,14 +319,18 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                 )
                 results[intent] = _jsonable(exposure)
                 for item in exposure.get("valued_funds", []):
-                    citation = _provenance_citation(
-                        session, item.get("holdings_source_key"), item.get("holdings_url"),
-                        item.get("holdings_retrieved_at"), item.get("holdings_verification_status", "unverified"),
-                        type="actual_investor_exposure", scheme_code=item.get("scheme_code"),
-                        holdings_as_of=item.get("holdings_as_of"),
-                    )
-                    if citation:
-                        citations.append(citation)
+                    for source_key, url, retrieved_at, scope in (
+                        (item.get("nav_source_key"), None, item.get("nav_retrieved_at"), "nav_valuation"),
+                        (item.get("holdings_source_key"), item.get("holdings_url"), item.get("holdings_retrieved_at"), "holdings_lookthrough"),
+                    ):
+                        citation = _provenance_citation(
+                            session, source_key, url, retrieved_at,
+                            item.get("holdings_verification_status", "unverified") if scope == "holdings_lookthrough" else "unverified",
+                            type="actual_investor_exposure", data_scope=scope,
+                            scheme_code=item.get("scheme_code"), holdings_as_of=item.get("holdings_as_of"),
+                        )
+                        if citation:
+                            citations.append(citation)
             elif intent == "portfolio":
                 if not codes:
                     raise ValueError("Portfolio analysis requires a scheme_code.")
@@ -368,18 +373,18 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                 for code in codes:
                     snapshot = latest_snapshot(session, code, request.end_date)
                     if snapshot:
-                        citations.append(
-                            {
-                                "type": "portfolio_disclosure",
-                                "scheme_code": code,
-                                "source_key": snapshot.source_key,
-                                "canonical_url": snapshot.document_url,
-                                "retrieved_at": snapshot.retrieved_at,
-                                "verification_status": "unverified",
-                                "effective_date": snapshot.effective_date,
-                                "content_hash": snapshot.content_hash,
-                            }
+                        disclosure = portfolio_payload(session, snapshot)
+                        evidence = disclosure.get("evidence") or {}
+                        source_citation = _provenance_citation(
+                            session, snapshot.source_key,
+                            evidence.get("canonical_url") or (disclosure.get("source") or {}).get("base_url"),
+                            evidence.get("retrieved_at") or snapshot.retrieved_at,
+                            evidence.get("verification_status", "unverified"),
+                            type="portfolio_disclosure", scheme_code=code,
+                            effective_date=snapshot.effective_date, content_hash=snapshot.content_hash,
                         )
+                        if source_citation:
+                            citations.append(source_citation)
                 for security in security_data.get("securities", []):
                     market = security.get("market") or {}
                     fundamentals = security.get("fundamentals") or {}
@@ -441,7 +446,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                                     "source_key": event.get("source_key"),
                                     "evidence_id": event.get("evidence_id"),
                                     "canonical_url": event.get("canonical_url"),
-                                    "retrieved_at": event.get("retrieved_at") or datetime.now(UTC),
+                                    "retrieved_at": event.get("retrieved_at"),
                                     "verification_status": event.get("verification_status", "unverified"),
                                 }
                             )
@@ -473,16 +478,27 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             social_analytics(session, None, request.start_date, request.end_date)
                         ),
                     }
-                citations.append(
-                    {
-                        "type": "social_aggregation",
-                        "scope": "fund_specific" if codes else "global",
-                        "scheme_codes": codes or None,
-                        "period_start": request.start_date,
-                        "period_end": request.end_date,
-                        "note": "Experimental discussion data; not a return predictor.",
-                    }
+                social_statement = select(SocialPost).where(
+                    SocialPost.is_spam.is_(False),
+                    (SocialPost.expires_at.is_(None) | (SocialPost.expires_at > datetime.now(UTC))),
                 )
+                if request.start_date:
+                    social_statement = social_statement.where(SocialPost.published_at >= datetime.combine(request.start_date, datetime.min.time(), UTC))
+                if request.end_date:
+                    social_statement = social_statement.where(SocialPost.published_at < datetime.combine(request.end_date, datetime.max.time(), UTC))
+                social_rows = session.scalars(social_statement.order_by(SocialPost.published_at.desc()).limit(request.top_k)).all()
+                for post in social_rows:
+                    evidence = session.get(EvidenceRecord, post.evidence_id) if post.evidence_id else None
+                    citation = _provenance_citation(
+                        session, post.source_key,
+                        evidence.canonical_url if evidence else post.canonical_url,
+                        evidence.retrieved_at if evidence else None,
+                        evidence.verification_status if evidence else "unverified",
+                        type="social_aggregation", post_id=post.post_id,
+                        published_at=post.published_at, scope="fund_specific" if codes else "global",
+                    )
+                    if citation:
+                        citations.append(citation)
             elif intent == "documents":
                 retrieved = search_documents(
                     session, request.question, codes[0] if len(codes) == 1 else None, request.top_k

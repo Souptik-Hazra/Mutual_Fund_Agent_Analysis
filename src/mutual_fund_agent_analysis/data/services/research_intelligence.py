@@ -144,6 +144,7 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
             "authority_tier": source.authority_tier,
             "is_official": source.is_official,
             "enabled": source.enabled,
+            "base_url": source.base_url,
         } if source else None,
         "evidence": {
             "evidence_id": evidence.evidence_id,
@@ -681,6 +682,33 @@ def create_social_post(session: Session, payload: Any) -> SocialPost:
     else:
         for key, value in values.items():
             setattr(row, key, value)
+    evidence_external_id = f"social:{payload.external_id}"
+    evidence = session.scalar(
+        select(EvidenceRecord).where(
+            EvidenceRecord.source_key == payload.source_key,
+            EvidenceRecord.external_id == evidence_external_id,
+        )
+    )
+    if evidence is None:
+        evidence = EvidenceRecord(
+            source_key=payload.source_key,
+            external_id=evidence_external_id,
+            canonical_url=str(payload.canonical_url) if payload.canonical_url else source.base_url,
+            title=f"Public social post metadata from {source.display_name}",
+            published_at=payload.published_at,
+            content_hash=digest,
+            verification_status="unverified",
+            metadata_json={"ingestion": "social_post_metadata"},
+        )
+        session.add(evidence)
+        session.flush()
+    else:
+        evidence.canonical_url = str(payload.canonical_url) if payload.canonical_url else source.base_url
+        evidence.published_at = payload.published_at
+        evidence.content_hash = digest
+        evidence.verification_status = "unverified"
+        evidence.retrieved_at = now
+    row.evidence_id = evidence.evidence_id
     session.commit()
     session.refresh(row)
     return row
@@ -1112,11 +1140,14 @@ def events_for_fund_exposure(
                     "sector": holding.sector,
                     "weight_pct": holding.weight_pct,
                 })
+        evidence = session.get(EvidenceRecord, event.evidence_id) if event.evidence_id else None
         mapped.append({
             "event_id": event.event_id, "title": event.title,
             "event_type": event.event_type, "status": event.status,
             "event_date": event.event_date, "source_key": event.source_key,
             "evidence_id": event.evidence_id, "canonical_url": event.canonical_url,
+            "retrieved_at": evidence.retrieved_at if evidence else None,
+            "verification_status": evidence.verification_status if evidence else "unverified",
             "portfolio_effective_date": snapshot.effective_date,
             "exposure_found": bool(matches), "holdings": matches,
             "aggregate_exposure_pct": sum((item["weight_pct"] or D("0") for item in matches), D("0")),
