@@ -170,6 +170,7 @@ def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
             entity = query.column_descriptions[0]["entity"]
             if entity is portfolio_module.NavReconciliation:
                 return SimpleNamespace(
+                    status="single_source",
                     canonical_nav=Decimal("20"),
                     nav_date=date(2026, 11, 25),
                 )
