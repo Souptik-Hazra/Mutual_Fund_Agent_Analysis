@@ -70,9 +70,7 @@ ARCHIVE="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'mfa-backup-*.tar.gz' -p
 printf 'Mutating both services to prove restoration ...\n'
 docker compose exec -T db psql -v ON_ERROR_STOP=1 -U mfa -d mutual_fund_agent \
   -c "UPDATE mutual_fund_schemes SET scheme_name = 'Restore Drill Mutated' WHERE scheme_code = 99999999;"
-qdrant_curl -fsS -X DELETE "$QDRANT_URL/collections/$QDRANT_COLLECTION/points/delete?wait=true" \
-  -H 'Content-Type: application/json' \
-  -d '{"points":["00000000-0000-4000-8000-000000000001"]}' >/dev/null
+qdrant_curl -fsS -X DELETE "$QDRANT_URL/collections/$QDRANT_COLLECTION" >/dev/null
 
 printf 'Restoring the archive into the isolated services ...\n'
 bash ./scripts/restore-local.sh "$ARCHIVE" --yes

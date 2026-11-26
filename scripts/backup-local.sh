@@ -47,7 +47,7 @@ QDRANT_NETWORK="$(docker inspect --format '{{range $name, $network := .NetworkSe
 [[ -n "$QDRANT_NETWORK" ]] || { printf 'Could not determine the Qdrant Compose network.\n' >&2; exit 1; }
 
 qdrant_curl() {
-  docker run --rm --network "$QDRANT_NETWORK" -v "$WORK_DIR:/backup" \
+  docker run --rm --user "$(id -u):$(id -g)" --network "$QDRANT_NETWORK" -v "$WORK_DIR:/backup" \
     -e "QDRANT_API_KEY=$QDRANT_API_KEY" --entrypoint sh "$CURL_IMAGE" -c '
       if [ -n "$QDRANT_API_KEY" ]; then
         exec curl -H "api-key: $QDRANT_API_KEY" "$@"

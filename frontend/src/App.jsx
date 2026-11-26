@@ -191,6 +191,7 @@ export default function App() {
   const runEvents = () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo, limit: "100" });
+    params.set("as_of", new Date(`${dateTo}T23:59:59+05:30`).toISOString());
     if (eventStatus) params.set("status", eventStatus);
     if (eventSource.trim()) params.set("source_key", eventSource.trim());
     return run(async () => {

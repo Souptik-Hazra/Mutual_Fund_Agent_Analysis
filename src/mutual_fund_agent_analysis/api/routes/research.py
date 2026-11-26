@@ -504,6 +504,72 @@ def collect_official_events(
         ) from exc
 
 
+def _event_state_as_of(
+    session: Session, event: MarketEvent, as_of: datetime
+) -> dict[str, Any] | None:
+    """Resolve the event version that was active at an aware UTC instant."""
+    created_at = event.created_at
+    if created_at is not None:
+        created_at_utc = (
+            created_at.replace(tzinfo=UTC)
+            if created_at.tzinfo is None or created_at.utcoffset() is None
+            else created_at.astimezone(UTC)
+        )
+        if created_at_utc > as_of:
+            return None
+
+    next_revision = session.scalar(
+        select(MarketEventRevision)
+        .where(MarketEventRevision.event_id == event.event_id)
+        .where(MarketEventRevision.recorded_at > as_of)
+        .order_by(MarketEventRevision.recorded_at.asc())
+        .limit(1)
+    )
+    if next_revision is not None:
+        return next_revision.snapshot
+
+    evidence_record = (
+        session.get(EvidenceRecord, event.evidence_id)
+        if event.evidence_id is not None
+        else None
+    )
+    evidence_snapshot = (
+        {
+            "evidence_id": evidence_record.evidence_id,
+            "source_key": evidence_record.source_key,
+            "external_id": evidence_record.external_id,
+            "canonical_url": evidence_record.canonical_url,
+            "title": evidence_record.title,
+            "published_at": evidence_record.published_at.isoformat()
+            if evidence_record.published_at
+            else None,
+            "retrieved_at": evidence_record.retrieved_at.isoformat()
+            if evidence_record.retrieved_at
+            else None,
+            "content_hash": evidence_record.content_hash,
+            "verification_status": evidence_record.verification_status,
+        }
+        if evidence_record is not None
+        else None
+    )
+    return {
+        "source_key": event.source_key,
+        "external_id": event.external_id,
+        "evidence_id": event.evidence_id,
+        "related_entity_id": event.related_entity_id,
+        "title": event.title,
+        "summary": event.summary,
+        "event_type": event.event_type,
+        "status": event.status,
+        "event_date": event.event_date.isoformat() if event.event_date else None,
+        "published_at": event.published_at.isoformat() if event.published_at else None,
+        "canonical_url": event.canonical_url,
+        "confidence": str(event.confidence) if event.confidence is not None else None,
+        "metadata": event.metadata_json or {},
+        "evidence": evidence_snapshot,
+    }
+
+
 @router.get("/events")
 def list_events(
     session: Annotated[Session, Depends(get_db)],
@@ -520,47 +586,113 @@ def list_events(
     ),
     source_key: str | None = Query(default=None, min_length=1, max_length=60),
     entity_id: int | None = Query(default=None, gt=0),
+    as_of: datetime | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=10000),
 ) -> dict:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be <= end_date.")
+    if as_of is None:
+        stmt = select(MarketEvent)
+        if start_date:
+            stmt = stmt.where(MarketEvent.event_date >= start_date)
+        if end_date:
+            stmt = stmt.where(MarketEvent.event_date <= end_date)
+        if status_filter:
+            stmt = stmt.where(MarketEvent.status == status_filter)
+        if event_type:
+            stmt = stmt.where(MarketEvent.event_type == event_type)
+        if source_key:
+            stmt = stmt.where(MarketEvent.source_key == source_key)
+        if entity_id:
+            stmt = stmt.where(MarketEvent.related_entity_id == entity_id)
+        rows = session.scalars(
+            stmt.order_by(
+                MarketEvent.event_date.desc().nullslast(),
+                MarketEvent.published_at.desc().nullslast(),
+            )
+            .offset(offset)
+            .limit(limit)
+        ).all()
+        items = []
+        for row in rows:
+            source_record = session.get(DataSource, row.source_key)
+            evidence_record = (
+                session.get(EvidenceRecord, row.evidence_id)
+                if row.evidence_id is not None
+                else None
+            )
+            items.append(
+                {
+                    "event_id": row.event_id,
+                    "title": row.title,
+                    "summary": row.summary,
+                    "event_type": row.event_type,
+                    "status": row.status,
+                    "event_date": row.event_date,
+                    "published_at": row.published_at,
+                    "source_key": row.source_key,
+                    "source": {
+                        "source_type": source_record.source_type,
+                        "authority_tier": source_record.authority_tier,
+                        "is_official": source_record.is_official,
+                        "attribution_required": source_record.attribution_required,
+                    }
+                    if source_record
+                    else None,
+                    "related_entity_id": row.related_entity_id,
+                    "evidence_id": row.evidence_id,
+                    "evidence": {
+                        "verification_status": evidence_record.verification_status,
+                        "published_at": evidence_record.published_at,
+                        "retrieved_at": evidence_record.retrieved_at,
+                        "content_hash": evidence_record.content_hash,
+                    }
+                    if evidence_record
+                    else None,
+                    "canonical_url": row.canonical_url,
+                    "confidence": row.confidence,
+                }
+            )
+        return {"count": len(items), "offset": offset, "limit": limit, "items": items}
+
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise HTTPException(status_code=422, detail="as_of must include a timezone offset.")
+    as_of_utc = as_of.astimezone(UTC)
     stmt = select(MarketEvent)
-    if start_date:
-        stmt = stmt.where(MarketEvent.event_date >= start_date)
-    if end_date:
-        stmt = stmt.where(MarketEvent.event_date <= end_date)
-    if status_filter:
-        stmt = stmt.where(MarketEvent.status == status_filter)
-    if event_type:
-        stmt = stmt.where(MarketEvent.event_type == event_type)
     if source_key:
         stmt = stmt.where(MarketEvent.source_key == source_key)
     if entity_id:
         stmt = stmt.where(MarketEvent.related_entity_id == entity_id)
-    rows = session.scalars(
-        stmt.order_by(
-            MarketEvent.event_date.desc().nullslast(), MarketEvent.published_at.desc().nullslast()
-        )
-        .offset(offset)
-        .limit(limit)
-    ).all()
-    items = []
+    rows = session.scalars(stmt.order_by(MarketEvent.event_id)).all()
+    historical_items: list[dict[str, Any]] = []
     for row in rows:
-        source_record = session.get(DataSource, row.source_key)
-        evidence_record = (
-            session.get(EvidenceRecord, row.evidence_id) if row.evidence_id is not None else None
-        )
-        items.append(
+        state = _event_state_as_of(session, row, as_of_utc)
+        if state is None:
+            continue
+        event_day = state.get("event_date")
+        if isinstance(event_day, str):
+            event_day = date.fromisoformat(event_day)
+        if start_date and (event_day is None or event_day < start_date):
+            continue
+        if end_date and (event_day is None or event_day > end_date):
+            continue
+        if status_filter and state.get("status") != status_filter:
+            continue
+        if event_type and state.get("event_type") != event_type:
+            continue
+        source_record = session.get(DataSource, state["source_key"])
+        evidence_state = state.get("evidence")
+        historical_items.append(
             {
                 "event_id": row.event_id,
-                "title": row.title,
-                "summary": row.summary,
-                "event_type": row.event_type,
-                "status": row.status,
-                "event_date": row.event_date,
-                "published_at": row.published_at,
-                "source_key": row.source_key,
+                "title": state.get("title"),
+                "summary": state.get("summary"),
+                "event_type": state.get("event_type"),
+                "status": state.get("status"),
+                "event_date": event_day.isoformat() if event_day else None,
+                "published_at": state.get("published_at"),
+                "source_key": state.get("source_key"),
                 "source": {
                     "source_type": source_record.source_type,
                     "authority_tier": source_record.authority_tier,
@@ -569,21 +701,37 @@ def list_events(
                 }
                 if source_record
                 else None,
-                "related_entity_id": row.related_entity_id,
-                "evidence_id": row.evidence_id,
+                "related_entity_id": state.get("related_entity_id"),
+                "evidence_id": state.get("evidence_id"),
                 "evidence": {
-                    "verification_status": evidence_record.verification_status,
-                    "published_at": evidence_record.published_at,
-                    "retrieved_at": evidence_record.retrieved_at,
-                    "content_hash": evidence_record.content_hash,
+                    "verification_status": evidence_state.get("verification_status"),
+                    "published_at": evidence_state.get("published_at"),
+                    "retrieved_at": evidence_state.get("retrieved_at"),
+                    "content_hash": evidence_state.get("content_hash"),
                 }
-                if evidence_record
+                if evidence_state
                 else None,
-                "canonical_url": row.canonical_url,
-                "confidence": row.confidence,
+                "canonical_url": state.get("canonical_url"),
+                "confidence": state.get("confidence"),
             }
         )
-    return {"count": len(items), "offset": offset, "limit": limit, "items": items}
+    historical_items.sort(
+        key=lambda item: (
+            item["event_date"] or "",
+            item["published_at"] or "",
+        ),
+        reverse=True,
+    )
+    total_count = len(historical_items)
+    page = historical_items[offset : offset + limit]
+    return {
+        "count": len(page),
+        "total_count": total_count,
+        "offset": offset,
+        "limit": limit,
+        "as_of": as_of_utc.isoformat(),
+        "items": page,
+    }
 
 
 @router.post("/social/posts", status_code=status.HTTP_201_CREATED)

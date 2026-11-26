@@ -9,11 +9,11 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.data.providers.amfi import AMFIClient
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
 from mutual_fund_agent_analysis.data.providers.niftyindices import NiftyIndicesClient
 from mutual_fund_agent_analysis.data.providers.twelvedata import TwelveDataClient
-from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.database.session import get_session_factory
 from mutual_fund_agent_analysis.models import (
     BenchmarkObservation,

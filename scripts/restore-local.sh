@@ -70,7 +70,7 @@ QDRANT_API_KEY="${QDRANT_API_KEY:-}"
 CURL_IMAGE="${QDRANT_CURL_IMAGE:-curlimages/curl:8.12.1}"
 [[ "$QDRANT_URL" == http://qdrant:* || "$QDRANT_URL" == https://qdrant:* ]] || { printf 'QDRANT_URL must use the private Compose service name qdrant.\n' >&2; exit 1; }
 qdrant_curl() {
-  docker run --rm --network "$QDRANT_NETWORK" -v "$WORK_DIR:/backup" \
+  docker run --rm --user "$(id -u):$(id -g)" --network "$QDRANT_NETWORK" -v "$WORK_DIR:/backup" \
     -e "QDRANT_API_KEY=$QDRANT_API_KEY" --entrypoint sh "$CURL_IMAGE" -c '
       if [ -n "$QDRANT_API_KEY" ]; then exec curl -H "api-key: $QDRANT_API_KEY" "$@"
       else exec curl "$@"; fi

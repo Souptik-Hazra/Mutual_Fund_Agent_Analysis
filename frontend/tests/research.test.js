@@ -83,3 +83,13 @@ test("historical equity status passes the selected end date as as_of", async () 
     component.includes('params.set(tab === "Fund Profile" ? "end_date" : "as_of", dateTo)'),
   );
 });
+
+
+test("event research sends the selected end date as a timezone-aware as_of instant", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(
+    app,
+    /params\.set\("as_of", new Date\(\x60\$\{dateTo\}T23:59:59\+05:30\x60\)\.toISOString\(\)\)/,
+  );
+});
