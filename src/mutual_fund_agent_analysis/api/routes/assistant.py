@@ -5,7 +5,7 @@ import logging
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -69,7 +69,6 @@ def _sse(event: str, payload: dict[str, Any]) -> str:
 def stream_research(
     request: ResearchAssistantRequest,
     session: Annotated[Session, Depends(get_db)],
-    http_request: Request,
 ) -> StreamingResponse:
     """Stream LangGraph node progress and the final grounded research result."""
     research_run_id = uuid4().hex
