@@ -92,7 +92,15 @@ def test_indexing_replaces_previous_chunks_and_removes_stale_trailing_chunks(mon
 
     fake_qdrant_module = ModuleType("langchain_qdrant")
     fake_qdrant_module.QdrantVectorStore = FakeStore
+    fake_client_module = ModuleType("qdrant_client")
+
+    class FakeQdrantClient:
+        def __init__(self, **_kwargs):
+            pass
+
+    fake_client_module.QdrantClient = FakeQdrantClient
     monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
+    monkeypatch.setitem(sys.modules, "qdrant_client", fake_client_module)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
 
     original = [
@@ -157,7 +165,15 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
 
     fake_qdrant_module = ModuleType("langchain_qdrant")
     fake_qdrant_module.QdrantVectorStore = FailingStore
+    fake_client_module = ModuleType("qdrant_client")
+
+    class FakeQdrantClient:
+        def __init__(self, **_kwargs):
+            pass
+
+    fake_client_module.QdrantClient = FakeQdrantClient
     monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
+    monkeypatch.setitem(sys.modules, "qdrant_client", fake_client_module)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
 
     assert (
