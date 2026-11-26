@@ -3,8 +3,9 @@
 import json
 import logging
 from typing import Annotated, Any
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -68,15 +69,17 @@ def _sse(event: str, payload: dict[str, Any]) -> str:
 def stream_research(
     request: ResearchAssistantRequest,
     session: Annotated[Session, Depends(get_db)],
+    http_request: Request,
 ) -> StreamingResponse:
     """Stream LangGraph node progress and the final grounded research result."""
+    research_run_id = uuid4().hex
 
     def events():
         graph = build_research_graph()
         final_state: dict[str, Any] = {}
         try:
             for update in graph.stream(
-                {"request": request, "session": session},
+                {"request": request, "session": session, "research_run_id": research_run_id},
                 stream_mode="updates",
             ):
                 for node, output in update.items():
@@ -90,6 +93,7 @@ def stream_research(
                         "progress",
                         {
                             "node": node,
+                            "research_run_id": research_run_id,
                             "message": events_by_node.get(node, f"{node} complete."),
                             "intents": final_state.get("intents", []),
                         },
@@ -98,6 +102,7 @@ def stream_research(
                 "complete",
                 {
                     "question": request.question,
+                    "research_run_id": research_run_id,
                     "intents": final_state.get("intents", []),
                     "answer": final_state.get("answer", "No answer generated."),
                     "results": final_state.get("results", {}),
@@ -120,6 +125,7 @@ def stream_research(
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
+            "X-Research-Run-ID": research_run_id,
         },
     )
 
@@ -128,13 +134,18 @@ def stream_research(
 def run_research(
     request: ResearchAssistantRequest,
     session: Annotated[Session, Depends(get_db)],
+    http_request: Request,
 ) -> dict[str, Any]:
+    research_run_id = uuid4().hex
     try:
         graph = build_research_graph()
-        result = graph.invoke({"request": request, "session": session})
+        result = graph.invoke(
+            {"request": request, "session": session, "research_run_id": research_run_id}
+        )
         return jsonable_encoder(
             {
                 "question": request.question,
+                "research_run_id": research_run_id,
                 "intents": result.get("intents", []),
                 "answer": result.get("answer", "No answer generated."),
                 "results": result.get("results", {}),
