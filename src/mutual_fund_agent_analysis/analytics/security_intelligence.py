@@ -66,11 +66,17 @@ def security_profile(
     latest = session.scalars(base_statement.order_by(*ordering).limit(1)).first()
     history_statement = base_statement
     if history_type == "fundamentals":
-        history_statement = history_statement.where(SecurityMarketObservation.fundamentals_json != {})
+        history_statement = history_statement.where(
+            SecurityMarketObservation.fundamentals_json != {}
+        )
     elif history_type == "events":
-        history_statement = history_statement.where(SecurityMarketObservation.corporate_events_json != [])
+        history_statement = history_statement.where(
+            SecurityMarketObservation.corporate_events_json != []
+        )
     elif history_type == "quotes":
-        history_statement = history_statement.where(SecurityMarketObservation.last_price.is_not(None))
+        history_statement = history_statement.where(
+            SecurityMarketObservation.last_price.is_not(None)
+        )
     observations = session.scalars(
         history_statement.order_by(*ordering).limit(history_limit)
     ).all()
