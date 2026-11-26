@@ -2,6 +2,7 @@
 
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -296,3 +297,156 @@ def test_category_ranking_excludes_peer_outside_common_observation_window(monkey
     assert result["excluded_peer_count"] == 1
     assert result["excluded_peers"][0]["scheme_code"] == 2
     assert "common window" in result["excluded_peers"][0]["reason"]
+
+
+def test_security_profile_keeps_latest_fundamentals_and_events_outside_quote_history():
+    observed = datetime(2026, 11, 25, 10, 0, tzinfo=UTC)
+    quote = SimpleNamespace(
+        security_key="INE009A01021",
+        isin="INE009A01021",
+        security_name="Example Limited",
+        symbol="EXAMPLE",
+        exchange="NSE",
+        observed_at=observed,
+        last_price=Decimal("150"),
+        change_pct=Decimal("1.5"),
+        day_high=Decimal("152"),
+        day_low=Decimal("148"),
+        volume=1000,
+        market_status="trading",
+        retrieved_at=observed,
+        source_key="quote_provider",
+        source_url="https://provider.example/quote",
+        content_hash="quote-hash",
+        fundamentals_json={},
+        corporate_events_json=[],
+    )
+    fundamentals = SimpleNamespace(
+        fundamentals_as_of=date(2026, 10, 31),
+        fundamentals_json={"pe_ratio": Decimal("20")},
+        observed_at=datetime(2026, 11, 1, 10, 0, tzinfo=UTC),
+        source_key="fundamentals_provider",
+        source_url="https://provider.example/fundamentals",
+        retrieved_at=observed,
+    )
+    events = SimpleNamespace(
+        corporate_events_json=[{"title": "Board meeting", "status": "scheduled"}],
+        observed_at=datetime(2026, 10, 15, 10, 0, tzinfo=UTC),
+        source_key="events_provider",
+        source_url="https://provider.example/events",
+        retrieved_at=observed,
+    )
+
+    class Rows:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def first(self):
+            return self.rows[0] if self.rows else None
+
+        def all(self):
+            return self.rows
+
+    class Session:
+        def __init__(self):
+            self.calls = 0
+
+        def scalars(self, _statement):
+            self.calls += 1
+            return Rows(
+                {
+                    1: [quote],
+                    2: [quote],
+                    3: [fundamentals],
+                    4: [events],
+                    5: [],
+                }[self.calls]
+            )
+
+    result = security_profile(Session(), "INE009A01021", as_of=date(2026, 11, 30))
+    assert result["market"]["last_price"] == Decimal("150")
+    assert result["fundamentals"]["metrics"] == {"pe_ratio": Decimal("20")}
+    assert result["fundamentals"]["source_key"] == "fundamentals_provider"
+    assert result["corporate_events"][0]["source_key"] == "events_provider"
+
+
+def test_latest_market_observation_applies_historical_as_of_filter():
+    class Rows:
+        def first(self):
+            return None
+
+    class Session:
+        statement = None
+
+        def scalars(self, statement):
+            self.statement = statement
+            return Rows()
+
+    session = Session()
+    _latest_market_observation(session, "INE009A01021", as_of=date(2026, 10, 31))
+    sql = str(session.statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "security_market_observations.observed_at <=" in sql
+
+
+def test_equity_status_uses_historical_market_observations():
+    snapshot = SimpleNamespace(
+        snapshot_id=10,
+        effective_date=date(2026, 10, 31),
+        status="complete",
+    )
+    holding = SimpleNamespace(
+        security_key="INE009A01021",
+        isin=None,
+        security_name="Example Limited",
+        sector="Technology",
+        weight_pct=Decimal("5"),
+        asset_class="equity",
+    )
+    observed = datetime(2026, 10, 30, 10, 0, tzinfo=UTC)
+    market = SimpleNamespace(
+        security_key="INE009A01021",
+        isin=None,
+        security_name="Example Limited",
+        symbol="EXAMPLE",
+        exchange="NSE",
+        source_key="quote_provider",
+        source_url="https://provider.example/quote",
+        observed_at=observed,
+        retrieved_at=observed,
+        fundamentals_as_of=None,
+        last_price=Decimal("150"),
+        change_pct=Decimal("1.5"),
+        day_high=Decimal("152"),
+        day_low=Decimal("148"),
+        volume=1000,
+        market_status="trading",
+        fundamentals_json={},
+        corporate_events_json=[],
+    )
+
+    class Rows:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def first(self):
+            return self.rows[0] if self.rows else None
+
+        def all(self):
+            return self.rows
+
+    class Session:
+        def __init__(self):
+            self.calls = 0
+            self.statements = []
+
+        def scalars(self, statement):
+            self.calls += 1
+            self.statements.append(statement)
+            return Rows({1: [snapshot], 2: [holding], 3: [market]}[self.calls])
+
+    session = Session()
+    result = fund_equity_status(10001, session, as_of=date(2026, 10, 31))
+    market_query = str(session.statements[2].compile(compile_kwargs={"literal_binds": True}))
+    assert "security_market_observations.observed_at <=" in market_query
+    assert result["market_data_as_of"] == date(2026, 10, 31)
+    assert result["items"][0]["market_data"]["observed_at"] == observed
