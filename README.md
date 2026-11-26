@@ -535,6 +535,16 @@ Alternatively, start the complete Docker Compose stack with `docker compose up -
 - Liveness: http://localhost:8000/api/v1/health/live
 - Readiness: http://localhost:8000/api/v1/health/ready
 
+### Initialize the local scheme catalogue
+
+After applying database migrations, populate the searchable scheme directory once:
+
+```bash
+python -m mutual_fund_agent_analysis.cli.sync_catalogue
+```
+
+This imports the paginated MFAPI scheme directory (names, scheme codes and available ISINs) into PostgreSQL. It skips the import when the local catalogue is already populated. To refresh it explicitly, add `--force`. The backend launcher runs this initialization automatically after migrations when the catalogue is empty. Scheme metadata discovery does not download every scheme's full NAV history; NAV history is synchronized separately when needed.
+
 ### Sync a scheme's NAV history
 
 Find a scheme code using the [MFAPI scheme search endpoint](https://api.mfapi.in/mf/search?q=HDFC), then run:
