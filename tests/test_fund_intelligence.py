@@ -292,6 +292,23 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
         def __init__(self):
             self.calls = 0
 
+        def get(self, model, _key):
+            if model.__name__ == "DataSource":
+                return SimpleNamespace(
+                    display_name="AMC Disclosures",
+                    enabled=True,
+                    is_official=True,
+                    source_type="official",
+                    base_url="https://amc.example",
+                )
+            if model.__name__ == "EvidenceRecord":
+                return SimpleNamespace(
+                    canonical_url="https://amc.example/portfolio.pdf",
+                    verification_status="verified",
+                    retrieved_at=datetime(2026, 11, 1, tzinfo=UTC),
+                )
+            return None
+
         def scalars(self, _statement):
             self.calls += 1
             if self.calls == 1:
