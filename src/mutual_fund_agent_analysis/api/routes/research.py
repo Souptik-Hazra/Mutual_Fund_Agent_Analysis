@@ -529,7 +529,9 @@ def _event_state_as_of(
     if next_revision is not None:
         return next_revision.snapshot
 
-    evidence_record = session.get(EvidenceRecord, event.evidence_id) if event.evidence_id is not None else None
+    evidence_record = (
+        session.get(EvidenceRecord, event.evidence_id) if event.evidence_id is not None else None
+    )
     evidence_snapshot = (
         {
             "evidence_id": evidence_record.evidence_id,
@@ -972,9 +974,7 @@ def delete_research_document(
             detail="Semantic index cleanup failed; the document was retained for safe retry.",
         )
     try:
-        session.execute(
-            delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
-        )
+        session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
         session.delete(document)
         session.commit()
     except Exception:

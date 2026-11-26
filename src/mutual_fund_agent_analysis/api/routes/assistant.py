@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 CAPABILITY_REGISTRY = {
     "fund": "Scheme discovery, performance, risk, returns and multi-fund comparison.",
     "category": (
-        "Exact-cohort category peers, common observation windows "
-        "and comparable return bases."
+        "Exact-cohort category peers, common observation windows and comparable return bases."
     ),
     "portfolio": ("Dated AMC holdings, sector allocation, concentration and portfolio overlap."),
     "actual_exposure": (
