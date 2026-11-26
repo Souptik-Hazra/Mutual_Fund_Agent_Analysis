@@ -91,9 +91,14 @@ echo Backend:   http://127.0.0.1:8000
 echo Frontend:  http://127.0.0.1:5173
 echo.
 echo Keep all three terminals open while developing.
-goto :eof
+echo.
+echo This launcher window will remain open. Press any key to close it.
+pause >nul
+exit /b 0
 
 :fail
 echo.
-pause
+echo Startup failed. Review the error above.
+echo Press any key to close this window.
+pause >nul
 exit /b 1
