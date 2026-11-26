@@ -760,6 +760,10 @@ def test_historical_event_route_serializes_selected_revision(monkeypatch):
     )
     result = routes.list_events(
         session=SessionStub(),
+        status_filter=None,
+        event_type=None,
+        source_key=None,
+        entity_id=None,
         as_of=as_of,
         limit=50,
         offset=0,
