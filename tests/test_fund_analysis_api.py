@@ -145,7 +145,11 @@ def test_comparison_uses_exact_shared_dates(monkeypatch) -> None:
         analytics_service,
         "load_fund_return_prices",
         lambda _session, code, *_args, **_kwargs: (
-            points[code], (), "growth_nav_total_return", "not_required", None
+            points[code],
+            (),
+            "growth_nav_total_return",
+            "not_required",
+            None,
         ),
     )
     result = compare_funds(session, [100, 200])
@@ -241,7 +245,11 @@ def test_idcw_same_option_comparison_warns_nav_only_distributions_excluded(monke
         analytics_service,
         "load_fund_return_prices",
         lambda _session, _code, *_args, **_kwargs: (
-            points, (), "nav_only_excludes_idcw", "incomplete", "No official coverage."
+            points,
+            (),
+            "nav_only_excludes_idcw",
+            "incomplete",
+            "No official coverage.",
         ),
     )
     result = analytics_service.compare_funds(session, [100, 200])
