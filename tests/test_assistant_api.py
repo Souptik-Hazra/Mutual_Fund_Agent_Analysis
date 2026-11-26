@@ -52,7 +52,7 @@ def test_streaming_assistant_exposes_one_research_run_id(client, monkeypatch):
 
     assert response.status_code == 200
     run_id = response.headers["X-Research-Run-ID"]
-    frames = [frame for frame in response.text.split("\\n\\n") if frame.strip()]
+    frames = [frame for frame in response.text.split("\n\n") if frame.strip()]
     complete = next(frame for frame in frames if frame.startswith("event: complete"))
     payload_line = next(line for line in complete.splitlines() if line.startswith("data: "))
     import json
