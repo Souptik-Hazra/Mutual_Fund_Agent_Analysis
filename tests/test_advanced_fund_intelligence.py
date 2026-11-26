@@ -203,9 +203,14 @@ def test_security_history_contract_is_bounded_typed_and_chronological():
         }
     )
     class ScalarRows:
-        def __init__(self, rows): self.rows = rows
-        def first(self): return self.rows[0] if self.rows else None
-        def all(self): return self.rows
+        def __init__(self, rows):
+            self.rows = rows
+
+        def first(self):
+            return self.rows[0] if self.rows else None
+
+        def all(self):
+            return self.rows
     class Session:
         def scalars(self, query):
             if query.column_descriptions[0]["entity"] is SecurityMarketObservation:
