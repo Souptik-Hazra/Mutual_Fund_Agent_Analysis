@@ -4,7 +4,12 @@ async function readPayload(response) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = payload.detail;
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail || `Request failed (${response.status})`));
+    const error = new Error(
+      typeof detail === "string" ? detail : JSON.stringify(detail || `Request failed (${response.status})`),
+    );
+    error.status = response.status;
+    error.detail = detail;
+    throw error;
   }
   return payload;
 }
