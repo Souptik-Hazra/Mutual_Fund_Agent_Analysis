@@ -478,6 +478,7 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             EvidenceRecord.source_key == source_key, EvidenceRecord.external_id == external_id
         ))
         digest = hashlib.sha256((item["title"] + item["summary"]).encode("utf-8")).hexdigest()
+        evidence_changed = evidence is None
         if evidence is None:
             evidence = EvidenceRecord(
                 source_key=source_key, external_id=external_id, canonical_url=item["url"],
@@ -487,17 +488,6 @@ def collect_rss_events(session: Session, source_key: str, feed_url: str) -> dict
             )
             session.add(evidence)
             session.flush()
-        evidence_changed = False
-        if evidence is None:
-            evidence = EvidenceRecord(
-                source_key=source_key, external_id=external_id, canonical_url=item["url"],
-                title=item["title"], published_at=item["published_at"],
-                content_hash=digest, verification_status="unverified",
-                metadata_json={"ingestion": "rss_atom", "feed_url": feed_url},
-            )
-            session.add(evidence)
-            session.flush()
-            evidence_changed = True
         else:
             evidence_changed = any((
                 evidence.content_hash != digest,
