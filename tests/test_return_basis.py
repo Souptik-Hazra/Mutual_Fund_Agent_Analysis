@@ -2,13 +2,14 @@
 
 from datetime import date
 from decimal import Decimal
+import importlib
 from types import SimpleNamespace
 
 import pytest
 
-from mutual_fund_agent_analysis.analytics import service
-from mutual_fund_agent_analysis.models.intelligence import DataSource
-from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
+service = importlib.import_module("mutual_fund_agent_analysis.analytics.service")
+DataSource = importlib.import_module("mutual_fund_agent_analysis.models.intelligence").DataSource
+MutualFundScheme = importlib.import_module("mutual_fund_agent_analysis.models.scheme").MutualFundScheme
 
 
 NAVS = [
