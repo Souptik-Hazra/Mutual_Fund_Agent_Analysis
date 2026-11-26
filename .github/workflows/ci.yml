@@ -41,7 +41,7 @@ jobs:
           cache: pip
       - name: Install project and development dependencies
         run: |
-          python -m pip install --upgrade pip setuptools>=84.1.0
+          python -m pip install --upgrade pip 'setuptools>=84.1.0'
           pip install -e ".[dev]"
       - name: Python dependency vulnerability audit
         run: |
