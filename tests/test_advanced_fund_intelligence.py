@@ -231,7 +231,7 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
     india_late = datetime(2026, 11, 25, 23, 45, tzinfo=ZoneInfo("Asia/Kolkata"))
     expected_cutoff = datetime(
         2026, 11, 25, 23, 59, 59, 999999, tzinfo=ZoneInfo("Asia/Kolkata")
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     observed = SimpleNamespace(
         observed_at=india_late,
         observation_id=1,
