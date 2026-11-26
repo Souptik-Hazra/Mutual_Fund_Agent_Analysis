@@ -982,7 +982,9 @@ def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
 
     captured = []
     monkeypatch.setattr(
-        research_routes, "create_social_post", lambda _session, payload: captured.append(payload)
+        research_routes,
+        "create_social_post",
+        lambda _session, payload, **kwargs: captured.append(payload),
     )
     monkeypatch.setattr(
         research_routes, "get_settings", lambda: SimpleNamespace(social_retention_days=30)
@@ -1004,6 +1006,79 @@ def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
     remaining = captured[0].expires_at - datetime.now(UTC)
     assert timedelta(days=14) - timedelta(seconds=2) < remaining <= timedelta(days=14)
     assert captured[0].text_excerpt == "Market discussion"
+
+
+
+def test_social_import_rolls_back_all_records_when_a_later_record_fails(monkeypatch):
+    source = _approved_social_source(enabled=True)
+
+    class StubSession:
+        def __init__(self):
+            self.committed = False
+            self.rolled_back = False
+
+        def get(self, _model, _key):
+            return source
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            self.rolled_back = True
+
+    calls = []
+
+    def persist(_session, payload, *, commit=True):
+        calls.append((payload.external_id, commit))
+        if payload.external_id == "post-2":
+            raise ValueError("simulated invalid second record")
+
+    monkeypatch.setattr(research_routes, "create_social_post", persist)
+    monkeypatch.setattr(
+        research_routes,
+        "get_settings",
+        lambda: SimpleNamespace(social_retention_days=30),
+    )
+    upload = UploadFile(
+        filename="reddit-export.csv",
+        file=io.BytesIO(
+            b"external_id,text_excerpt\\npost-1,First discussion\\npost-2,Second discussion\\n"
+        ),
+    )
+    session = StubSession()
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_social_dataset(
+                session=session,
+                source="reddit",
+                file=upload,
+            )
+        )
+
+    assert error.value.status_code == 422
+    assert calls == [("post-1", False), ("post-2", False)]
+    assert session.committed is False
+    assert session.rolled_back is True
+
+
+def test_social_csv_import_rejects_excessive_columns():
+    headers = ",".join(f"column_{index}" for index in range(51))
+    upload = UploadFile(
+        filename="wide-export.csv",
+        file=io.BytesIO((headers + "\\n").encode("utf-8")),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            research_routes.import_social_dataset(
+                session=SimpleNamespace(rollback=lambda: None),
+                source="reddit",
+                file=upload,
+            )
+        )
+
+    assert error.value.status_code == 413
 
 
 def test_social_import_rejects_unreviewed_or_disabled_source():
