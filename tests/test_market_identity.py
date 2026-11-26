@@ -258,4 +258,4 @@ def test_security_identity_rejects_exchange_symbol_mapped_to_another_entity():
     )
     with pytest.raises(HTTPException) as error:
         _resolve_security_identity(Session(), request, date(2026, 11, 25))
-    assert error.value.status_code == 422
+    assert error.value.status_code == 409
