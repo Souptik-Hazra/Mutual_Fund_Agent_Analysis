@@ -40,6 +40,7 @@ def test_assistant_request_validates_codes_and_date_order():
         question="Compare these funds", scheme_codes=[125497, 120503]
     )
     assert len(request.scheme_codes) == 2
+    assert request.synthesize is False
 
 
 def test_graph_compiles_with_supervisor_and_specialist_nodes():

@@ -81,9 +81,6 @@ def test_agent_marks_document_excerpts_as_untrusted_in_system_prompt(monkeypatch
     captured = {}
 
     class StubModel:
-        def with_retry(self, **_kwargs):
-            return self
-
         def invoke(self, messages):
             captured["messages"] = messages
             return SimpleNamespace(content="Evidence summary.")
@@ -91,7 +88,7 @@ def test_agent_marks_document_excerpts_as_untrusted_in_system_prompt(monkeypatch
     monkeypatch.setattr(research_graph, "create_chat_model", lambda **_kwargs: StubModel())
     research_graph._synthesize(
         {
-            "request": SimpleNamespace(question="Summarize this document"),
+            "request": SimpleNamespace(question="Summarize this document", synthesize=True),
             "intents": ["documents"],
             "results": {
                 "documents": {

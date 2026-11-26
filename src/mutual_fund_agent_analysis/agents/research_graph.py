@@ -549,9 +549,9 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
                     ),
                     HumanMessage(
                         content=(
-                            f"Question: {request.question}\\nRetrieved evidence JSON: {evidence}\\n"
+                            f"Question: {request.question}\nRetrieved evidence JSON: {evidence}\n"
                             "Available source reference IDs: "
-                            f"{json.dumps(citations, default=str)}\\n"
+                            f"{json.dumps(citations, default=str)}\n"
                             "Summarize the evidence concisely. Do not fabricate citation IDs."
                         )
                     ),
@@ -601,12 +601,13 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
         )
 
     if errors:
-        answer += "\\n\\nLimitations: " + "; ".join(errors)
+        answer += "\n\nLimitations: " + "; ".join(errors)
     return {
         "answer": answer,
         "model_used": model_used,
         "research_run_id": state.get("research_run_id"),
     }
+
 
 @lru_cache(maxsize=1)
 def build_research_graph():

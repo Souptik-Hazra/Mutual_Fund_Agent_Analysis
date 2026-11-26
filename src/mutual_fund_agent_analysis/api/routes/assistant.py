@@ -53,7 +53,7 @@ def assistant_capabilities() -> dict[str, Any]:
             {"id": capability_id, "description": description}
             for capability_id, description in CAPABILITY_REGISTRY.items()
         ],
-        "llm_synthesis": "optional; configured provider required",
+        "llm_synthesis": "explicit opt-in via request.synthesize; disabled by default",
         "financial_calculations": "deterministic analytics services",
         "supported_providers": ["gemini", "groq", "openai"],
         "streaming_endpoint": "/api/v1/assistant/research/stream",
