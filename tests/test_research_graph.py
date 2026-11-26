@@ -332,11 +332,16 @@ def test_security_specialist_preserves_market_and_fundamental_observations(monke
         "coverage": {"schemes_with_disclosures": 1},
     }
     snapshot = SimpleNamespace(
-        effective_date=date(2026, 10, 31),
-        content_hash="e" * 64,
-        evidence_id=10,
-        document_url="https://amc.example/portfolio.pdf",
+        snapshot_id=12,
+        scheme_code=125497,
         source_key="amc_disclosures",
+        evidence_id=10,
+        effective_date=date(2026, 10, 31),
+        published_at=datetime(2026, 11, 1, tzinfo=UTC),
+        status="complete",
+        content_hash="e" * 64,
+        total_market_value=Decimal("1000000"),
+        document_url="https://amc.example/portfolio.pdf",
         retrieved_at=None,
     )
     monkeypatch.setattr(research_graph, "securities_for_funds", lambda *args, **kwargs: expected)
