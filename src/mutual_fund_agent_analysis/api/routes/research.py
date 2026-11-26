@@ -834,6 +834,7 @@ async def import_social_dataset(
             registry, get_settings().social_retention_days
         )
         imported = 0
+        scored_imported = 0
         for index, item in enumerate(rows, start=1):
             if not isinstance(item, dict):
                 raise ValueError(f"Record {index} must be a JSON object.")
@@ -868,10 +869,11 @@ async def import_social_dataset(
             })
             create_social_post(session, payload)
             imported += 1
+            scored_imported += int(payload.sentiment_score is not None)
         session.commit()
         return {
             "source": source, "imported": imported, "retention_days": retention_days,
-            "sentiment_status": "partially_scored" if metadata.get("evaluated_sentiment_models") else "not_scored",
+            "sentiment_status": "scored" if scored_imported == imported else "partially_scored" if scored_imported else "not_scored",
             "note": "Imported records retain provider provenance and source retention rules; only allowlisted evaluated sentiment models are accepted.",
         }
     except HTTPException:
