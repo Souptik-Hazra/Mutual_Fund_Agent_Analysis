@@ -177,9 +177,9 @@ Daily, weekly, monthly, quarterly, yearly, and custom date-range analysis are pa
 | 7 | Agent evaluation quality | Stable deterministic analytics and evidence contracts |
 | 8 | Local operations hardening | Integrated application and data flows |
 
-Parallel work is allowed only when it does not change shared financial contracts or migrations concurrently. Each work package should use a dedicated feature branch and PR; merge only after review, CI, migration checks, and regression evaluation.
+Parallel work is allowed only when it does not change shared financial contracts or migrations concurrently. For this personal repository, implementation updates are committed directly to the existing `main` branch. Do not create feature branches or pull requests. Keep each coordinated delivery reviewable and run the affected regression suites and CI before marking it complete.
 
-## Definition of done for every PR
+## Definition of done for every main-branch delivery
 
 - Tests cover normal, boundary, missing, stale, conflicting, and invalid inputs.
 - Financial logic has independent known-answer fixtures and uses Decimal where monetary precision matters.
@@ -188,6 +188,7 @@ Parallel work is allowed only when it does not change shared financial contracts
 - No silent data fabrication, fallback to a different scope, or unsupported certainty.
 - Ruff, formatting, full pytest/PostgreSQL suite, Docker checks, frontend tests/build, and offline evaluation pass.
 - README and this roadmap are updated with delivered scope and remaining limitations.
+- Commit the completed coordinated changeset directly to `main`; no PR or feature branch is used.
 
 ## Explicitly out of scope
 
@@ -231,3 +232,18 @@ The following work is now merged into `main` (PRs #19–#21):
 - P0-04: The frontend no longer assumes NIFTY 50. It resolves effective-dated official category benchmark mappings for each selected scheme and only applies a common mapping across a multi-fund selection. Twelve Data quote ingestion requires an explicit ISIN, exact NSE/BSE symbol and exchange match, and unique effective-dated official identifier mappings to one active canonical entity. Missing, ambiguous, stale or unofficial mappings fail closed.
 
 Supporting methodology is documented in `docs/financial-return-methodology.md` and `docs/security-identity-mapping.md`. CI passed for the merged P0-02/03 and P0-04 pull requests, including backend tests, frontend tests/build, and offline agent evaluation. The CI workflow is now standardized on Python 3.11 for backend checks and Node.js 22 for frontend checks. Source onboarding and live-data verification remain separate acceptance gates; no live provider data or complete IDCW coverage is implied by these code changes.
+
+
+## P1 completion record (2026-11-26)
+
+P1 work delivered directly to `main`:
+
+- [x] Add LangGraph category-peer routing using the exact-cohort, common-date, common-return-basis category analytics service.
+- [x] Add LangGraph actual-investor-exposure routing using ledger-derived units and accepted reconciled NAV; include valuation dates, dated holdings coverage, exclusions and limitations in specialist evidence.
+- [x] Exclude fully redeemed zero-unit funds from current valued-fund totals while retaining partial positive balances and invalid-ledger exclusions.
+- [x] Add typed, bounded security observation history filters (quotes/fundamentals/events/all), oldest-first ordering, and source/retrieval provenance.
+- [x] Confirm the React selected end date is sent as API `as_of` for historical equity/security status; add a frontend contract guard.
+- [x] Add specialist-routing, ledger-exposure, security-history, and frontend historical-date regression tests.
+- [x] CI remains Python 3.11 for backend and Node.js 22 for React/Vite; no redundant Python version matrix is required.
+
+Validation caveat: repository-hosted GitHub Actions status must be checked after the P1 changes settle. Provider-dependent live quote, distribution, and AMC holdings validation remains outside mocked/offline CI and is not claimed by these tests.
