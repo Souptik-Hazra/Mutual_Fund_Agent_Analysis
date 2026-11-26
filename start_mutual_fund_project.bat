@@ -33,14 +33,14 @@ echo ERROR: Frontend package.json was not found.
 goto :fail
 
 :check_modules
-if exist "%FRONTEND_DIR%\node_modules\vite\bin\vite.js" goto :check_wsl
+if exist "%FRONTEND_DIR%\node_modules\vite\bin\vite.js" goto :check_docker
 echo ERROR: Frontend dependencies are missing. Run npm ci in frontend.
 goto :fail
 
-:check_wsl
-where wsl.exe >nul 2>nul
+:check_docker
+where docker.exe >nul 2>nul
 if not errorlevel 1 goto :check_npm
-echo ERROR: WSL is unavailable.
+echo ERROR: Docker CLI was not found. Install Docker Desktop for Windows.
 goto :fail
 
 :check_npm
@@ -56,18 +56,14 @@ echo ERROR: Windows Terminal (wt.exe) is required.
 goto :fail
 
 :launch
-echo ERROR: Could not resolve the repository path inside WSL.
-goto :fail
-
-:launch
-REM Docker startup is delegated to PowerShell to avoid Windows Terminal argument-quoting issues.
-start "Docker - WSL" wt.exe -w new --title "Docker - WSL" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_docker_windows.ps1"
+REM Docker Desktop runs natively on Windows; no WSL commands are used by this launcher.
+start "Docker - Windows" wt.exe -w new --title "Docker - Windows" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_docker_desktop.ps1"
 start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_backend.ps1"
 start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" --startingDirectory "%FRONTEND_DIR%" cmd.exe /k npm run dev
 
 echo.
 echo Startup terminals have been launched.
-echo Docker:    PostgreSQL :5432 and Qdrant :6333 (WSL services)
+echo Docker:    PostgreSQL :5432 and Qdrant :6333 (Docker Desktop)
 echo Backend:   http://127.0.0.1:8000
 echo Frontend:  http://127.0.0.1:5173
 echo.
