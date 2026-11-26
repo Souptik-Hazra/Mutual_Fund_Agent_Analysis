@@ -32,10 +32,10 @@ from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models import (
     BenchmarkObservation,
     DataSource,
-    EvidenceRecord,
     DistributionCoverageAttestation,
     DistributionObservation,
     DocumentChunk,
+    EvidenceRecord,
     MarketEvent,
     MutualFundScheme,
     NavObservation,

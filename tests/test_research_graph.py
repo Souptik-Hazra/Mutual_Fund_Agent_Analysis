@@ -1,7 +1,7 @@
 """Tests for the LangGraph supervisor and its deterministic routing layer."""
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 import mutual_fund_agent_analysis.agents.research_graph as research_graph
@@ -375,3 +375,37 @@ def test_llm_evidence_budget_preserves_valid_json_and_reports_omissions():
     assert set(parsed["results"]) == {"fund", "portfolio"}
     assert parsed["truncated"] is True
     assert parsed["omitted_paths"]
+
+def test_compiled_graph_returns_provenance_complete_fund_citation(monkeypatch):
+    request = ResearchAssistantRequest(
+        question="Show CAGR for this mutual fund",
+        scheme_codes=[125497],
+    )
+    nav = SimpleNamespace(
+        canonical_source="amfi",
+        evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
+        nav_date=date(2026, 11, 25),
+        canonical_nav="123.45",
+        source_values={"amfi": "123.45"},
+    )
+
+    class Session:
+        def scalar(self, _statement):
+            return nav
+
+        def get(self, _model, _key):
+            return SimpleNamespace(base_url="https://www.amfiindia.com")
+
+    monkeypatch.setattr(
+        research_graph,
+        "analyze_fund",
+        lambda *_args, **_kwargs: {"cagr": "0.125"},
+    )
+    result = build_research_graph().invoke(
+        {"request": request, "session": Session()}
+    )
+    citation = result["citations"][0]
+    assert citation["source_key"] == "amfi"
+    assert citation["canonical_url"] == "https://www.amfiindia.com"
+    assert citation["retrieved_at"] == nav.evaluated_at
+    assert citation["verification_status"] == "unverified"
