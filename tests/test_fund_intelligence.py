@@ -248,7 +248,8 @@ def test_category_ranking_excludes_peer_outside_common_observation_window(monkey
             scheme_code=1, scheme_name="Selected", fund_house="AMC A", scheme_category="Large Cap"
         ),
         SimpleNamespace(
-            scheme_code=2, scheme_name="Short history", fund_house="AMC B", scheme_category="Large Cap"
+            scheme_code=2, scheme_name="Short history", fund_house="AMC B",
+            scheme_category="Large Cap"
         ),
     ]
 
