@@ -44,7 +44,9 @@ def test_actual_exposure_rejects_invalid_selection():
 
 
 def test_benchmark_resolver_requires_enabled_official_source():
-    mapping = SimpleNamespace(\n        source_key="unverified", benchmark_code="NIFTY100", benchmark_source="niftyindices"\n    )
+    mapping = SimpleNamespace(
+        source_key="unverified", benchmark_code="NIFTY100", benchmark_source="niftyindices"
+    )
 
     class Rows:
         def all(self):
@@ -64,7 +66,9 @@ def test_benchmark_resolver_requires_enabled_official_source():
 
 
 def test_benchmark_resolver_accepts_effective_mapping_with_official_registry_source():
-    mapping = SimpleNamespace(\n        source_key="nifty_official", benchmark_code="NIFTY100", benchmark_source="niftyindices"\n    )
+    mapping = SimpleNamespace(
+        source_key="nifty_official", benchmark_code="NIFTY100", benchmark_source="niftyindices"
+    )
 
     class Rows:
         def all(self):
