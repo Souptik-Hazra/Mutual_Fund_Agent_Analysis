@@ -114,6 +114,17 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
             self.statement = statement
             return Rows()
 
+        def execute(self, _statement):
+            class Bounds:
+                @staticmethod
+                def all():
+                    return [
+                        (1, date(2025, 1, 1), date(2026, 1, 1)),
+                        (2, date(2025, 1, 1), date(2026, 1, 1)),
+                    ]
+
+            return Bounds()
+
     def fake_analyze(_session, code, **_kwargs):
         return type(
             "Report",
@@ -272,6 +283,17 @@ def test_category_ranking_excludes_peer_outside_common_observation_window(monkey
 
         def scalars(self, _statement):
             return Rows()
+
+        def execute(self, _statement):
+            class Bounds:
+                @staticmethod
+                def all():
+                    return [
+                        (1, date(2025, 1, 1), date(2026, 1, 1)),
+                        (2, date(2024, 1, 1), date(2026, 1, 1)),
+                    ]
+
+            return Bounds()
 
     def report(code, start, end):
         return SimpleNamespace(

@@ -5,11 +5,12 @@ from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import case, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.service import analyze_fund
 from mutual_fund_agent_analysis.models.intelligence import DataSource
+from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
@@ -51,30 +52,49 @@ def analyze_category_peers(
     ).all()
     cohort_truncated = len(peer_rows) > max_peers
     peers = peer_rows[:max_peers]
-    initial_reports = {}
+    peer_codes = [peer.scheme_code for peer in peers]
+    nav_bounds = session.execute(
+        select(
+            NavReconciliation.scheme_code,
+            func.min(NavReconciliation.nav_date),
+            func.max(NavReconciliation.nav_date),
+        )
+        .where(
+            NavReconciliation.scheme_code.in_(peer_codes),
+            NavReconciliation.status.in_(["single_source", "matched"]),
+        )
+        .group_by(NavReconciliation.scheme_code)
+    ).all()
+    bounds = {code: (first, last) for code, first, last in nav_bounds}
+    eligible_peers = []
     excluded = []
     for peer in peers:
-        try:
-            initial_reports[peer.scheme_code] = analyze_fund(
-                session,
-                peer.scheme_code,
-                benchmark_code=benchmark_code,
-                start_date=start_date,
-                end_date=end_date,
-                benchmark_source=benchmark_source,
+        if peer.scheme_code not in bounds:
+            excluded.append(
+                {
+                    "scheme_code": peer.scheme_code,
+                    "reason": "No accepted reconciled NAV history is available.",
+                }
             )
-        except ValueError as exc:
-            excluded.append({"scheme_code": peer.scheme_code, "reason": str(exc)})
-    if scheme_code not in initial_reports:
+        else:
+            eligible_peers.append(peer)
+    if scheme_code not in bounds:
         raise ValueError("Selected scheme has insufficient reconciled history for peer analysis.")
 
-    common_start = max(report.start_date for report in initial_reports.values())
-    common_end = min(report.end_date for report in initial_reports.values())
+    common_start = max(
+        [bounds[peer.scheme_code][0] for peer in eligible_peers]
+        + ([start_date] if start_date else [])
+    )
+    common_end = min(
+        [bounds[peer.scheme_code][1] for peer in eligible_peers]
+        + ([end_date] if end_date else [])
+    )
     if common_start >= common_end:
         raise ValueError("Category peers do not share a common observation window.")
 
     aligned_reports = {}
-    for code in initial_reports:
+    for peer in eligible_peers:
+        code = peer.scheme_code
         try:
             report = analyze_fund(
                 session,
