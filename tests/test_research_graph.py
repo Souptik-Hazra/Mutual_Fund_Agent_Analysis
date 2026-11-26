@@ -195,6 +195,7 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
 
 def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
     from decimal import Decimal
+
     expected = {
         "cagr": Decimal("0.1250"),
         "volatility": Decimal("0.0825"),
@@ -329,7 +330,10 @@ def test_document_specialist_preserves_retrieval_citations(monkeypatch):
                 "title": "Scheme factsheet",
                 "page_number": 5,
                 "text": "Expense ratio is 0.75%.",
-                "citation": {"content_hash": "f" * 64, "canonical_url": "https://amc.example/fs.pdf"},
+                "citation": {
+                    "content_hash": "f" * 64,
+                    "canonical_url": "https://amc.example/fs.pdf",
+                },
             }
         ],
         "retrieval_mode": "lexical_fallback",
