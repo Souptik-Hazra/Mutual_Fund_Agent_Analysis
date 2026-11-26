@@ -60,10 +60,7 @@ def _verified_identity_source(session: Session, source_key: str | None) -> bool:
         return False
     source = session.get(DataSource, source_key)
     return bool(
-        source
-        and source.enabled
-        and source.is_official
-        and source.source_type == "official"
+        source and source.enabled and source.is_official and source.source_type == "official"
     )
 
 
@@ -72,12 +69,14 @@ def _resolve_security_identity(
 ) -> ResearchEntity:
     """Resolve exact ISIN and exchange-symbol identifiers to one verified canonical entity."""
     isin_rows = session.scalars(
-        select(EntityIdentifier).where(
+        select(EntityIdentifier)
+        .where(
             EntityIdentifier.namespace == "ISIN",
             EntityIdentifier.normalized_value == payload.isin,
             (EntityIdentifier.valid_from.is_(None) | (EntityIdentifier.valid_from <= observed_on)),
             (EntityIdentifier.valid_to.is_(None) | (EntityIdentifier.valid_to >= observed_on)),
-        ).limit(2)
+        )
+        .limit(2)
     ).all()
     if len(isin_rows) != 1:
         raise HTTPException(
