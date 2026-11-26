@@ -160,11 +160,14 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
     monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant_module)
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
 
-    assert document_vectors.index_chunks(
-        100,
-        "Fixture",
-        [{"text": "lexical data remains", "chunk_index": 0, "content_hash": "a" * 64}],
-    ) is False
+    assert (
+        document_vectors.index_chunks(
+            100,
+            "Fixture",
+            [{"text": "lexical data remains", "chunk_index": 0, "content_hash": "a" * 64}],
+        )
+        is False
+    )
 
 
 def test_search_chunks_falls_back_when_embedding_provider_is_unavailable(monkeypatch):
@@ -189,8 +192,6 @@ def test_search_chunks_falls_back_when_embedding_provider_is_unavailable(monkeyp
 
     import langchain_google_genai
 
-    monkeypatch.setattr(
-        langchain_google_genai, "GoogleGenerativeAIEmbeddings", FailingEmbeddings
-    )
+    monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FailingEmbeddings)
 
     assert document_vectors.search_chunks("fund expenses", 5) is None
