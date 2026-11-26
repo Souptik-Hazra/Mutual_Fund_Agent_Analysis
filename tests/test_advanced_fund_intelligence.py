@@ -304,12 +304,8 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
 
 def test_actual_exposure_uses_as_of_ledger_nav_and_holdings_with_exact_expected_values():
     as_of = date(2026, 6, 30)
-    snapshot = SimpleNamespace(
-        snapshot_id=4, status="complete", effective_date=date(2026, 6, 1)
-    )
-    nav = SimpleNamespace(
-        status="matched", canonical_nav=Decimal("20"), nav_date=date(2026, 6, 29)
-    )
+    snapshot = SimpleNamespace(snapshot_id=4, status="complete", effective_date=date(2026, 6, 1))
+    nav = SimpleNamespace(status="matched", canonical_nav=Decimal("20"), nav_date=date(2026, 6, 29))
     holding = SimpleNamespace(
         isin="INE000A",
         security_key="INE000A",
@@ -431,9 +427,7 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
             transaction_id=3,
         ),
     ]
-    snapshot = SimpleNamespace(
-        snapshot_id=5, status="complete", effective_date=date(2026, 6, 1)
-    )
+    snapshot = SimpleNamespace(snapshot_id=5, status="complete", effective_date=date(2026, 6, 1))
     nav = SimpleNamespace(
         status="single_source",
         canonical_nav=Decimal("10"),
@@ -479,16 +473,12 @@ def test_actual_exposure_filters_future_transactions_and_selects_historical_hold
     assert result["valued_funds"][0]["units"] == Decimal("10")
     assert result["total_valued_portfolio_inr"] == Decimal("100")
     assert result["equity_exposure"][0]["actual_exposure_inr"] == Decimal("25")
-    assert result["equity_exposure"][0]["fund_exposures"][0]["holdings_as_of"] == date(
-        2026, 6, 1
-    )
+    assert result["equity_exposure"][0]["fund_exposures"][0]["holdings_as_of"] == date(2026, 6, 1)
 
 
 def test_actual_exposure_marks_partial_disclosure_as_incomplete_coverage():
     as_of = date(2026, 6, 30)
-    snapshot = SimpleNamespace(
-        snapshot_id=6, status="partial", effective_date=date(2026, 5, 31)
-    )
+    snapshot = SimpleNamespace(snapshot_id=6, status="partial", effective_date=date(2026, 5, 31))
     holding = SimpleNamespace(
         isin="INE003C",
         security_key="INE003C",
