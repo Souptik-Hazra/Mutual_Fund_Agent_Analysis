@@ -130,6 +130,13 @@ def test_category_analysis_uses_exact_category_and_option_cohort(monkeypatch):
                 "observation_count": 250,
                 "start_date": datetime(2025, 1, 1).date(),
                 "end_date": datetime(2026, 1, 1).date(),
+                "base100_series": (
+                    (datetime(2025, 1, 1).date(), Decimal("100")),
+                    (datetime(2026, 1, 1).date(), Decimal("112")),
+                ),
+                "return_basis": "growth_nav_total_return",
+                "distribution_coverage_status": "not_required",
+                "benchmark_unavailable_reason": None,
             },
         )()
 
