@@ -351,6 +351,23 @@ def test_portfolio_metrics_require_complete_weights_before_hhi_is_reported():
         def scalars(self, _statement):
             return SimpleNamespace(all=lambda: rows)
 
+        def get(self, model, _key):
+            if model is DataSource:
+                return SimpleNamespace(
+                    display_name="AMC Disclosures",
+                    source_type="official",
+                    authority_tier=1,
+                    is_official=True,
+                    enabled=True,
+                    base_url="https://amc.example",
+                )
+            return SimpleNamespace(
+                evidence_id=1,
+                canonical_url="https://amc.example/portfolio.csv",
+                retrieved_at=datetime(2026, 11, 5, tzinfo=UTC),
+                verification_status="verified",
+            )
+
     result = portfolio_payload(StubSession(), snapshot)
     assert result["weight_coverage_pct"] == Decimal("100")
     assert result["hhi_0_to_1"] == Decimal("0.52")
@@ -493,6 +510,9 @@ def test_social_post_persistence_discards_excerpt_and_provider_text_metadata(mon
         def refresh(self, _row):
             return None
 
+        def flush(self):
+            return None
+
     session = StubSession()
     payload = SocialPostInput(
         source_key="reddit",
@@ -633,7 +653,7 @@ def test_portfolio_upload_rejects_more_than_5000_rows_before_persistence():
     with pytest.raises(HTTPException) as error:
         asyncio.run(
             research_routes.import_portfolio_file(
-                session=None,
+                session=SimpleNamespace(rollback=lambda: None),
                 file=upload,
                 scheme_code=100,
                 effective_date=date(2026, 11, 25),
