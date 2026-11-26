@@ -251,3 +251,36 @@ def test_routing_dataset_covers_all_eight_specialists():
     }
     assert expected_specialists.issubset(result["per_intent"])
     assert result["exact_match_accuracy"] >= 0.90
+
+
+def test_research_run_id_flows_through_graph_nodes():
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.agents.research_graph import _plan, _run_tools, _synthesize
+
+    run_id = "research-run-123"
+    plan = _plan(
+        {
+            "request": SimpleNamespace(question="Explain fund risk", scheme_codes=[]),
+            "research_run_id": run_id,
+        }
+    )
+    tools = _run_tools(
+        {
+            "request": SimpleNamespace(scheme_codes=[]),
+            "session": None,
+            "intents": [],
+            "research_run_id": run_id,
+        }
+    )
+    synthesis = _synthesize(
+        {
+            "request": SimpleNamespace(question="Explain fund risk"),
+            "intents": [],
+            "research_run_id": run_id,
+        }
+    )
+
+    assert plan["research_run_id"] == run_id
+    assert tools["research_run_id"] == run_id
+    assert synthesis["research_run_id"] == run_id
