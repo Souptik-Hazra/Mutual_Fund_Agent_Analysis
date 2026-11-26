@@ -240,11 +240,15 @@ def test_multi_fund_equity_overlap_uses_isin_and_equal_fund_weights():
     snapshots = {
         1: SimpleNamespace(
             snapshot_id=11,
+            source_key="amc_disclosures",
+            evidence_id=1,
             effective_date=datetime(2026, 10, 31).date(),
             status="complete",
         ),
         2: SimpleNamespace(
             snapshot_id=22,
+            source_key="amc_disclosures",
+            evidence_id=1,
             effective_date=datetime(2026, 9, 30).date(),
             status="partial",
         ),
