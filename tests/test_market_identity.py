@@ -1,6 +1,6 @@
 """Exact-identity tests for Twelve Data quote ingestion."""
 
-from datetime import date, datetime, UTC
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -189,6 +189,42 @@ def test_security_identity_rejects_unofficial_mapping_provenance():
                 return entity
             if model is DataSource:
                 return SimpleNamespace(enabled=True, is_official=False, source_type="provider")
+            return None
+
+    request = QuoteSyncRequest(
+        security_key=ISIN, security_name="Infosys Limited",
+        symbol="INFY", exchange="NSE", isin=ISIN,
+    )
+    with pytest.raises(HTTPException) as error:
+        _resolve_security_identity(Session(), request, date(2026, 11, 25))
+    assert error.value.status_code == 422
+
+
+def test_security_identity_rejects_exchange_symbol_mapped_to_another_entity():
+    entity = SimpleNamespace(entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited")
+    isin_mapping = SimpleNamespace(entity_id=44, source_key="official_registry")
+    other_entity_symbol = SimpleNamespace(entity_id=99, source_key="official_registry")
+
+    class Rows:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
+
+    class Session:
+        def __init__(self):
+            self.calls = 0
+
+        def scalars(self, _statement):
+            self.calls += 1
+            return Rows([isin_mapping] if self.calls == 1 else [other_entity_symbol])
+
+        def get(self, model, _key):
+            if model is ResearchEntity:
+                return entity
+            if model is DataSource:
+                return SimpleNamespace(enabled=True, is_official=True, source_type="official")
             return None
 
     request = QuoteSyncRequest(
