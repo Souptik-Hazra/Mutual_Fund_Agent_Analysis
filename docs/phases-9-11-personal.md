@@ -7,7 +7,7 @@ The project now targets the current stable API families:
 - LangGraph 1.2.24+
 - langchain-google-genai 4.5.2+ and langchain-groq 1.2.1+
 - React 19.3.1+, Vite 8.3.8+, and @vitejs/plugin-react 6.3.0+
-- Node.js 20.19+ (CI uses Node 22)
+- Node.js 22 (CI uses Node 22)
 
 LangGraph is a core dependency because the API imports and uses the compiled research graph. Qdrant and OpenAI provider packages remain optional extras.
 
@@ -16,7 +16,7 @@ LangGraph is a core dependency because the API imports and uses the compiled res
 
 The FastAPI endpoints `POST /api/v1/assistant/research` and `POST /api/v1/assistant/research/stream` run a supervisor-style LangGraph 1.x `StateGraph`. It deterministically routes questions to only the relevant specialist workflows: fund analytics, portfolio intelligence, event intelligence, social intelligence and document research. Specialist tools call existing Python services directly; they do not reimplement financial calculations. Model initialization uses LangChain 1.x `init_chat_model` through a provider-neutral factory. Model synthesis uses bounded retries. The streaming endpoint emits graph-node progress as Server-Sent Events and returns the same structured final result. Graph state is request-scoped and discarded after the response; no persistent conversation memory is enabled. The configured Gemini/Groq/OpenAI provider is used only for optional synthesis. If no provider is configured, the workflow returns a deterministic result summary and the underlying structured data.
 
-Request fields: `question`, optional `scheme_codes`, `benchmark_code`, `start_date`, `end_date`, `annual_risk_free_rate`, `periods_per_year`, and `top_k`. Responses include routed intents, structured results, citations/source references, limitations and the synthesis provider name.
+Request fields: `question`, optional `scheme_codes`, `benchmark_code`, `start_date`, `end_date`, `annual_risk_free_rate`, `periods_per_year`, and `top_k`. Responses include routed intents, structured results, citations/source references, limitations, the synthesis provider name and a per-execution `research_run_id`. Streaming responses also expose `X-Research-Run-ID`; the same ID is included in progress/completion events and specialist logs so one research execution can be traced without logging portfolio or prompt contents.
 
 The graph does not autonomously execute purchases, trades, account operations or external write actions. Document text and social content are treated as untrusted evidence. Financial outputs remain the responsibility of deterministic analytics.
 
