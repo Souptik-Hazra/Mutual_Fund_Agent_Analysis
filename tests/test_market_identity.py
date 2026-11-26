@@ -117,8 +117,10 @@ def test_security_identity_requires_unique_official_isin_and_exchange_symbol_map
 
     class Session:
         def __init__(self, isin_rows=None, symbol_rows=None, official=True):
-            self.results = [isin_rows if isin_rows is not None else [isin_mapping],
-                            symbol_rows if symbol_rows is not None else [symbol_mapping]]
+            self.results = [
+                isin_rows if isin_rows is not None else [isin_mapping],
+                symbol_rows if symbol_rows is not None else [symbol_mapping],
+            ]
             self.official = official
 
         def scalars(self, _statement):
@@ -134,8 +136,11 @@ def test_security_identity_requires_unique_official_isin_and_exchange_symbol_map
             return None
 
     request = QuoteSyncRequest(
-        security_key=ISIN, security_name="Infosys Limited",
-        symbol="INFY", exchange="NSE", isin=ISIN,
+        security_key=ISIN,
+        security_name="Infosys Limited",
+        symbol="INFY",
+        exchange="NSE",
+        isin=ISIN,
     )
     assert _resolve_security_identity(Session(), request, date(2026, 11, 25)) is entity
 
