@@ -8,9 +8,12 @@ import pytest
 from pydantic import ValidationError
 
 from mutual_fund_agent_analysis.analytics import fund_intelligence
+from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 from mutual_fund_agent_analysis.api.routes.fund_intelligence import (
     FundCompareRequest,
     MarketObservationRequest,
+    _latest_market_observation,
+    fund_equity_status,
     router,
 )
 
