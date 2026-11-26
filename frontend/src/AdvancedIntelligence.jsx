@@ -21,8 +21,11 @@ export default function AdvancedIntelligence({ tab, schemeCodes, dateFrom, dateT
     try {
       if (!schemeCodes?.length) throw new Error("Enter at least one valid scheme code in the workspace.");
       const params = new URLSearchParams();
-      if (dateTo && tab !== "Actual Exposure") {
-        params.set(tab === "Fund Profile" ? "end_date" : "as_of", dateTo);
+      if (dateTo) {
+        params.set(
+          tab === "Fund Profile" ? "end_date" : tab === "Actual Exposure" ? "as_of_date" : "as_of",
+          dateTo,
+        );
       }
       let path;
       if (tab === "Fund Profile") {
@@ -52,13 +55,15 @@ export default function AdvancedIntelligence({ tab, schemeCodes, dateFrom, dateT
         {tab === "Security Intelligence" && "Source-attributed market observations, dated fundamentals, corporate events and AMC-disclosed fund positions."}
       </p>
       {tab === "Security Intelligence" && <div className="field"><label>Security key / ISIN / mapped symbol key</label><input value={securityKey} onChange={(event) => setSecurityKey(event.target.value)} placeholder="Enter the exact security_key from a holdings disclosure" /></div>}
-      <div className="muted">Selected schemes: {schemeCodes.join(", ") || "none"} · {tab === "Actual Exposure" ? "Valuation uses latest accepted NAV" : `As of: ${dateTo || "latest available"}`}</div>
+      <div className="muted">Selected schemes: {schemeCodes.join(", ") || "none"} · {tab === "Actual Exposure" ? `Valuation as of: ${dateTo || "today"}` : `As of: ${dateTo || "latest available"}`}</div>
       <button className="primary" disabled={busy} onClick={load}>{busy ? "Loading…" : "Load intelligence"}</button>
       {error && <div className="error">{error}</div>}
     </Panel>
     {data && <Panel title="Structured results">
       {tab === "Fund Profile" && <div className="analysis-grid">{Object.entries(data.sections || {}).map(([key, section]) => <div className="metric" key={key}><small>{key.replaceAll("_", " ")}</small><strong>{section.status || "unknown"}</strong></div>)}</div>}
-      {tab === "Actual Exposure" && <><div className="analysis-grid"><div className="metric"><small>Portfolio value</small><strong>₹{number(data.total_valued_portfolio_inr)}</strong></div><div className="metric"><small>Covered funds</small><strong>{number(data.coverage?.valued_fund_count)}</strong></div><div className="metric"><small>Equity securities</small><strong>{number(data.equity_exposure?.length)}</strong></div></div>{data.warning && <p className="muted">{data.warning}</p>}
+      {tab === "Actual Exposure" && <><div className="analysis-grid"><div className="metric"><small>Portfolio value · {data.as_of_date || dateTo}</small><strong>₹{number(data.total_valued_portfolio_inr)}</strong></div><div className="metric"><small>Valued funds</small><strong>{number(data.coverage?.valued_fund_count)} / {number(data.coverage?.selected_fund_count)}</strong></div><div className="metric"><small>Holdings look-through</small><strong>{number(data.coverage?.lookthrough_coverage_pct)}%</strong></div><div className="metric"><small>Equity securities</small><strong>{number(data.equity_exposure?.length)}</strong></div></div>{data.warning && <p className="muted">{data.warning}</p>}
+        {data.valued_funds?.length > 0 && <div className="table-wrap"><table><thead><tr><th>Fund</th><th>Units</th><th>NAV</th><th>NAV date</th><th>NAV age</th><th>Value (INR)</th></tr></thead><tbody>{data.valued_funds.map((fund) => <tr key={fund.scheme_code}><td>{fund.scheme_name}<small>{fund.scheme_code}</small></td><td>{number(fund.units)}</td><td>{number(fund.latest_nav)}</td><td>{fund.nav_date}</td><td>{fund.valuation_age_days} days</td><td>₹{number(fund.market_value_inr)}</td></tr>)}</tbody></table></div>}
+        {[...(data.excluded_funds || []).map((item) => item.reason), ...(data.disclosure_warnings || []).map((item) => item.reason), ...(data.data_quality_warnings || []).map((item) => item.reason)].map((warning, index) => <p className="muted" key={index}>{warning}</p>)}}
         {data.equity_exposure?.length > 0 && <div className="table-wrap"><table><thead><tr><th>Underlying share</th><th>Funds</th><th>Exposure (INR)</th><th>Portfolio weight</th></tr></thead><tbody>{data.equity_exposure.slice(0, 20).map((item) => <tr key={item.security_key}><td>{item.security_name}<small>{item.security_key}</small></td><td>{item.funds_present}</td><td>₹{number(item.actual_exposure_inr)}</td><td>{number(item.actual_portfolio_weight_pct)}%</td></tr>)}</tbody></table></div>}
         {data.sector_exposure?.length > 0 && <details><summary>Sector exposure</summary><pre className="json-evidence">{pretty(data.sector_exposure)}</pre></details>}</>}
       {tab === "Security Intelligence" && <><div className="analysis-grid"><div className="metric"><small>Last price</small><strong>{data.market?.last_price == null ? "—" : `₹${number(data.market.last_price)}`}</strong></div><div className="metric"><small>Quote freshness</small><strong>{data.market?.freshness || "unavailable"}</strong></div><div className="metric"><small>Fundamentals</small><strong>{data.fundamentals?.availability || "unavailable"}</strong></div><div className="metric"><small>Fund positions</small><strong>{number(data.portfolio_coverage?.matched_scheme_count)}</strong></div></div>{data.limitations?.map((item) => <p className="muted" key={item}>{item}</p>)}</>}
