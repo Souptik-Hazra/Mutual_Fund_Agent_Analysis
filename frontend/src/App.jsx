@@ -112,6 +112,7 @@ export default function App() {
   const runFundAnalysis = (code) => {
     setCodes(String(code));
     return run(async () => {
+      await request("/schemes/" + code + "/sync-nav", { method: "POST" });
       const selection = await resolveBenchmarkForCodes([code], dateTo, benchmark);
       const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo, frequency: analysisFrequency });
       if (selection.benchmark) {
