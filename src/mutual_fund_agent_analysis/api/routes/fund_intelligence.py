@@ -317,8 +317,12 @@ def security_market_status(
     security_key: str,
     session: Annotated[Session, Depends(get_db)],
     isin: str | None = Query(default=None, min_length=12, max_length=20),
+    as_of: date | None = None,
 ) -> dict:
-    return _market_payload(_latest_market_observation(session, security_key.strip().upper(), isin))
+    return _market_payload(
+        _latest_market_observation(session, security_key.strip().upper(), isin, as_of=as_of),
+        as_of=as_of,
+    )
 
 
 @router.post("/market-observations", status_code=status.HTTP_201_CREATED)
