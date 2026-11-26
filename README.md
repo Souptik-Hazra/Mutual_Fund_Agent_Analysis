@@ -476,6 +476,8 @@ Only configure providers that are actually used. Keep `.env` out of version cont
 - Avoid storing deleted or restricted social content contrary to platform requirements.
 - Show missing data, stale data, and calculation limitations rather than silently filling gaps.
 
+See [the focused security review](docs/security-review.md) for verified local-only network boundaries, dependency scanning, upload/source validation controls and known limitations.
+
 ---
 
 
@@ -489,7 +491,7 @@ Only configure providers that are actually used. Keep `.env` out of version cont
 
 ### CI validation
 
-Pull requests targeting `main` run one backend job on Python 3.11 (dependency installation, Ruff lint/format, backup/restore shell validation, Docker Compose validation, API image build, the PostgreSQL-backed pytest suite, and offline agent evaluation) plus the existing Node.js 22 frontend tests and Vite production build. The backend suite is not duplicated across Python versions.
+Each push to `main` runs the full CI workflow: Python 3.11 backend dependency installation and `pip-audit`, Ruff lint/format, backup/restore script validation, Docker Compose validation, API image build, PostgreSQL/Qdrant-backed pytest with coverage, and offline agent evaluation; Node.js 22 runs `npm ci`, `npm audit`, frontend tests and the Vite production build. A separate job runs the isolated PostgreSQL/Qdrant backup-and-restore drill. The backend suite is not duplicated across Python versions.
 
 ### Setup
 
