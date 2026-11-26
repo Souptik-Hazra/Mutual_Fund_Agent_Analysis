@@ -300,8 +300,6 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation():
     assert payload["availability"] == "available"
     assert payload["observation_history"][0]["content_hash"] == "late-india-observation"
 
-
-
 def test_exposure_math():
     as_of = date(2026, 6, 30)
     snapshot = SimpleNamespace(snapshot_id=4, status="complete", effective_date=date(2026, 6, 1))
