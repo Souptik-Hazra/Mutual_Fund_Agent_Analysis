@@ -170,8 +170,9 @@ def test_category_specialist_uses_existing_deterministic_peer_service(monkeypatc
 def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
     captured = {}
 
-    def exposure(session, codes):
+    def exposure(session, codes, as_of_date):
         captured["codes"] = codes
+        captured["as_of_date"] = as_of_date
         return {
             "valuation_basis": "ledger units x reconciled NAV",
             "coverage": {"valued_fund_count": 1, "selected_fund_count": 2},
@@ -185,11 +186,13 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
     request = ResearchAssistantRequest(
         question="Show my actual investor exposure",
         scheme_codes=[125497, 120503],
+        as_of_date=date(2026, 11, 20),
     )
     result = research_graph._run_tools(
         {"request": request, "session": object(), "intents": ["actual_exposure"]}
     )
     assert captured["codes"] == [125497, 120503]
+    assert captured["as_of_date"] == date(2026, 11, 20)
     assert result["citations"][0]["valuation_dates"][0]["nav_date"] == date(2026, 11, 25)
 
 
@@ -343,3 +346,16 @@ def test_document_specialist_preserves_retrieval_citations(monkeypatch):
     )
     assert result["results"]["documents"] == expected
     assert result["citations"][0]["content_hash"] == "f" * 64
+
+
+def test_assistant_request_rejects_as_of_date_after_end_date():
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError, match="as_of_date cannot be later"):
+        ResearchAssistantRequest(
+            question="Show my actual exposure",
+            scheme_codes=[125497],
+            end_date=date(2026, 6, 30),
+            as_of_date=date(2026, 7, 1),
+        )
