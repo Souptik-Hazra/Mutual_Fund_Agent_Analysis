@@ -270,7 +270,6 @@ def security_profile(
         "observation_history_limit": history_limit,
         "observation_history_type": history_type,
         "observation_history_order": "ascending",
-
         "freshness_policy": {
             "quote_fresh_hours": 24,
             "fundamentals_fresh_days": 180,
