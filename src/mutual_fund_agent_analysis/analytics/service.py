@@ -105,7 +105,28 @@ def load_fund_prices(
         statement = statement.where(NavReconciliation.nav_date <= end_date)
     rows = session.scalars(statement.order_by(NavReconciliation.nav_date)).all()
     if not rows:
-        raise ValueError(f"No reconciled NAV observations found for scheme {scheme_code}.")
+        coverage_statement = select(NavReconciliation).where(
+            NavReconciliation.scheme_code == scheme_code
+        )
+        coverage = session.scalars(
+            coverage_statement.order_by(NavReconciliation.nav_date)
+        ).all()
+        if not coverage:
+            raise ValueError(
+                f"No reconciled NAV observations exist for scheme {scheme_code}. "
+                "Synchronize NAV history before running analytics."
+            )
+        available_start = coverage[0].nav_date
+        available_end = coverage[-1].nav_date
+        requested_window = (
+            f"{start_date.isoformat() if start_date else 'earliest'} to "
+            f"{end_date.isoformat() if end_date else 'latest'}"
+        )
+        raise ValueError(
+            f"No reconciled NAV observations for scheme {scheme_code} in requested "
+            f"window {requested_window}. Available NAV history: "
+            f"{available_start.isoformat()} to {available_end.isoformat()}."
+        )
 
     conflicts = tuple(row.nav_date for row in rows if row.status == "conflict")
     if conflicts and not allow_nav_conflicts:

@@ -136,6 +136,7 @@ class ResearchState(TypedDict, total=False):
     intents: list[str]
     results: dict[str, Any]
     errors: list[str]
+    specialist_statuses: dict[str, str]
     answer: str
     citations: list[dict[str, Any]]
     model_used: str | None
@@ -235,6 +236,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
     results: dict[str, Any] = {}
     errors: list[str] = []
     citations: list[dict[str, Any]] = []
+    specialist_statuses: dict[str, str] = {}
     codes = request.scheme_codes
 
     for intent in state.get("intents", []):
@@ -594,6 +596,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             "source_key": item.get("source_key"),
                         }
                     )
+            specialist_statuses[intent] = "completed"
             logger.info(
                 "research.specialist.completed",
                 extra={
@@ -603,6 +606,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                 },
             )
         except (ValueError, LookupError) as exc:
+            specialist_statuses[intent] = "limited"
             errors.append(f"{intent}: {exc}")
             logger.warning(
                 "research.specialist.limited specialist=%s error_type=%s detail=%s",
@@ -620,6 +624,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
     return {
         "results": results,
         "errors": errors,
+        "specialist_statuses": specialist_statuses,
         "citations": citations,
         "research_run_id": state.get("research_run_id"),
     }
