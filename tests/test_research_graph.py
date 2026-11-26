@@ -115,15 +115,15 @@ def test_router_selects_category_specialist_for_peer_rankings():
 
 
 def test_router_selects_actual_investor_exposure_specialist():
-    assert classify_intents("Show my actual investor exposure from the ledger", [125497, 120503]) == [
-        "actual_exposure"
-    ]
+    assert classify_intents(
+        "Show my actual investor exposure from the ledger", [125497, 120503]
+    ) == ["actual_exposure"]
 
 
 def test_router_keeps_hypothetical_portfolio_exposure_separate():
-    assert classify_intents("Compare equity exposure across these fund portfolios", [125497, 120503]) == [
-        "portfolio"
-    ]
+    assert classify_intents(
+        "Compare equity exposure across these fund portfolios", [125497, 120503]
+    ) == ["portfolio"]
 
 
 def test_category_specialist_uses_existing_deterministic_peer_service(monkeypatch):
