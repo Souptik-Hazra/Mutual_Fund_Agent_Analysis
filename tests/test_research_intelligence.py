@@ -750,7 +750,7 @@ def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatc
         "summary": "Original summary",
         "event_type": "results",
         "status": "reported",
-        "event_date": "2026-10-28",
+        "event_date": "2026-10-29",
         "published_at": created_at.isoformat(),
         "canonical_url": "https://www.nseindia.com/notice/77",
         "confidence": "0.5",
@@ -778,13 +778,13 @@ def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatc
     result = routes.list_events(
         session=SessionStub(),
         as_of=as_of,
-        start_date=date(2026, 10, 1),
+        start_date=date(2026, 10, 29),
         limit=50,
         offset=0,
     )
     assert result["items"][0]["title"] == "Original title"
     assert result["items"][0]["status"] == "reported"
-    assert result["items"][0]["event_date"] == "2026-10-28"
+    assert result["items"][0]["event_date"] == "2026-10-29"
     assert result["as_of"] == as_of.isoformat()
 
 
