@@ -1,6 +1,6 @@
 """Tests for category, cross-fund and underlying-security intelligence contracts."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
