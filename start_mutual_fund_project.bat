@@ -10,7 +10,6 @@ title Mutual Fund Agent Analysis - Launcher
 for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
 set "FRONTEND_DIR=%PROJECT_DIR%\frontend"
 set "VENV_ACTIVATE=%PROJECT_DIR%\.venv\Scripts\activate.bat"
-set "WSL_PROJECT="
 
 echo.
 echo ==========================================
@@ -52,18 +51,16 @@ goto :fail
 
 :check_terminal
 where wt.exe >nul 2>nul
-if not errorlevel 1 goto :resolve_wsl
+if not errorlevel 1 goto :launch
 echo ERROR: Windows Terminal (wt.exe) is required.
 goto :fail
 
-:resolve_wsl
-for /f "usebackq delims=" %%I in (`wsl.exe wslpath -a "%PROJECT_DIR%" 2^>nul`) do set "WSL_PROJECT=%%I"
-if defined WSL_PROJECT goto :launch
+:launch
 echo ERROR: Could not resolve the repository path inside WSL.
 goto :fail
 
 :launch
-REM WSL path contains no spaces in the current project location; avoid quoted --cd arguments because wt.exe can preserve the quotes.
+REM Docker startup is delegated to PowerShell to avoid Windows Terminal argument-quoting issues.
 start "Docker - WSL" wt.exe -w new --title "Docker - WSL" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_docker_windows.ps1"
 start "Backend - FastAPI" wt.exe -w new --title "Backend - FastAPI" --startingDirectory "%PROJECT_DIR%" powershell.exe -NoExit -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\start_backend.ps1"
 start "Frontend - Vite" wt.exe -w new --title "Frontend - Vite" --startingDirectory "%FRONTEND_DIR%" cmd.exe /k npm run dev
