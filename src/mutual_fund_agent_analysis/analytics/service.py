@@ -395,6 +395,8 @@ def compare_funds(
         for code in codes
     }
     bases = {item[2] for item in loaded.values()}
+    if len(bases) > 1:
+        raise ValueError("Selected IDCW schemes do not share one verified return basis; comparison is unavailable.")
     warnings = []
     effective_benchmark = benchmark_code
     if "nav_only_excludes_idcw" in bases and benchmark_code is not None:
