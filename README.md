@@ -811,6 +811,14 @@ Phase 12 is merged in PR #15. It adds:
 
 **Market-data boundary:** The API persists timestamped provider observations but does not automatically fetch live stock prices, fundamentals or corporate events. Register an enabled provider in the source registry and ingest its observations. Do not interpret the latest stored observation as a live exchange quote. See [Phase 12 implementation notes](docs/phase-12-fund-category-equity-intelligence.md).
 
+## P1 — Research specialists and investor exposure
+
+The LangGraph supervisor routes explicit category-peer ranking requests to the deterministic category analysis service and personal/ledger exposure requests to the investor-ledger look-through service. Category reports preserve exact cohort, common observation dates and return-basis rules. Actual exposure is calculated from ledger units multiplied by accepted reconciled NAV; source dates, coverage gaps and excluded funds are retained.
+
+The security intelligence endpoint accepts bounded `history_limit` (1–500) and `history_type` (`quotes`, `fundamentals`, `events`, or `all`) filters. Returned history is chronological and keeps observation timestamps, retrieval timestamps, source URL/key and content hash. The selected equity-status date continues to flow through the API as `as_of`; this selects the disclosure and stored observation no later than the requested date.
+
+Fully redeemed ledger positions are excluded from current valued-fund totals. Historical investor reporting remains based on the transaction ledger and its as-of valuation rules. No live quote or holdings freshness is implied by stored provider observations.
+
 ## Personal SIP and investor transaction workflows
 
 The local **Investments** workspace separates simulated contributions from the actual personal
