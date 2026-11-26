@@ -120,8 +120,6 @@ class SipSimulationResponse(BaseModel):
     absolute_gain: Decimal
     xirr: Decimal | None
     coverage_ratio: Decimal
-    fund_return_basis: str = "growth_nav_total_return"
-    benchmark_return_basis: str = "tri"
     return_basis: Literal["simulated_sip"] = "simulated_sip"
 
 
@@ -152,3 +150,5 @@ class ActiveRiskResponse(BaseModel):
     information_ratio: Decimal | None
     mean_active_return: Decimal | None
     coverage_ratio: Decimal
+    fund_return_basis: str = "growth_nav_total_return"
+    benchmark_return_basis: str = "tri"
