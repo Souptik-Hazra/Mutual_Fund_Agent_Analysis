@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import io
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -1003,7 +1004,8 @@ def test_social_csv_import_applies_retention_and_hashes_content(monkeypatch):
     assert result["imported"] == 1
     assert result["retention_days"] == 14
     assert session.committed is True
-    assert captured[0].content_hash == __import__("hashlib").sha256(b"Market discussion").hexdigest()
+    expected_hash = hashlib.sha256(b"Market discussion").hexdigest()
+    assert captured[0].content_hash == expected_hash
     remaining = captured[0].expires_at - datetime.now(UTC)
     assert timedelta(days=14) - timedelta(seconds=2) < remaining <= timedelta(days=14)
     assert captured[0].text_excerpt == "Market discussion"
