@@ -80,7 +80,9 @@ test("historical equity status passes the selected end date as as_of", async () 
     ),
   );
   assert.ok(
-    component.includes('params.set(tab === "Fund Profile" ? "end_date" : "as_of", dateTo)'),
+    component.includes(
+      'tab === "Actual Exposure" ? "as_of_date" : "as_of"',
+    ),
   );
 });
 
