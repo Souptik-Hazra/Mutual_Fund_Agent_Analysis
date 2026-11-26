@@ -116,6 +116,8 @@ def latest_snapshot(session: Session, scheme_code: int, as_of: date | None = Non
 
 
 def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str, Any]:
+    source = session.get(DataSource, snapshot.source_key)
+    evidence = session.get(EvidenceRecord, snapshot.evidence_id) if snapshot.evidence_id else None
     rows = session.scalars(select(PortfolioHolding).where(
         PortfolioHolding.snapshot_id == snapshot.snapshot_id
     ).order_by(PortfolioHolding.weight_pct.desc().nullslast(), PortfolioHolding.security_name)).all()
@@ -135,7 +137,21 @@ def portfolio_payload(session: Session, snapshot: PortfolioSnapshot) -> dict[str
             sectors[row.sector or "Unclassified"] += row.weight_pct
     return {
         "snapshot_id": snapshot.snapshot_id, "scheme_code": snapshot.scheme_code,
-        "source_key": snapshot.source_key, "effective_date": snapshot.effective_date,
+        "source_key": snapshot.source_key,
+        "source": {
+            "display_name": source.display_name,
+            "source_type": source.source_type,
+            "authority_tier": source.authority_tier,
+            "is_official": source.is_official,
+            "enabled": source.enabled,
+        } if source else None,
+        "evidence": {
+            "evidence_id": evidence.evidence_id,
+            "canonical_url": evidence.canonical_url,
+            "retrieved_at": evidence.retrieved_at,
+            "verification_status": evidence.verification_status,
+        } if evidence else None,
+        "effective_date": snapshot.effective_date,
         "published_at": snapshot.published_at, "status": snapshot.status,
         "content_hash": snapshot.content_hash, "total_market_value": snapshot.total_market_value,
         "holdings_count": len(rows), "holdings": [{

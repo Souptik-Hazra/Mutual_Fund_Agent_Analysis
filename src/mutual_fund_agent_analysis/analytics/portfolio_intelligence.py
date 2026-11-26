@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.models.investor import InvestorTransaction
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
-from mutual_fund_agent_analysis.models.intelligence import DataSource
+from mutual_fund_agent_analysis.models.intelligence import DataSource, EvidenceRecord
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
@@ -195,6 +195,21 @@ def actual_portfolio_exposure(
             continue
 
         holdings_fund_codes.add(code)
+        source = session.get(DataSource, snapshot.source_key)
+        evidence = session.get(EvidenceRecord, snapshot.evidence_id) if snapshot.evidence_id else None
+        if source is None or not source.enabled or not source.is_official or source.source_type != "official":
+            reason = "The holdings source is not an enabled registered official source."
+            warnings.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "untrusted_holdings_source", "reason": reason}
+            )
+            continue
+        if evidence is None or evidence.verification_status != "verified":
+            reason = "The official-source holdings disclosure has not been independently verified."
+            warnings.append({"scheme_code": code, "reason": reason})
+            data_quality_warnings.append(
+                {"scheme_code": code, "type": "unverified_holdings_evidence", "reason": reason}
+            )
         holdings = session.scalars(
             select(PortfolioHolding).where(PortfolioHolding.snapshot_id == snapshot.snapshot_id)
         ).all()
@@ -214,7 +229,7 @@ def actual_portfolio_exposure(
             data_quality_warnings.append(
                 {"scheme_code": code, "type": "missing_holding_weights", "reason": reason}
             )
-        if snapshot.status == "complete" and weight_complete:
+        if snapshot.status == "complete" and weight_complete and evidence is not None and evidence.verification_status == "verified":
             lookthrough_value += value
         if snapshot.status != "complete":
             reason = (

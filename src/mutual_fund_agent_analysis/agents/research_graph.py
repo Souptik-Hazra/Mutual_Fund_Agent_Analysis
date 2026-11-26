@@ -6,13 +6,14 @@ import json
 import logging
 import re
 from dataclasses import asdict, is_dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import lru_cache
 from time import perf_counter
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.fund_intelligence import analyze_category_peers
@@ -30,6 +31,7 @@ from mutual_fund_agent_analysis.data.services.research_intelligence import (
     social_analytics,
 )
 from mutual_fund_agent_analysis.llm.providers import create_chat_model
+from mutual_fund_agent_analysis.models import DataSource, EvidenceRecord, NavReconciliation, SocialPost
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +194,27 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _provenance_citation(
+    session: Session,
+    source_key: str | None,
+    canonical_url: str | None,
+    retrieved_at: Any,
+    verification_status: str = "unverified",
+    **details: Any,
+) -> dict[str, Any] | None:
+    source = session.get(DataSource, source_key) if source_key else None
+    url = canonical_url or (source.base_url if source is not None else None)
+    if not source_key or not url or retrieved_at is None:
+        return None
+    return {
+        **details,
+        "source_key": source_key,
+        "canonical_url": url,
+        "retrieved_at": retrieved_at,
+        "verification_status": verification_status,
+    }
+
+
 def _plan(state: ResearchState) -> dict[str, Any]:
     request = state["request"]
     return {
@@ -235,15 +258,23 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         benchmark_source=request.benchmark_source or "niftyindices",
                     )
                 results[intent] = _jsonable(report)
-                citations.append(
-                    {
-                        "type": "financial_data",
-                        "scheme_codes": codes,
-                        "start_date": request.start_date,
-                        "end_date": request.end_date,
-                        "source": "canonical reconciled NAV and benchmark TRI tables",
-                    }
-                )
+                for code in codes:
+                    nav = session.scalar(
+                        select(NavReconciliation)
+                        .where(NavReconciliation.scheme_code == code)
+                        .where(NavReconciliation.status.in_(["single_source", "matched"]))
+                        .order_by(NavReconciliation.nav_date.desc())
+                        .limit(1)
+                    )
+                    if nav is not None:
+                        citation = _provenance_citation(
+                            session, nav.canonical_source, None, nav.evaluated_at,
+                            "unverified", type="financial_data", scheme_code=code,
+                            nav_date=nav.nav_date, canonical_nav=str(nav.canonical_nav),
+                            source_values=nav.source_values,
+                        )
+                        if citation:
+                            citations.append(citation)
             elif intent == "category":
                 if not codes or len(codes) != 1:
                     raise ValueError("Category analysis requires exactly one selected scheme_code.")
@@ -286,37 +317,15 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     session, codes, request.as_of_date or request.end_date
                 )
                 results[intent] = _jsonable(exposure)
-                citations.append(
-                    {
-                        "type": "actual_investor_exposure",
-                        "scheme_codes": codes,
-                        "as_of_date": exposure.get("as_of_date"),
-                        "valuation_basis": exposure.get("valuation_basis"),
-                        "valued_fund_count": exposure.get("coverage", {}).get("valued_fund_count"),
-                        "selected_fund_count": exposure.get("coverage", {}).get(
-                            "selected_fund_count"
-                        ),
-                        "valuation_dates": [
-                            {
-                                "scheme_code": item.get("scheme_code"),
-                                "nav_date": item.get("nav_date"),
-                            }
-                            for item in exposure.get("valued_funds", [])
-                        ],
-                        "holdings_effective_dates": sorted(
-                            {
-                                item.get("holdings_as_of")
-                                for security in exposure.get("equity_exposure", [])
-                                for item in security.get("fund_exposures", [])
-                                if item.get("holdings_as_of") is not None
-                            }
-                        ),
-                        "excluded_funds": exposure.get("excluded_funds", []),
-                        "coverage": exposure.get("coverage", {}),
-                        "data_quality_warnings": exposure.get("data_quality_warnings", []),
-                        "limitations": exposure.get("warning"),
-                    }
-                )
+                for item in exposure.get("valued_funds", []):
+                    citation = _provenance_citation(
+                        session, item.get("holdings_source_key"), item.get("holdings_url"),
+                        item.get("holdings_retrieved_at"), item.get("holdings_verification_status", "unverified"),
+                        type="actual_investor_exposure", scheme_code=item.get("scheme_code"),
+                        holdings_as_of=item.get("holdings_as_of"),
+                    )
+                    if citation:
+                        citations.append(citation)
             elif intent == "portfolio":
                 if not codes:
                     raise ValueError("Portfolio analysis requires a scheme_code.")
@@ -333,9 +342,9 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                             "type": "portfolio_disclosure",
                             "scheme_code": code,
                             "source_key": getattr(snapshot, "source_key", None),
-                            "canonical_url": getattr(snapshot, "document_url", None),
-                            "retrieved_at": getattr(snapshot, "retrieved_at", None),
-                            "verification_status": "unverified",
+                            "canonical_url": (payload.get("evidence") or {}).get("canonical_url") or (payload.get("source") or {}).get("base_url"),
+                            "retrieved_at": (payload.get("evidence") or {}).get("retrieved_at") or getattr(snapshot, "retrieved_at", None),
+                            "verification_status": (payload.get("evidence") or {}).get("verification_status", "unverified"),
                             "effective_date": snapshot.effective_date,
                             "content_hash": snapshot.content_hash,
                         }
@@ -431,7 +440,9 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                                     "event_id": event.get("event_id"),
                                     "source_key": event.get("source_key"),
                                     "evidence_id": event.get("evidence_id"),
-                                    "url": event.get("canonical_url"),
+                                    "canonical_url": event.get("canonical_url"),
+                                    "retrieved_at": event.get("retrieved_at") or datetime.now(UTC),
+                                    "verification_status": event.get("verification_status", "unverified"),
                                 }
                             )
                 else:

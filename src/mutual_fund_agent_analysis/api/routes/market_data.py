@@ -350,32 +350,26 @@ class SecurityObservationInput(BaseModel):
 
 def _validate_registered_source_url(source: DataSource, candidate: str) -> str:
     """Require HTTPS and keep source attribution on the registered source host."""
-    registered = urlsplit(source.base_url or "")
     supplied = urlsplit(candidate)
+    registered = urlsplit(source.base_url or "")
+    try:
+        supplied_port = supplied.port or 443
+        registered_port = registered.port or 443
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="source_url has an invalid port.") from exc
     registered_host = (registered.hostname or "").lower().rstrip(".")
     supplied_host = (supplied.hostname or "").lower().rstrip(".")
-    try:
-        registered_port = registered.port or 443
-        supplied_port = supplied.port or 443
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail="source_url must use a valid port on the registered data-source host.",
-        ) from exc
     if (
-        registered.scheme.lower() != "https"
-        or supplied.scheme.lower() != "https"
-        or not registered_host
+        supplied.scheme.lower() != "https"
         or not supplied_host
-        or registered_port != supplied_port
         or supplied.username is not None
         or supplied.password is not None
+        or not registered_host
+        or registered.scheme.lower() != "https"
+        or registered_port != supplied_port
         or not (supplied_host == registered_host or supplied_host.endswith("." + registered_host))
     ):
-        raise HTTPException(
-            status_code=422,
-            detail="source_url must use HTTPS on the registered data-source host.",
-        )
+        raise HTTPException(status_code=422, detail="source_url must use HTTPS on the registered data-source host.")
     return candidate
 
 

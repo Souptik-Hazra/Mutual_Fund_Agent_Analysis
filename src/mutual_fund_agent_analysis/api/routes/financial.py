@@ -73,23 +73,20 @@ def _validate_source_url(
     *,
     require_registered_host: bool = False,
 ) -> None:
-    supplied = urlsplit(source_url)
-    registered = urlsplit(source.base_url or "")
-    try:
-        supplied_port = supplied.port or 443
-        registered_port = registered.port or 443
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="The evidence URL has an invalid port.") from exc
-    supplied_host = (supplied.hostname or "").lower().rstrip(".")
-    registered_host = (registered.hostname or "").lower().rstrip(".")
-    if supplied.scheme.lower() != "https" or not supplied_host or supplied.username is not None or supplied.password is not None:
-        raise HTTPException(status_code=422, detail="Evidence URLs must use HTTPS without embedded credentials.")
-    if not registered_host:
-        if require_registered_host:
-            raise HTTPException(status_code=422, detail="A verified record requires a registered HTTPS source host.")
-        return
-    if registered.scheme.lower() != "https" or supplied_port != registered_port or not (supplied_host == registered_host or supplied_host.endswith("." + registered_host)):
-        raise HTTPException(status_code=422, detail="The evidence URL must use HTTPS on the registered data-source host and port.")
+    from mutual_fund_agent_analysis.api.routes.market_data import _validate_registered_source_url
+
+    if source.base_url:
+        _validate_registered_source_url(source, source_url)
+    elif require_registered_host:
+        raise HTTPException(
+            status_code=422,
+            detail="A verified record requires a registered HTTPS source base_url.",
+        )
+    else:
+        parsed = urlsplit(source_url)
+        if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None:
+            raise HTTPException(status_code=422, detail="Evidence URLs must use HTTPS without embedded credentials.")
+
 
 
 def _scheme_or_404(session: Session, scheme_code: int) -> MutualFundScheme:

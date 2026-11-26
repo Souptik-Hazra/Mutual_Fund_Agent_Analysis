@@ -9,6 +9,7 @@ from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.analytics.service import analyze_fund
+from mutual_fund_agent_analysis.models.intelligence import DataSource
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
 from mutual_fund_agent_analysis.models.scheme import MutualFundScheme
 
@@ -228,9 +229,13 @@ def compare_disclosed_equity(
     for code in scheme_codes:
         snapshot = session.scalars(
             select(PortfolioSnapshot)
+            .join(DataSource, DataSource.source_key == PortfolioSnapshot.source_key)
             .where(
                 PortfolioSnapshot.scheme_code == code,
                 PortfolioSnapshot.status.in_(["complete", "partial"]),
+                DataSource.enabled.is_(True),
+                DataSource.is_official.is_(True),
+                DataSource.source_type == "official",
             )
             .order_by(
                 PortfolioSnapshot.effective_date.desc(),
