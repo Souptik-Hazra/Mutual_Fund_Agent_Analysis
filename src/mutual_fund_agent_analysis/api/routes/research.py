@@ -767,7 +767,7 @@ def get_social_provider_status(session: Annotated[Session, Depends(get_db)]) -> 
     providers = {}
     for source_key in ("reddit", "x"):
         registry = session.get(DataSource, source_key)
-        metadata = registry.metadata_json if registry and isinstance(registry.metadata_json, dict) else {}
+        metadata = (\n            registry.metadata_json if registry and isinstance(registry.metadata_json, dict) else {}\n        )
         reviewed = bool(
             registry
             and registry.terms_url
@@ -822,7 +822,7 @@ async def import_social_dataset(
             parsed = json.loads(content)
             rows = parsed.get("posts", []) if isinstance(parsed, dict) else parsed
         else:
-            raise HTTPException(status_code=415, detail="Only CSV and JSON social exports are supported.")
+            raise HTTPException(\n                status_code=415, detail="Only CSV and JSON social exports are supported."\n            )
         if not isinstance(rows, list) or not rows or len(rows) > 500:
             raise ValueError("Import must contain between 1 and 500 post records.")
         registry = session.get(DataSource, source)
@@ -845,19 +845,19 @@ async def import_social_dataset(
             if not isinstance(item, dict):
                 raise ValueError(f"Record {index} must be a JSON object.")
             if item.get("source_key") not in (None, "", source):
-                raise ValueError(f"Record {index} has a source_key that does not match the selected source.")
+                raise ValueError(\n                    f"Record {index} has a source_key that does not match the selected source."\n                )
             excerpt = str(item.get("text_excerpt") or item.get("text") or "")[:2000]
             canonical_url = item.get("canonical_url") or item.get("url") or None
             external_id = str(item.get("external_id") or item.get("id") or "").strip()
             digest_input = excerpt or str(canonical_url or external_id)
             if not external_id or not digest_input:
-                raise ValueError(f"Record {index} requires an external_id and text or canonical URL.")
+                raise ValueError(\n                    f"Record {index} requires an external_id and text or canonical URL."\n                )
             raw_metadata = item.get("metadata") or {}
             if isinstance(raw_metadata, str):
                 raw_metadata = json.loads(raw_metadata) if raw_metadata.strip() else {}
             if not isinstance(raw_metadata, dict):
                 raise ValueError(f"Record {index} metadata must be a JSON object.")
-            payload = SocialPostInput.model_validate({
+            payload = SocialPostInput.model_validate(\n                {
                 "source_key": source,
                 "external_id": external_id,
                 "related_entity_id": item.get("related_entity_id") or None,
@@ -867,7 +867,7 @@ async def import_social_dataset(
                 "published_at": item.get("published_at") or None,
                 "engagement_count": item.get("engagement_count") or 0,
                 "sentiment_label": item.get("sentiment_label") or None,
-                "sentiment_score": item.get("sentiment_score") if item.get("sentiment_score") not in (None, "") else None,
+                    "sentiment_score": item.get("sentiment_score")\n                    if item.get("sentiment_score") not in (None, "")\n                    else None,
                 "sentiment_model": item.get("sentiment_model") or None,
                 "is_spam": item.get("is_spam") or False,
                 "expires_at": datetime.now(UTC) + timedelta(days=retention_days),
@@ -889,7 +889,7 @@ async def import_social_dataset(
         session.rollback()
         if isinstance(exc, ValueError):
             raise _domain_error(exc) from exc
-        raise HTTPException(status_code=422, detail="Unable to validate the social import file.") from exc
+        raise HTTPException(\n            status_code=422, detail="Unable to validate the social import file."\n        ) from exc
 
 
 @router.get("/social/collect")
