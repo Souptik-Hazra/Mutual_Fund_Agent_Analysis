@@ -737,13 +737,16 @@ def _synthesize(state: ResearchState) -> dict[str, Any]:
                     "model": model_used,
                 },
             )
-        except ValueError:
-            logger.info(
+        except ValueError as exc:
+            # Missing provider credentials/model is an optional capability
+            # limitation, not a failed deterministic research run.
+            logger.warning(
                 "research.llm_synthesis.unavailable",
                 extra={
                     "research_run_id": state.get("research_run_id"),
                     "llm_call_count": 0,
                     "reason": "provider_not_configured",
+                    "detail": str(exc),
                 },
             )
         except Exception:
