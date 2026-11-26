@@ -84,8 +84,16 @@ def _validate_source_url(
         )
     else:
         parsed = urlsplit(source_url)
-        if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None:
-            raise HTTPException(status_code=422, detail="Evidence URLs must use HTTPS without embedded credentials.")
+        if (
+            parsed.scheme.lower() != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Evidence URLs must use HTTPS without embedded credentials.",
+            )
 
 
 
@@ -225,7 +233,11 @@ def add_scheme_metadata_observation(
             scheme.launch_date = request.launch_date
         if request.closure_date is not None:
             scheme.closure_date = request.closure_date
-        if request.expense_ratio is not None and request.expense_ratio_effective_date is not None and request.expense_ratio_effective_date <= today:
+        if (
+            request.expense_ratio is not None
+            and request.expense_ratio_effective_date is not None
+            and request.expense_ratio_effective_date <= today
+        ):
             scheme.effective_expense_ratio = request.expense_ratio
             scheme.expense_ratio_effective_date = request.expense_ratio_effective_date
             scheme.expense_ratio_source_key = request.source_key
@@ -420,15 +432,23 @@ def add_distribution_observation(
     )
     if latest_revision is None:
         if previous is not None or request.revision != 1:
-            raise HTTPException(status_code=409, detail="The first distribution revision must be revision 1 and cannot supersede another record.")
+            raise HTTPException(
+                status_code=409,
+                detail="The first distribution revision must be revision 1 and cannot supersede another record.",
+            )
     elif (
         previous is None
         or previous.distribution_id != latest_revision.distribution_id
         or latest_revision.status != "active"
     ):
-        raise HTTPException(status_code=409, detail="A new distribution revision must explicitly supersede the latest active revision.")
+        raise HTTPException(
+            status_code=409,
+            detail="A new distribution revision must explicitly supersede the latest active revision.",
+        )
     elif request.revision != latest_revision.revision + 1:
-        raise HTTPException(status_code=422, detail="Distribution revisions must increase sequentially.")
+        raise HTTPException(
+            status_code=422, detail="Distribution revisions must increase sequentially."
+        )
 
     record = DistributionObservation(
         scheme_code=scheme_code,

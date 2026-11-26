@@ -199,9 +199,7 @@ def actual_portfolio_exposure(
         holdings_fund_codes.add(code)
         source = session.get(DataSource, snapshot.source_key)
         evidence = (
-            session.get(EvidenceRecord, snapshot.evidence_id)
-            if snapshot.evidence_id
-            else None
+            session.get(EvidenceRecord, snapshot.evidence_id) if snapshot.evidence_id else None
         )
         if (
             source is None
@@ -229,9 +227,8 @@ def actual_portfolio_exposure(
             (D(holding.weight_pct) for holding in holdings if holding.weight_pct is not None),
             D("0"),
         )
-        weight_complete = (
-            missing_weight_count == 0
-            and D("99") <= disclosed_weight_total <= D("101")
+        weight_complete = missing_weight_count == 0 and D("99") <= disclosed_weight_total <= D(
+            "101"
         )
         contexts[code].update(
             holdings_snapshot_id=snapshot.snapshot_id,

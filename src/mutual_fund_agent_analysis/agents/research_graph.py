@@ -273,9 +273,15 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     )
                     if nav is not None:
                         citation = _provenance_citation(
-                            session, nav.canonical_source, None, nav.evaluated_at,
-                            "unverified", type="financial_data", scheme_code=code,
-                            nav_date=nav.nav_date, canonical_nav=str(nav.canonical_nav),
+                            session,
+                            nav.canonical_source,
+                            None,
+                            nav.evaluated_at,
+                            "unverified",
+                            type="financial_data",
+                            scheme_code=code,
+                            nav_date=nav.nav_date,
+                            canonical_nav=str(nav.canonical_nav),
                             source_values=nav.source_values,
                         )
                         if citation:
@@ -302,14 +308,21 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                     .limit(1)
                 )
                 citation = _provenance_citation(
-                    session, nav.canonical_source if nav else None, None,
-                    nav.evaluated_at if nav else None, "unverified",
-                    type="category_peer_analysis", scheme_code=codes[0],
+                    session,
+                    nav.canonical_source if nav else None,
+                    None,
+                    nav.evaluated_at if nav else None,
+                    "unverified",
+                    type="category_peer_analysis",
+                    scheme_code=codes[0],
                     peer_definition=report.get("peer_definition"),
                     comparison_window=report.get("comparison_window"),
                     return_basis=selected_fund.get("return_basis"),
-                    distribution_coverage_status=selected_fund.get("distribution_coverage_status"),
-                    peer_count=report.get("peer_count"), peer_limit=report.get("peer_limit"),
+                    distribution_coverage_status=selected_fund.get(
+                        "distribution_coverage_status"
+                    ),
+                    peer_count=report.get("peer_count"),
+                    peer_limit=report.get("peer_limit"),
                     cohort_truncated=report.get("cohort_truncated"),
                     benchmark_code=report.get("benchmark_code"),
                     benchmark_source=report.get("benchmark_source"),
@@ -531,22 +544,14 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         SocialPost.published_at >= social_start
                     )
                 if request.end_date:
-                    social_end = datetime.combine(
-                        request.end_date, datetime.max.time(), UTC
-                    )
-                    social_statement = social_statement.where(
-                        SocialPost.published_at < social_end
-                    )
+                    social_end = datetime.combine(request.end_date, datetime.max.time(), UTC)
+                    social_statement = social_statement.where(SocialPost.published_at < social_end)
                 social_rows = session.scalars(
-                    social_statement.order_by(SocialPost.published_at.desc()).limit(
-                        request.top_k
-                    )
+                    social_statement.order_by(SocialPost.published_at.desc()).limit(request.top_k)
                 ).all()
                 for post in social_rows:
                     evidence = (
-                        session.get(EvidenceRecord, post.evidence_id)
-                        if post.evidence_id
-                        else None
+                        session.get(EvidenceRecord, post.evidence_id) if post.evidence_id else None
                     )
                     citation = _provenance_citation(
                         session,
