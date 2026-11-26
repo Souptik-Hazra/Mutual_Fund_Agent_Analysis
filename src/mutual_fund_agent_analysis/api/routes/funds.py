@@ -437,7 +437,8 @@ def get_active_risk(
         if return_basis == "nav_only_excludes_idcw":
             raise ValueError(
                 coverage_reason
-                or "Verified IDCW total-return coverage is required for tracking error and information ratio."
+                or "Verified IDCW total-return coverage is required for tracking "
+                "error and information ratio."
             )
         benchmark_prices = load_benchmark_prices(
             session, benchmark_code, start_date, end_date, benchmark_source
