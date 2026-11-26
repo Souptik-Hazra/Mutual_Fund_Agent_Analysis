@@ -178,7 +178,9 @@ def test_security_identity_rejects_ambiguous_isin_mapping():
 
 
 def test_security_identity_rejects_unofficial_mapping_provenance():
-    entity = SimpleNamespace(entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited")
+    entity = SimpleNamespace(
+        entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited"
+    )
     isin_mapping = SimpleNamespace(entity_id=44, source_key="unofficial")
 
     class Rows:
@@ -206,7 +208,9 @@ def test_security_identity_rejects_unofficial_mapping_provenance():
 
 
 def test_security_identity_rejects_exchange_symbol_mapped_to_another_entity():
-    entity = SimpleNamespace(entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited")
+    entity = SimpleNamespace(
+        entity_id=44, entity_type="company", status="active", canonical_name="Infosys Limited"
+    )
     isin_mapping = SimpleNamespace(entity_id=44, source_key="official_registry")
     other_entity_symbol = SimpleNamespace(entity_id=99, source_key="official_registry")
 
