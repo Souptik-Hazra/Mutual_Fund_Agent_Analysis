@@ -716,3 +716,140 @@ def test_lexical_retrieval_ranks_term_frequency_before_candidate_limit(monkeypat
     finally:
         session.close()
         engine.dispose()
+
+
+def test_historical_event_route_selects_revision_active_at_as_of_time(monkeypatch):
+    from datetime import timedelta
+    from mutual_fund_agent_analysis.api.routes import research as routes
+
+    as_of = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+    created_at = as_of - timedelta(days=10)
+    corrected_at = as_of + timedelta(days=2)
+    current_event = SimpleNamespace(
+        event_id=77,
+        created_at=created_at,
+        source_key="nse",
+        external_id="notice-77",
+        evidence_id=None,
+        related_entity_id=None,
+        title="Corrected title",
+        summary="Corrected summary",
+        event_type="results",
+        status="confirmed",
+        event_date=date(2026, 10, 29),
+        published_at=created_at,
+        canonical_url="https://www.nseindia.com/notice/77",
+        confidence=Decimal("0.9"),
+        metadata_json={"revision": 2},
+    )
+    prior_snapshot = {
+        "source_key": "nse",
+        "external_id": "notice-77",
+        "evidence_id": None,
+        "related_entity_id": None,
+        "title": "Original title",
+        "summary": "Original summary",
+        "event_type": "results",
+        "status": "reported",
+        "event_date": "2026-10-28",
+        "published_at": created_at.isoformat(),
+        "canonical_url": "https://www.nseindia.com/notice/77",
+        "confidence": "0.5",
+        "metadata": {"revision": 1},
+        "evidence": None,
+    }
+
+    class SessionStub:
+        def scalars(self, _statement):
+            return SimpleNamespace(all=lambda: [current_event])
+
+        def scalar(self, _statement):
+            return SimpleNamespace(snapshot=prior_snapshot, recorded_at=corrected_at)
+
+        def get(self, model, _key):
+            if model is routes.DataSource:
+                return SimpleNamespace(
+                    source_type="exchange",
+                    authority_tier=1,
+                    is_official=True,
+                    attribution_required=True,
+                )
+            return None
+
+    result = routes.list_events(
+        session=SessionStub(),
+        as_of=as_of,
+        limit=50,
+        offset=0,
+    )
+    assert result["items"][0]["title"] == "Original title"
+    assert result["items"][0]["status"] == "reported"
+    assert result["items"][0]["event_date"] == "2026-10-28"
+    assert result["as_of"] == as_of.isoformat()
+
+
+def test_event_as_of_requires_timezone_aware_datetime():
+    from datetime import datetime
+
+    from fastapi import HTTPException
+
+    from mutual_fund_agent_analysis.api.routes.research import list_events
+
+    with pytest.raises(HTTPException) as error:
+        list_events(session=None, as_of=datetime(2026, 11, 1, 12, 0))
+    assert error.value.status_code == 422
+
+
+def test_document_delete_does_not_remove_lexical_records_when_vector_cleanup_fails(monkeypatch):
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(research_routes, "delete_document_chunks", lambda _document_id: False)
+
+    class SessionStub:
+        def __init__(self):
+            self.deleted = False
+            self.committed = False
+
+        def get(self, _model, _key):
+            return SimpleNamespace(document_id=100)
+
+        def execute(self, _statement):
+            raise AssertionError("Lexical chunks must not be deleted before vector cleanup.")
+
+        def delete(self, _document):
+            self.deleted = True
+
+        def commit(self):
+            self.committed = True
+
+    session = SessionStub()
+    with pytest.raises(HTTPException) as error:
+        research_routes.delete_research_document(100, session)
+
+    assert error.value.status_code == 503
+    assert session.deleted is False
+    assert session.committed is False
+
+
+def test_document_delete_removes_vectors_before_lexical_records(monkeypatch):
+    order = []
+    monkeypatch.setattr(
+        research_routes, "delete_document_chunks", lambda _document_id: order.append("vectors") or True
+    )
+
+    class SessionStub:
+        def get(self, _model, _key):
+            return SimpleNamespace(document_id=101)
+
+        def execute(self, _statement):
+            order.append("lexical_chunks")
+
+        def delete(self, _document):
+            order.append("document")
+
+        def commit(self):
+            order.append("commit")
+
+    result = research_routes.delete_research_document(101, SessionStub())
+    assert result["deleted"] is True
+    assert order == ["vectors", "lexical_chunks", "document", "commit"]
