@@ -168,6 +168,8 @@ A fund-level social sentiment measure may be calculated as a weighted aggregatio
 
 Historical sentiment analysis is limited by the historical data accessible through each provider and by the date collection began.
 
+**Optional provider access:** Reddit and X API credentials are not required to start or use the core application. The Social workspace reports provider readiness at `/api/v1/social/providers`. If API credentials are unavailable, authorized CSV/JSON exports can be imported through `/api/v1/social/import-file` after the source has been enabled and its terms/access review recorded. Imported content remains subject to source-specific retention and provenance rules. News and official filings are analyzed separately and are never labelled as Reddit/X sentiment.
+
 ## News and Upcoming Events
 
 The News & Event Radar should distinguish between what has happened, what is officially scheduled, what has been reported, and what is merely circulating. The system cannot know future news before it is published; it can monitor scheduled events, developing stories, and public claims that are already circulating.
