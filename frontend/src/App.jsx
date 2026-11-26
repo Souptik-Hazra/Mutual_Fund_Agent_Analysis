@@ -157,23 +157,19 @@ export default function App() {
     }
   };
   const addCompareScheme = (scheme) => {
-    setCompareSelected((current) => {
-      if (current.some((item) => item.scheme_code === scheme.scheme_code)) return current;
-      if (current.length >= 5) {
-        setError("You can compare a maximum of 5 schemes.");
-        return current;
-      }
-      const next = [...current, scheme];
-      setCodes(next.map((item) => item.scheme_code).join(","));
-      return next;
-    });
+    if (compareSelected.some((item) => item.scheme_code === scheme.scheme_code)) return;
+    if (compareSelected.length >= 5) {
+      setError("You can compare a maximum of 5 schemes.");
+      return;
+    }
+    const next = [...compareSelected, scheme];
+    setCompareSelected(next);
+    setCodes(next.map((item) => item.scheme_code).join(","));
   };
   const removeCompareScheme = (schemeCode) => {
-    setCompareSelected((current) => {
-      const next = current.filter((item) => item.scheme_code !== schemeCode);
-      setCodes(next.map((item) => item.scheme_code).join(","));
-      return next;
-    });
+    const next = compareSelected.filter((item) => item.scheme_code !== schemeCode);
+    setCompareSelected(next);
+    setCodes(next.map((item) => item.scheme_code).join(","));
   };
   const runCompare = () => {
     if (schemeCodes.length < 2 || schemeCodes.length > 5) {
