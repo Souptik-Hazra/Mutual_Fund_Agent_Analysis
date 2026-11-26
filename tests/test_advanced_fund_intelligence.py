@@ -119,7 +119,7 @@ def test_actual_exposure_fully_redeemed_fund_is_excluded_from_valuation(monkeypa
     assert "remaining units" in result["excluded_funds"][0]["reason"]
 
 
-def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav(monkeypatch):
+def test_actual_exposure_keeps_partially_redeemed_positive_units_for_nav():
     from decimal import Decimal
     import mutual_fund_agent_analysis.analytics.portfolio_intelligence as module
 
@@ -206,9 +206,8 @@ def test_security_history_rejects_unbounded_or_unknown_filters():
         security_profile(None, "EX", history_type="everything")
 
 
-def test_indian_as_of_day_includes_late_evening_exchange_observation(monkeypatch):
+def test_indian_as_of_day_includes_late_evening_exchange_observation():
     from datetime import datetime, timezone
-    from sqlalchemy import select
     from mutual_fund_agent_analysis.models.security import SecurityMarketObservation
     from mutual_fund_agent_analysis.analytics.security_intelligence import security_profile
 
@@ -250,8 +249,7 @@ def test_indian_as_of_day_includes_late_evening_exchange_observation(monkeypatch
                 # SQL bind parameters carry the date cutoff for all quote/history selectors.
                 params = query.compile().params
                 cutoff_values = [
-                    value for value in params.values()
-                    if isinstance(value, datetime)
+                    value for value in params.values() if isinstance(value, datetime)
                 ]
                 assert expected_cutoff in cutoff_values
                 return ScalarRows()
