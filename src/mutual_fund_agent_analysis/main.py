@@ -1,6 +1,11 @@
 """FastAPI application entry point."""
 
-from fastapi import FastAPI
+import logging
+import re
+import time
+import uuid
+
+from fastapi import FastAPI, Request
 
 from mutual_fund_agent_analysis import __version__
 from mutual_fund_agent_analysis.api.routes.advanced_fund_intelligence import (
@@ -18,6 +23,8 @@ from mutual_fund_agent_analysis.api.routes.market_data import router as market_d
 from mutual_fund_agent_analysis.api.routes.research import router as research_router
 from mutual_fund_agent_analysis.core.config import get_settings
 from mutual_fund_agent_analysis.core.logging_config import configure_logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -38,6 +45,44 @@ def create_app() -> FastAPI:
     application.include_router(intelligence_router, prefix=settings.api_v1_prefix)
     application.include_router(research_router, prefix=settings.api_v1_prefix)
     application.include_router(assistant_router, prefix=settings.api_v1_prefix)
+
+    @application.middleware("http")
+    async def request_context(request: Request, call_next):
+        supplied_id = request.headers.get("x-request-id", "")
+        request_id = (
+            supplied_id
+            if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", supplied_id)
+            else uuid.uuid4().hex
+        )
+        request.state.request_id = request_id
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception(
+                "http.request.failed",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": 500,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+            )
+            raise
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "http.request.completed",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            },
+        )
+        return response
+
     return application
 
 

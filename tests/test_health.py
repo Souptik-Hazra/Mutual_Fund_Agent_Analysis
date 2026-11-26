@@ -12,6 +12,7 @@ def test_liveness_returns_ok() -> None:
     response = client.get("/api/v1/health/live")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+    assert response.headers["X-Request-ID"]
 
 
 def test_readiness_returns_ready_when_database_is_available(monkeypatch) -> None:
@@ -46,3 +47,15 @@ def test_readiness_returns_503_when_migrations_are_pending(monkeypatch) -> None:
     assert response.json() == {
         "detail": "Database is unavailable or schema migrations are not current."
     }
+
+
+
+def test_request_id_is_correlated_and_untrusted_values_are_replaced() -> None:
+    client = TestClient(create_app())
+    accepted = client.get("/api/v1/health/live", headers={"X-Request-ID": "local-run_123"})
+    assert accepted.headers["X-Request-ID"] == "local-run_123"
+
+    rejected = client.get("/api/v1/health/live", headers={"X-Request-ID": "invalid value"})
+    generated = rejected.headers["X-Request-ID"]
+    assert generated != "invalid value"
+    assert len(generated) == 32
