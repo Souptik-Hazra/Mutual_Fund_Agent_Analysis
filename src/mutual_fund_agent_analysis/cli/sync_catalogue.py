@@ -28,7 +28,7 @@ def main() -> None:
     session = get_session_factory()()
     try:
         existing = session.scalar(select(func.count()).select_from(MutualFundScheme)) or 0
-        if existing and not args.force:
+        if existing >= 30000 and not args.force:
             logger.info("Scheme catalogue already contains %s schemes; skipping import.", existing)
             return
 
