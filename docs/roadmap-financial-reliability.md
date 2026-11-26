@@ -44,7 +44,7 @@ Financial calculations remain deterministic backend operations. LLMs may route, 
 | P3-01 | Documentation reconciliation | **Partial** | README project status now points to the actual P2/P3 acceptance gates. Continue reconciling feature descriptions against merged implementation and remove any remaining stale claims. |
 | P3-02 | Authoritative roadmap | **In progress** | This document is the single P2/P3 delivery ledger. Historical phase notes remain supporting records, not competing current roadmaps. |
 | P3-03 | Assistant capability registry | **Implemented; CI verification pending** | `/assistant/capabilities` and frontend Overview expose the eight routed capabilities: fund, category, portfolio, actual exposure, security, events, social and documents. Registry IDs match the LangGraph intent names. |
-| P3-04 | Reproducible frontend installation | **Open** | CI currently uses Node.js 22 and `npm install`; a committed `package-lock.json` and `npm ci` are still required for deterministic installs. No lockfile has been fabricated. |
+| P3-04 | Reproducible frontend installation | **Implemented** | `frontend/package-lock.json` is committed, CI installs with `npm ci`, and Node.js 22 is pinned in the frontend workflow. The npm cache key now uses the lockfile so dependency changes invalidate the cache correctly. |
 | P3-05 | Code cleanup | **Partial** | Cleanup has been limited to the Qdrant lifecycle and directly touched request/route logic. A broader unused-code/dead-component review remains open and must preserve API contracts. |
 | P3-06 | Observability and integration limitations | **Partial** | API requests now receive a validated/generated `X-Request-ID`; structured completion logs include request ID, method, path, status and duration without query strings. Propagating research-run IDs through LangGraph nodes and specialist outputs remains open. |
 
@@ -58,7 +58,7 @@ Financial calculations remain deterministic backend operations. LLMs may route, 
 
 ## Completion criteria
 
-P2/P3 are complete only when every remaining external gate above has been either verified with evidence or explicitly documented as unavailable, the complete backend/frontend/agent/backup CI is green on `main`, the frontend lockfile is committed, and the final code review confirms that financial methodology, provenance, historical `as_of` behaviour and local-only security boundaries remain intact.
+P2/P3 are complete only when every remaining external gate above has been either verified with evidence or explicitly documented as unavailable, the complete backend/frontend/agent/backup CI is green on `main`, the frontend lockfile is committed and cache-keyed, and the final code review confirms that financial methodology, provenance, historical `as_of` behaviour and local-only security boundaries remain intact.
 
 ## Explicitly out of scope
 
