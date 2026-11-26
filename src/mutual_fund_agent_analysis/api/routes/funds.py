@@ -44,6 +44,7 @@ from mutual_fund_agent_analysis.api.schemas.investor import (
     SipSimulationResponse,
 )
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
+from mutual_fund_agent_analysis.data.services.nav_sync import sync_scheme_nav
 from mutual_fund_agent_analysis.database.session import get_db
 from mutual_fund_agent_analysis.models import (
     InvestorTransaction,
@@ -180,6 +181,55 @@ def get_scheme(
             latest_canonical_source=latest.canonical_source,
         )
     return SchemeDetail.model_validate(payload)
+
+
+@router.post("/schemes/{scheme_code}/sync-nav")
+def sync_scheme_nav_on_demand(
+    scheme_code: int,
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Fetch NAV history once when a catalogue-only scheme is first analysed."""
+    _validate_scheme_code(scheme_code)
+    if session.get(MutualFundScheme, scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Scheme not found in the local catalogue.")
+
+    existing_count = session.scalar(
+        select(func.count())
+        .select_from(NavReconciliation)
+        .where(NavReconciliation.scheme_code == scheme_code)
+    ) or 0
+    if existing_count:
+        return {
+            "scheme_code": scheme_code,
+            "synced": False,
+            "observation_count": existing_count,
+            "message": "NAV history is already available locally.",
+        }
+
+    try:
+        processed = sync_scheme_nav(session, scheme_code)
+        session.commit()
+    except (httpx.HTTPError, ValueError) as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Unable to retrieve valid NAV history from MFAPI: {exc}",
+        ) from exc
+    except Exception:
+        session.rollback()
+        raise
+
+    if processed < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="The provider returned fewer than two NAV observations; analytics cannot be calculated.",
+        )
+    return {
+        "scheme_code": scheme_code,
+        "synced": True,
+        "observation_count": processed,
+        "message": "NAV history fetched and reconciled successfully.",
+    }
 
 
 @router.get("/schemes/{scheme_code}/analytics", response_model=FundAnalyticsResponse)
