@@ -184,6 +184,11 @@ def test_social_collection_applies_source_specific_expiry(monkeypatch):
     captured = []
     monkeypatch.setattr(
         research_routes,
+        "social_provider_credentials",
+        lambda: {"reddit": True, "x": False},
+    )
+    monkeypatch.setattr(
+        research_routes,
         "search_reddit",
         lambda _query, _limit: [
             {
@@ -942,7 +947,8 @@ def test_social_provider_status_never_exposes_credentials(monkeypatch):
     assert result["providers"]["reddit"]["status"] == "not_configured"
     assert result["providers"]["reddit"]["can_collect"] is False
     assert result["providers"]["reddit"]["can_import"] is True
-    assert result["providers"]["x"]["status"] == "not_configured"
+    assert result["providers"]["x"]["status"] == "disabled"
+    assert result["providers"]["x"]["can_import"] is False
     assert "client_secret" not in str(result).lower()
 
 
