@@ -194,8 +194,6 @@ def test_actual_exposure_specialist_uses_ledger_service(monkeypatch):
 
 
 def test_fund_specialist_preserves_exact_deterministic_result(monkeypatch):
-    from decimal import Decimal
-
     expected = {
         "cagr": "0.1250",
         "volatility": "0.0825",
