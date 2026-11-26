@@ -117,7 +117,6 @@ def load_fund_prices(
     return prices, conflicts
 
 
-
 def load_fund_return_prices(
     session: Session,
     scheme_code: int,
