@@ -25,6 +25,10 @@ if not exist "%VENV_ACTIVATE%" (
     echo "%VENV_ACTIVATE%"
     goto :fail
 )
+if not exist "%PROJECT_DIR%\.venv\Scripts\python.exe" (
+    echo ERROR: The virtual environment Python executable is missing.
+    goto :fail
+)
 if not exist "%FRONTEND_DIR%\package.json" (
     echo ERROR: Frontend package.json was not found.
     goto :fail
