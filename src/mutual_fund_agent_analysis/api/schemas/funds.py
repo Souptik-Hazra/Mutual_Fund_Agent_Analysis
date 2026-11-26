@@ -73,7 +73,12 @@ class FundAnalyticsResponse(BaseModel):
     nav_conflict_dates: list[date]
     calendar_year_as_of_date: date | None
     frequency: Literal["daily", "weekly", "monthly", "quarterly", "yearly"]
-    return_basis: Literal["nav_only_excludes_idcw", "growth_nav_total_return", "idcw_payout_total_return", "idcw_reinvested_total_return"] = "nav_only_excludes_idcw"
+    return_basis: Literal[
+        "nav_only_excludes_idcw",
+        "growth_nav_total_return",
+        "idcw_payout_total_return",
+        "idcw_reinvested_total_return",
+    ] = "nav_only_excludes_idcw"
     benchmark_return_basis: Literal["tri"] | None = None
     distribution_coverage_status: str = "not_required"
     benchmark_unavailable_reason: str | None = None
