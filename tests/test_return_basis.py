@@ -146,8 +146,11 @@ def test_growth_scheme_uses_nav_series_against_tri(monkeypatch):
     ]
     monkeypatch.setattr(service, "load_benchmark_prices", lambda *_args, **_kwargs: benchmark)
     report = service.analyze_fund(
-        SimpleNamespace(), 77, benchmark_code="NIFTY TRI",
-        start_date=NAVS[0].date, end_date=NAVS[-1].date,
+        SimpleNamespace(),
+        77,
+        benchmark_code="NIFTY TRI",
+        start_date=NAVS[0].date,
+        end_date=NAVS[-1].date,
     )
     assert report.return_basis == "growth_nav_total_return"
     assert report.benchmark_return_basis == "tri"
@@ -163,6 +166,7 @@ def test_mixed_growth_and_idcw_comparison_is_rejected_before_ranking():
                         SimpleNamespace(scheme_code=1, option_type="growth"),
                         SimpleNamespace(scheme_code=2, option_type="idcw_reinvestment"),
                     ]
+
             return Result()
 
     with pytest.raises(ValueError, match="Mixed Growth and IDCW"):
