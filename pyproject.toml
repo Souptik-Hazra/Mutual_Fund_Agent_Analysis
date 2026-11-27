@@ -29,6 +29,7 @@ dependencies = [
 [project.scripts]
 mfa-sync-nav = "mutual_fund_agent_analysis.cli.sync_nav:main"
 mfa-sync-catalogue = "mutual_fund_agent_analysis.cli.sync_catalogue:main"
+mfa-sync-scheme-metadata = "mutual_fund_agent_analysis.cli.sync_scheme_metadata:main"
 mfa-sync-benchmark = "mutual_fund_agent_analysis.cli.sync_benchmark:main"
 mfa-purge-expired-social = "mutual_fund_agent_analysis.cli.purge_social:main"
 mfa-evaluate-agent = "mutual_fund_agent_analysis.cli.evaluate_agent:main"
