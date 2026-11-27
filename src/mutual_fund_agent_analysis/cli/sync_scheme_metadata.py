@@ -23,7 +23,9 @@ CHECKPOINT = Path("data/cache/scheme_metadata_offset.txt")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Sync scheme-name metadata and history from MFAPI without fetching NAV histories."
+        description=(
+            "Sync scheme-name metadata from MFAPI without fetching NAV histories."
+        )
     )
     parser.add_argument("--page-size", type=int, default=500)
     parser.add_argument("--start-offset", type=int)
