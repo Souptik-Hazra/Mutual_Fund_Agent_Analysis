@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -11,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.data.providers.contracts import NavResponse
+from mutual_fund_agent_analysis.data.services.scheme_metadata_sync import classify_scheme_name
 from mutual_fund_agent_analysis.data.services.intelligence import (
     add_entity_alias,
     add_entity_identifier,
@@ -139,13 +139,7 @@ def upsert_nav_response(
             raw_metadata, sort_keys=True, separators=(",", ":"), default=str
         )
         metadata_hash = hashlib.sha256(encoded_metadata.encode("utf-8")).hexdigest()
-        normalized_name = re.sub(r"[^a-z0-9]+", " ", metadata.scheme_name.lower()).strip()
-        plan_type = None
-        if re.search(r"\bdirect plan\b", normalized_name):
-            plan_type = "direct"
-        elif re.search(r"\bregular plan\b", normalized_name):
-            plan_type = "regular"
-        option_type = "growth" if re.search(r"\bgrowth\b", normalized_name) else None
+        plan_type, option_type = classify_scheme_name(metadata.scheme_name)
         source_url = (
             (response.raw_payload or {}).get("endpoint")
             or source_record.base_url
