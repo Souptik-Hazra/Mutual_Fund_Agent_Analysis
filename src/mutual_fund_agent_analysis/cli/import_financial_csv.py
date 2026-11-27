@@ -222,6 +222,21 @@ def import_scheme_metadata_rows(
                         scheme.effective_expense_ratio = record.expense_ratio
                         scheme.expense_ratio_effective_date = record.expense_ratio_effective_date
                         scheme.expense_ratio_source_key = source_key
+
+                    # Verified official-source metadata may enrich these
+                    # canonical descriptive fields. Ignore absent/non-string
+                    # values and preserve already-populated values.
+                    for field_name in (
+                        "fund_house",
+                        "scheme_type",
+                        "scheme_category",
+                        "isin_growth",
+                        "isin_div_reinvestment",
+                    ):
+                        value = record.metadata.get(field_name)
+                        if isinstance(value, str) and value.strip():
+                            if getattr(scheme, field_name) is None:
+                                setattr(scheme, field_name, value.strip())
                 session.flush()
             counts["imported"] += 1
         except (ValueError, ValidationError) as exc:
