@@ -6,9 +6,7 @@ import hashlib
 import json
 import re
 from datetime import UTC, datetime
-from urllib.parse import urlencode
 
-from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
