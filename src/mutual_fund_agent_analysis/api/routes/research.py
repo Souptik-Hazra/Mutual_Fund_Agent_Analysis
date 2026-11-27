@@ -958,7 +958,7 @@ async def import_social_dataset(
         ) from exc
 
 
-@router.get("/social/collect")
+@router.post("/social/collect")
 def collect_social_posts(
     source: str,
     q: Annotated[str, Query(min_length=3, max_length=300)],
