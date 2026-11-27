@@ -222,3 +222,39 @@ def test_distribution_import_tracks_corrections_and_never_attests_coverage():
     finally:
         session.close()
         engine.dispose()
+
+
+def test_verified_metadata_import_promotes_descriptive_fields_without_overwriting():
+    from mutual_fund_agent_analysis.cli.import_financial_csv import (
+        import_scheme_metadata_rows,
+    )
+
+    engine, session = _import_session()
+    try:
+        row = {
+            "scheme_code": "1001",
+            "source_url": "https://amc.example/scheme",
+            "metadata_json": (
+                '{"fund_house":"Example AMC","scheme_type":"Open Ended",'
+                '"scheme_category":"Flexi Cap","isin_growth":"INE000A01001"}'
+            ),
+        }
+        result = import_scheme_metadata_rows(
+            session, [row], source_key="amc", verification_status="verified"
+        )
+        assert result["counts"] == {"imported": 1, "skipped": 0, "failed": 0}
+        scheme = session.get(MutualFundScheme, 1001)
+        assert scheme.fund_house == "Example AMC"
+        assert scheme.scheme_type == "Open Ended"
+        assert scheme.scheme_category == "Flexi Cap"
+        assert scheme.isin_growth == "INE000A01001"
+
+        row["metadata_json"] = '{"fund_house":"Different AMC"}'
+        import_scheme_metadata_rows(
+            session, [row], source_key="amc", verification_status="verified"
+        )
+        session.refresh(scheme)
+        assert scheme.fund_house == "Example AMC"
+    finally:
+        session.close()
+        engine.dispose()
