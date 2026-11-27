@@ -123,6 +123,8 @@ def upsert_nav_response(
     session.execute(scheme_statement)
 
     source_record = session.get(DataSource, normalized_source)
+    if source_record is not None and not source_record.enabled:
+        raise ValueError(f"Source '{normalized_source}' is disabled.")
     source_key = normalized_source if source_record is not None else None
     if source_record is not None:
         raw_metadata = {
@@ -133,7 +135,6 @@ def upsert_nav_response(
             "scheme_category": metadata.scheme_category,
             "isin_growth": metadata.isin_growth,
             "isin_div_reinvestment": metadata.isin_div_reinvestment,
-            "nav_observation_count": len(response.data),
         }
         encoded_metadata = json.dumps(
             raw_metadata, sort_keys=True, separators=(",", ":"), default=str
