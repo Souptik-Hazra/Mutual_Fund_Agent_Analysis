@@ -11,7 +11,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIScheme
-from mutual_fund_agent_analysis.models import DataSource, MutualFundScheme, SchemeMetadataObservation
+from mutual_fund_agent_analysis.models import (
+    DataSource,
+    MutualFundScheme,
+    SchemeMetadataObservation,
+)
 
 
 def classify_scheme_name(name: str) -> tuple[str | None, str | None]:
@@ -76,7 +80,9 @@ def persist_catalogue_metadata(
             plan_type=plan_type,
             option_type=option_type,
             verification_status="unverified",
-            verification_note="Classification parsed from explicit MFAPI scheme-name labels; unverified.",
+            verification_note=(
+                "Classification parsed from explicit MFAPI scheme-name labels; unverified."
+            ),
             metadata_json=raw,
         )
         .on_conflict_do_nothing(
