@@ -85,7 +85,9 @@ def persist_catalogue_metadata(
         .returning(SchemeMetadataObservation.metadata_id)
     ).scalar_one_or_none()
 
-    scheme.scheme_name = item.scheme_name
+    # The canonical name is assigned when the scheme is first created. Later
+    # provider labels remain source-attributed observations/aliases and cannot
+    # silently rename a canonical record.
     scheme.isin_growth = item.isin_growth or scheme.isin_growth
     scheme.isin_div_reinvestment = item.isin_div_reinvestment or scheme.isin_div_reinvestment
     # Parsed labels are observations only until independently verified. Do not
