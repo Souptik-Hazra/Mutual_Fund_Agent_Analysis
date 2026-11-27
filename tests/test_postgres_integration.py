@@ -39,6 +39,7 @@ from mutual_fund_agent_analysis.models import (
     ResearchEntity,
     SecurityMarketObservation,
     SocialPost,
+    SchemeMetadataObservation,
 )
 
 
@@ -586,3 +587,77 @@ def test_postgres_social_purge_deletes_only_expired_records(migrated_postgres: E
         )
         assert expired is None
         assert unexpired is not None
+
+
+def test_nav_metadata_observation_is_compact_idempotent_and_source_gated(
+    migrated_postgres: Engine,
+) -> None:
+    source_key = "metadata_review_provider"
+    with Session(migrated_postgres) as session, session.begin():
+        session.add(
+            DataSource(
+                source_key=source_key,
+                display_name="Metadata review provider",
+                source_type="provider",
+                authority_tier=3,
+                is_official=False,
+                enabled=True,
+                base_url="https://metadata.example.test",
+                metadata_json={},
+            )
+        )
+
+    def response(nav_rows: list[dict[str, str]]) -> MFAPINavResponse:
+        return MFAPINavResponse.model_validate(
+            {
+                "meta": {
+                    "scheme_code": 991245,
+                    "scheme_name": "Metadata Review Fund - Direct Plan - Growth",
+                    "fund_house": "Review AMC",
+                    "scheme_type": "Open Ended Schemes",
+                    "scheme_category": "Equity",
+                },
+                "data": nav_rows,
+                "status": "SUCCESS",
+            }
+        )
+
+    with Session(migrated_postgres) as session, session.begin():
+        upsert_nav_response(
+            session,
+            response([{"date": "25-11-2026", "nav": "10.0"}]),
+            source=source_key,
+        )
+        upsert_nav_response(
+            session,
+            response([
+                {"date": "25-11-2026", "nav": "10.0"},
+                {"date": "26-11-2026", "nav": "10.1"},
+            ]),
+            source=source_key,
+        )
+
+    with Session(migrated_postgres) as session:
+        observations = session.scalars(
+            select(SchemeMetadataObservation).where(
+                SchemeMetadataObservation.scheme_code == 991245,
+                SchemeMetadataObservation.source_key == source_key,
+            )
+        ).all()
+        assert len(observations) == 1
+        assert observations[0].verification_status == "unverified"
+        assert "nav_observation_count" not in observations[0].metadata_json
+        assert observations[0].metadata_json["fund_house"] == "Review AMC"
+
+    with Session(migrated_postgres) as session, session.begin():
+        source = session.get(DataSource, source_key)
+        assert source is not None
+        source.enabled = False
+
+    with Session(migrated_postgres) as session, session.begin():
+        with pytest.raises(ValueError, match="disabled"):
+            upsert_nav_response(
+                session,
+                response([{"date": "27-11-2026", "nav": "10.2"}]),
+                source=source_key,
+            )
