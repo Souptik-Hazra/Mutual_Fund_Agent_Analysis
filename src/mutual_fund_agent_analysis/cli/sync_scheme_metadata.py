@@ -86,13 +86,19 @@ def main() -> None:
             time.sleep(1.0)
 
         total_schemes = session.scalar(select(func.count()).select_from(MutualFundScheme)) or 0
-        observed_schemes = session.scalar(
-            select(func.count(func.distinct(SchemeMetadataObservation.scheme_code)))
-        ) or 0
+        observed_schemes = (
+            session.scalar(select(func.count(func.distinct(SchemeMetadataObservation.scheme_code))))
+            or 0
+        )
         logger.info(
             "Metadata sync complete for this run: pages=%s new=%s duplicates=%s "
             "catalogue_schemes=%s schemes_with_metadata_history=%s next_offset=%s",
-            pages, imported, skipped, total_schemes, observed_schemes, offset,
+            pages,
+            imported,
+            skipped,
+            total_schemes,
+            observed_schemes,
+            offset,
         )
 
 
