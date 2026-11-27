@@ -88,7 +88,7 @@ def persist_catalogue_metadata(
     scheme.scheme_name = item.scheme_name
     scheme.isin_growth = item.isin_growth or scheme.isin_growth
     scheme.isin_div_reinvestment = item.isin_div_reinvestment or scheme.isin_div_reinvestment
-    scheme.plan_type = plan_type or scheme.plan_type
-    scheme.option_type = option_type or scheme.option_type
+    # Parsed labels are observations only until independently verified. Do not
+    # let an unverified provider classification affect canonical scheme filters.
     scheme.source_updated_at = observed_at or datetime.now(UTC)
     return existing is not None
