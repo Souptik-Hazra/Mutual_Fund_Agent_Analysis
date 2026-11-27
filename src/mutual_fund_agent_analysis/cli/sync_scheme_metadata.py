@@ -73,7 +73,10 @@ def main() -> None:
             CHECKPOINT.write_text(str(offset), encoding="utf-8")
             logger.info(
                 "Pages=%s offset=%s new_observations=%s duplicates=%s",
-                pages, offset, imported, skipped,
+                pages,
+                offset,
+                imported,
+                skipped,
             )
             if len(page) < args.page_size:
                 CHECKPOINT.unlink(missing_ok=True)
