@@ -1,0 +1,42 @@
+name: Backup and Restore Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - "Dockerfile"
+      - "scripts/backup-local.sh"
+      - "scripts/restore-local.sh"
+      - "scripts/test-backup-restore-drill.sh"
+      - "migrations/**"
+      - "src/mutual_fund_agent_analysis/models/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - "Dockerfile"
+      - "scripts/backup-local.sh"
+      - "scripts/restore-local.sh"
+      - "scripts/test-backup-restore-drill.sh"
+      - "migrations/**"
+      - "src/mutual_fund_agent_analysis/models/**"
+
+concurrency:
+  group: backup-restore-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backup-restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run isolated PostgreSQL and Qdrant recovery drill
+        run: ./scripts/test-backup-restore-drill.sh
