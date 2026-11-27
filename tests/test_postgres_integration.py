@@ -630,10 +630,12 @@ def test_nav_metadata_observation_is_compact_idempotent_and_source_gated(
         )
         upsert_nav_response(
             session,
-            response([
-                {"date": "25-11-2026", "nav": "10.0"},
-                {"date": "26-11-2026", "nav": "10.1"},
-            ]),
+            response(
+                [
+                    {"date": "25-11-2026", "nav": "10.0"},
+                    {"date": "26-11-2026", "nav": "10.1"},
+                ]
+            ),
             source=source_key,
         )
 
