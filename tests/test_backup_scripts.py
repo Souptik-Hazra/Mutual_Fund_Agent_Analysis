@@ -17,11 +17,11 @@ def test_backup_and_restore_scripts_pass_bash_syntax_check():
         assert result.returncode == 0, result.stderr
 
 
-def test_qdrant_is_not_published_to_the_host():
+def test_qdrant_is_published_to_loopback_only():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     qdrant = compose.split("  qdrant:", 1)[1].split("\n  api:", 1)[0]
-    assert "ports:" not in qdrant
-    assert "6333:" not in qdrant
+    assert '"127.0.0.1:6333:6333"' in qdrant
+    assert '"0.0.0.0:6333:6333"' not in qdrant
 
 
 def test_backup_and_restore_use_private_compose_network():
