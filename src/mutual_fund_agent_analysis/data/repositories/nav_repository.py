@@ -140,12 +140,12 @@ def upsert_nav_response(
         )
         metadata_hash = hashlib.sha256(encoded_metadata.encode("utf-8")).hexdigest()
         normalized_name = re.sub(r"[^a-z0-9]+", " ", metadata.scheme_name.lower()).strip()
-        plan_type = (
-            "direct" if re.search(r"\\bdirect plan\\b", normalized_name)
-            else "regular" if re.search(r"\\bregular plan\\b", normalized_name)
-            else None
-        )
-        option_type = "growth" if re.search(r"\\bgrowth\\b", normalized_name) else None
+        plan_type = None
+        if re.search(r"\bdirect plan\b", normalized_name):
+            plan_type = "direct"
+        elif re.search(r"\bregular plan\b", normalized_name):
+            plan_type = "regular"
+        option_type = "growth" if re.search(r"\bgrowth\b", normalized_name) else None
         source_url = (
             (response.raw_payload or {}).get("endpoint")
             or source_record.base_url
