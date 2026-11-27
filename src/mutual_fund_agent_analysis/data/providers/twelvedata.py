@@ -108,6 +108,13 @@ class TwelveDataClient:
         price = self._decimal(payload, "close", "price")
         if price is None or price <= 0:
             raise ValueError("Provider quote has no positive last price.")
+        raw_volume = payload.get("volume")
+        try:
+            volume = int(raw_volume) if raw_volume not in (None, "") else None
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Provider quote returned an invalid trading volume.") from exc
+        if volume is not None and volume < 0:
+            raise ValueError("Provider quote returned a negative trading volume.")
         state = payload.get("is_market_open")
         return EquityQuote(
             symbol=returned_symbol.strip().upper(),
@@ -117,7 +124,7 @@ class TwelveDataClient:
             change_pct=self._decimal(payload, "percent_change"),
             day_high=self._decimal(payload, "high"),
             day_low=self._decimal(payload, "low"),
-            volume=int(payload["volume"]) if payload.get("volume") not in (None, "") else None,
+            volume=volume,
             market_status="trading" if state is True else "closed" if state is False else "unknown",
             source_url=f"{self.base_url}/quote",
         )
