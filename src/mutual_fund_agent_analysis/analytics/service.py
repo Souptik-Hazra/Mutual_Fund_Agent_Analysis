@@ -108,9 +108,7 @@ def load_fund_prices(
         coverage_statement = select(NavReconciliation).where(
             NavReconciliation.scheme_code == scheme_code
         )
-        coverage = session.scalars(
-            coverage_statement.order_by(NavReconciliation.nav_date)
-        ).all()
+        coverage = session.scalars(coverage_statement.order_by(NavReconciliation.nav_date)).all()
         if not coverage:
             raise ValueError(
                 f"No reconciled NAV observations exist for scheme {scheme_code}. "
