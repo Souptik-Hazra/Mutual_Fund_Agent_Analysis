@@ -90,6 +90,9 @@ def upsert_nav_response(
     if not normalized_source or len(normalized_source) > 40:
         raise ValueError("source must contain between 1 and 40 characters.")
     metadata = response.meta
+    source_record = session.get(DataSource, normalized_source)
+    if source_record is not None and not source_record.enabled:
+        raise ValueError(f"Source '{normalized_source}' is disabled.")
     scheme_values = {
         "scheme_code": metadata.scheme_code,
         "scheme_name": metadata.scheme_name,
@@ -122,9 +125,6 @@ def upsert_nav_response(
     )
     session.execute(scheme_statement)
 
-    source_record = session.get(DataSource, normalized_source)
-    if source_record is not None and not source_record.enabled:
-        raise ValueError(f"Source '{normalized_source}' is disabled.")
     source_key = normalized_source if source_record is not None else None
     if source_record is not None:
         raw_metadata = {
