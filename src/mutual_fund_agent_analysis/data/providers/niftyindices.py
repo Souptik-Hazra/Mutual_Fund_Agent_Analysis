@@ -158,15 +158,22 @@ class NiftyIndicesClient:
         return min(0.5 * (2**attempt), 10.0)
 
     def _fetch_chunk(self, name: str, start_date: date, end_date: date) -> Any:
+        normalized_name = name.strip()
+        if (
+            not normalized_name
+            or len(normalized_name) > 160
+            or any(char in normalized_name for char in ("'", '"', "\\", "\n", "\r", "{", "}"))
+        ):
+            raise ValueError("Benchmark name contains unsupported characters.")
         cinfo = (
             "{'name':'"
-            + name
+            + normalized_name
             + "','startDate':'"
             + start_date.strftime("%d-%b-%Y")
             + "','endDate':'"
             + end_date.strftime("%d-%b-%Y")
             + "','indexName':'"
-            + name
+            + normalized_name
             + "'}"
         )
         body = json.dumps({"cinfo": cinfo})
