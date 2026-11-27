@@ -233,7 +233,10 @@ def sync_scheme_nav_on_demand(
     if processed < 2:
         raise HTTPException(
             status_code=422,
-            detail="The provider returned fewer than two NAV observations; analytics cannot be calculated.",
+            detail=(
+                "The provider returned fewer than two NAV observations; "
+                "analytics cannot be calculated."
+            ),
         )
     return {
         "scheme_code": scheme_code,
