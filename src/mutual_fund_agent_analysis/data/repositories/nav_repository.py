@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -30,6 +31,7 @@ from mutual_fund_agent_analysis.models import (
     NavObservation,
     NavReconciliation,
     ProviderSyncRun,
+    SchemeMetadataObservation,
 )
 
 
@@ -104,15 +106,15 @@ def upsert_nav_response(
     scheme_statement = scheme_statement.on_conflict_do_update(
         index_elements=[MutualFundScheme.scheme_code],
         set_={
-            "scheme_name": excluded.scheme_name,
-            "fund_house": func.coalesce(excluded.fund_house, MutualFundScheme.fund_house),
-            "scheme_type": func.coalesce(excluded.scheme_type, MutualFundScheme.scheme_type),
+            "scheme_name": func.coalesce(MutualFundScheme.scheme_name, excluded.scheme_name),
+            "fund_house": func.coalesce(MutualFundScheme.fund_house, excluded.fund_house),
+            "scheme_type": func.coalesce(MutualFundScheme.scheme_type, excluded.scheme_type),
             "scheme_category": func.coalesce(
-                excluded.scheme_category, MutualFundScheme.scheme_category
+                MutualFundScheme.scheme_category, excluded.scheme_category
             ),
-            "isin_growth": func.coalesce(excluded.isin_growth, MutualFundScheme.isin_growth),
+            "isin_growth": func.coalesce(MutualFundScheme.isin_growth, excluded.isin_growth),
             "isin_div_reinvestment": func.coalesce(
-                excluded.isin_div_reinvestment, MutualFundScheme.isin_div_reinvestment
+                MutualFundScheme.isin_div_reinvestment, excluded.isin_div_reinvestment
             ),
             "source": excluded.source,
             "source_updated_at": excluded.source_updated_at,
@@ -120,9 +122,51 @@ def upsert_nav_response(
     )
     session.execute(scheme_statement)
 
-    source_key = (
-        normalized_source if session.get(DataSource, normalized_source) is not None else None
-    )
+    source_record = session.get(DataSource, normalized_source)
+    source_key = normalized_source if source_record is not None else None
+    if source_record is not None:
+        raw_metadata = {
+            "scheme_code": metadata.scheme_code,
+            "scheme_name": metadata.scheme_name,
+            "fund_house": metadata.fund_house,
+            "scheme_type": metadata.scheme_type,
+            "scheme_category": metadata.scheme_category,
+            "isin_growth": metadata.isin_growth,
+            "isin_div_reinvestment": metadata.isin_div_reinvestment,
+            "provider_payload": response.raw_payload or {},
+        }
+        encoded_metadata = json.dumps(
+            raw_metadata, sort_keys=True, separators=(",", ":"), default=str
+        )
+        metadata_hash = hashlib.sha256(encoded_metadata.encode("utf-8")).hexdigest()
+        normalized_name = re.sub(r"[^a-z0-9]+", " ", metadata.scheme_name.lower()).strip()
+        plan_type = (
+            "direct" if re.search(r"\\bdirect plan\\b", normalized_name)
+            else "regular" if re.search(r"\\bregular plan\\b", normalized_name)
+            else None
+        )
+        option_type = "growth" if re.search(r"\\bgrowth\\b", normalized_name) else None
+        source_url = (
+            (response.raw_payload or {}).get("endpoint")
+            or source_record.base_url
+            or "https://api.mfapi.in"
+        )
+        metadata_statement = insert(SchemeMetadataObservation).values(
+            scheme_code=metadata.scheme_code,
+            source_key=normalized_source,
+            source_url=source_url,
+            content_hash=metadata_hash,
+            observed_at=datetime.now(UTC),
+            plan_type=plan_type,
+            option_type=option_type,
+            verification_status="unverified",
+            verification_note=(
+                "Captured from NAV provider metadata; canonical classifications "
+                "require independent verification."
+            ),
+            metadata_json=raw_metadata,
+        ).on_conflict_do_nothing(constraint="uq_scheme_metadata_source_hash")
+        session.execute(metadata_statement)
     entity = session.scalar(
         select(ResearchEntity)
         .join(EntityIdentifier, EntityIdentifier.entity_id == ResearchEntity.entity_id)
