@@ -134,7 +134,7 @@ class MFAPIClient:
                             except (TypeError, ValueError, OverflowError):
                                 retry_after = None
                 delay = retry_after if retry_after is not None else 5.0 * (2**attempt)
-                time.sleep(min(max(delay, 1.0), 120.0))
+                time.sleep(min(max(delay, 0.0), 120.0))
         if last_error is not None:
             raise last_error
         raise RuntimeError("MFAPI request failed without an exception.")
