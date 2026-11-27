@@ -11,7 +11,9 @@ from urllib.parse import urlencode
 from sqlalchemy import func, select
 
 from mutual_fund_agent_analysis.data.providers.mfapi import MFAPIClient
-from mutual_fund_agent_analysis.data.services.scheme_metadata_sync import persist_catalogue_metadata
+from mutual_fund_agent_analysis.data.services.scheme_metadata_sync import (
+    persist_catalogue_metadata,
+)
 from mutual_fund_agent_analysis.database.session import get_session_factory
 from mutual_fund_agent_analysis.models import MutualFundScheme, SchemeMetadataObservation
 
