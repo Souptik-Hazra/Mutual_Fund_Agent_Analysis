@@ -37,9 +37,9 @@ from mutual_fund_agent_analysis.models import (
     NavReconciliation,
     ProviderSyncRun,
     ResearchEntity,
+    SchemeMetadataObservation,
     SecurityMarketObservation,
     SocialPost,
-    SchemeMetadataObservation,
 )
 
 
