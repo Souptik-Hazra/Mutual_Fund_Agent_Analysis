@@ -23,9 +23,7 @@ CHECKPOINT = Path("data/cache/scheme_metadata_offset.txt")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description=(
-            "Sync scheme-name metadata from MFAPI without fetching NAV histories."
-        )
+        description=("Sync scheme-name metadata from MFAPI without fetching NAV histories.")
     )
     parser.add_argument("--page-size", type=int, default=500)
     parser.add_argument("--start-offset", type=int)
@@ -41,8 +39,10 @@ def main() -> None:
     CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
     if args.reset_checkpoint:
         CHECKPOINT.unlink(missing_ok=True)
-    offset = args.start_offset if args.start_offset is not None else (
-        int(CHECKPOINT.read_text().strip()) if CHECKPOINT.exists() else 0
+    offset = (
+        args.start_offset
+        if args.start_offset is not None
+        else (int(CHECKPOINT.read_text().strip()) if CHECKPOINT.exists() else 0)
     )
     if offset < 0:
         parser.error("Offset cannot be negative.")
