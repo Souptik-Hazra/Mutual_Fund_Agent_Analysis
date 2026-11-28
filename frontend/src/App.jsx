@@ -381,6 +381,7 @@ export default function App() {
   const compareSearchRequest = useRef(0);
   const assistantSearchRequest = useRef(0);
   const eventSearchRequest = useRef(0);
+  const operationRequest = useRef(0);
 
   const schemeCodes = useMemo(
     () =>
@@ -392,11 +393,14 @@ export default function App() {
   );
   const compareNameMap = useMemo(() => Object.fromEntries(selectedSchemes.map((s) => [s.scheme_code, s.scheme_name])), [selectedSchemes]);
   const updateSchemeSelection = (next) => {
+    operationRequest.current += 1;
     const unique = [...new Map(next.map((item) => [item.scheme_code, item])).values()].slice(0, 5);
     setSelectedSchemes(unique); setCompareSelected(unique); setAssistantSelected(unique);
     setCodes(unique.map((item) => item.scheme_code).join(","));
+    setData(null); setError("");
   };
   const selectGlobalScheme = (scheme, maxCount = 5) => {
+    if (maxCount === 1) return updateSchemeSelection([scheme]);
     if (selectedSchemes.some((item) => item.scheme_code === scheme.scheme_code)) return;
     if (selectedSchemes.length >= maxCount) return setError(`Select a maximum of ${maxCount} funds.`);
     updateSchemeSelection([...selectedSchemes, scheme]);
@@ -502,14 +506,17 @@ export default function App() {
         : "No valid official effective-dated mapping; fund-only analysis will be used unless you enter an explicit override.";
 
   async function run(fn, stepLabel = "") {
+    const requestId = ++operationRequest.current;
     setBusy(true); setBusyStep(stepLabel); setError(""); setData(null);
     try {
-      const result = await fn(); setData(result); return result;
+      const result = await fn();
+      if (requestId === operationRequest.current) setData(result);
+      return result;
     } catch (e) {
-      setError(e.message); return null;
+      if (requestId === operationRequest.current) setError(e.message);
+      return null;
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   }
   function json(method, body) {
@@ -995,6 +1002,9 @@ export default function App() {
                 compareSearchRequest.current += 1;
                 assistantSearchRequest.current += 1;
                 eventSearchRequest.current += 1;
+                operationRequest.current += 1;
+                setBusy(false);
+                setBusyStep("");
                 setTab(item);
                 setData(null);
                 setError("");
