@@ -454,12 +454,12 @@ export default function App() {
         benchmark: { code: override.trim(), source: "niftyindices", source_key: null },
         mappings: [],
       };
-      setBenchmarkResolution(result);
+      if (requestId === operationRequest.current) setBenchmarkResolution(result);
       return result;
     }
     if (!targetCodes.length) {
       const result = { availability: "unavailable", benchmark: null, mappings: [] };
-      setBenchmarkResolution(result);
+      if (requestId === operationRequest.current) setBenchmarkResolution(result);
       return result;
     }
     const mappings = await Promise.all(
@@ -787,6 +787,7 @@ export default function App() {
   };
   const runEvents = async () => {
     if (!validateDateRange()) return;
+    const requestId = ++operationRequest.current;
     const selectedCode = eventScheme?.scheme_code || schemeCodes[0];
     if (!selectedCode) return setError("Search and select a fund before loading events.");
     const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo, limit: "100" });
@@ -803,19 +804,19 @@ export default function App() {
         request(`/events/fund-exposure/${selectedCode}?start_date=${dateFrom}&end_date=${dateTo}`),
       ]);
       const exposureById = new Map((exposure.events || []).map((item) => [item.event_id, item]));
-      setEventData({
+      if (requestId === operationRequest.current) setEventData({
         ...listing,
         events: (listing.items || []).map((item) => ({ ...item, ...(exposureById.get(item.event_id) || {}) })),
         exposure_summary: exposure,
       });
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
   const collectEventFeed = async () => {
+    const requestId = ++operationRequest.current;
     const source = eventSources.find((item) => item.source_key === eventSource);
     if (!source) return setError("Select an official source before collecting.");
     if (!source.ready) return setError("This source is not approved for collection.");
@@ -829,15 +830,17 @@ export default function App() {
         `/events/collect/${encodeURIComponent(source.source_key)}?feed_url=${encodeURIComponent(eventFeedUrl.trim())}`,
         { method: "POST" },
       );
+      if (requestId !== operationRequest.current) return;
       setEventCollection(result);
       const refreshed = await request("/events/sources");
-      setEventSources(refreshed.items || []);
-      await runEvents();
+      if (requestId === operationRequest.current) {
+        setEventSources(refreshed.items || []);
+        await runEvents();
+      }
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
