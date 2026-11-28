@@ -716,7 +716,7 @@ def _validate_synthesized_answer(
 ) -> tuple[bool, str]:
     """Fail closed when synthesis invents citation references or numeric values."""
     citation_ids = {item["citation_id"] for item in citations if item.get("citation_id")}
-    used_ids = set(re.findall(r"\\[(C\\d+)\\]", answer))
+    used_ids = set(re.findall(r"\[(C\d+)\]", answer))
     if used_ids - citation_ids:
         return False, "The answer contains unknown citation references."
     if citation_ids and not used_ids:
