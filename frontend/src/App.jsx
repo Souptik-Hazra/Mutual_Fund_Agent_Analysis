@@ -899,7 +899,7 @@ export default function App() {
           as_of_date: dateTo,
           synthesize,
         },
-        (progress) => setStreamProgress((current) => [...current, progress]),
+        (progress) => { if (requestId === operationRequest.current) setStreamProgress((current) => [...current, progress]); },
       );
       if (requestId === operationRequest.current) setData(result);
     } catch (e) {
