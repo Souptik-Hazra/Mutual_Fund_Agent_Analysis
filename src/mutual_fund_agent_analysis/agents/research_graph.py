@@ -228,6 +228,10 @@ def _historical_nav_citations(
     session: Session, scheme_code: int, start_date: date, end_date: date
 ) -> list[dict[str, Any]]:
     """Cite the NAV observations in the exact window used by fund analytics."""
+    if isinstance(start_date, str):
+        start_date = date.fromisoformat(start_date)
+    if isinstance(end_date, str):
+        end_date = date.fromisoformat(end_date)
     rows = session.scalars(
         select(NavReconciliation)
         .where(
@@ -308,16 +312,22 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         benchmark_source=request.benchmark_source or "niftyindices",
                     )
                 results[intent] = _jsonable(report)
-                reports = report.funds if len(codes) > 1 else (report,)
+                reports = report.funds if hasattr(report, "funds") else (report,)
                 for fund_report in reports:
-                    citations.extend(
-                        _historical_nav_citations(
-                            session,
-                            fund_report.scheme_code,
-                            fund_report.start_date,
-                            fund_report.end_date,
+                    if isinstance(fund_report, dict):
+                        report_code = fund_report.get("scheme_code")
+                        report_start = fund_report.get("start_date") or request.start_date
+                        report_end = fund_report.get("end_date") or request.end_date
+                    else:
+                        report_code = fund_report.scheme_code
+                        report_start = fund_report.start_date
+                        report_end = fund_report.end_date
+                    if report_code and report_start and report_end:
+                        citations.extend(
+                            _historical_nav_citations(
+                                session, report_code, report_start, report_end
+                            )
                         )
-                    )
             elif intent == "category":
                 if not codes or len(codes) != 1:
                     raise ValueError("Category analysis requires exactly one selected scheme_code.")
