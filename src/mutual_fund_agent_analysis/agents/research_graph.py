@@ -739,6 +739,7 @@ def _validate_synthesized_answer(
 
     def normalize_number(value: str) -> str:
         return value.replace(",", "").rstrip("%")
+
     evidence_numbers = {
         normalize_number(value)
         for value in re.findall(r"(?<![A-Za-z])[-+]?\d[\d,]*(?:\.\d+)?%?", evidence_text)
