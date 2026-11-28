@@ -736,6 +736,7 @@ def _validate_synthesized_answer(
         ensure_ascii=False,
         default=str,
     )
+
     def normalize_number(value: str) -> str:
         return value.replace(",", "").rstrip("%")
     evidence_numbers = {
@@ -744,7 +745,7 @@ def _validate_synthesized_answer(
     }
     answer_numbers = {
         normalize_number(value)
-        for value in re.findall(r"(?<![A-Za-z])[-+]?\\d[\\d,]*(?:\\.\\d+)?%?", answer)
+        for value in re.findall(r"(?<![A-Za-z])[-+]?\d[\d,]*(?:\.\d+)?%?", answer)
     }
     if answer_numbers - evidence_numbers:
         return False, "The answer contains numerical claims not present in retrieved evidence."
