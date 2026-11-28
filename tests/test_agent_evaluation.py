@@ -59,9 +59,7 @@ def test_reviewed_retrieval_benchmark_exercises_lexical_semantic_and_fused_ranki
                 for document_id, chunk_index in items
             ]
 
-        fused = reciprocal_rank_fusion(
-            rows(case["lexical"]), rows(case["semantic"]), limit=5
-        )
+        fused = reciprocal_rank_fusion(rows(case["lexical"]), rows(case["semantic"]), limit=5)
         def encode(pair):
             return pair[0] * 1000 + pair[1]
         metrics = retrieval_metrics(
@@ -357,14 +355,16 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
             return type(
                 "Rows",
                 (),
-                {"all": lambda _self: [
-                    SimpleNamespace(
-                        canonical_source="amfi",
-                        evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
-                        nav_date=date(2026, 11, 25),
-                        status="matched",
-                    )
-                ]},
+                {
+                    "all": lambda _self: [
+                        SimpleNamespace(
+                            canonical_source="amfi",
+                            evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
+                            nav_date=date(2026, 11, 25),
+                            status="matched",
+                        )
+                    ]
+                },
             )()
 
         def get(self, model, _key):
