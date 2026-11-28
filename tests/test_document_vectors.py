@@ -46,7 +46,17 @@ def test_indexing_replaces_previous_chunks_and_removes_stale_trailing_chunks(mon
             assert collection_name == "test_vectors"
             assert wait is True
             self.deleted_document_ids.append(100)
-            self.points.clear()
+            filters = points_selector.filter
+            keep_conditions = getattr(filters, "must_not", [])
+            keep_version = (
+                keep_conditions[0].match.value if keep_conditions else None
+            )
+            self.points = {
+                point_id: document
+                for point_id, document in self.points.items()
+                if keep_version is not None
+                and document.metadata.get("index_version") == keep_version
+            }
 
         def close(self):
             self.closed = True
@@ -141,7 +151,7 @@ def test_indexing_replaces_previous_chunks_and_removes_stale_trailing_chunks(mon
     assert document_vectors.index_chunks(100, "Fixture", shorter) is True
     assert len(client.points) == 1
     assert next(iter(client.points.values())).page_content == "replacement"
-    assert client.deleted_document_ids == [100, 100]
+    assert client.deleted_document_ids == [100, 100, 100]
     assert client.closed is True
 
 
