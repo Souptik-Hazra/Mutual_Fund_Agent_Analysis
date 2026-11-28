@@ -25,6 +25,33 @@ export async function request(path, options = {}) {
   return readPayload(response);
 }
 
+function parseSSEFrame(frame, onProgress, state) {
+  let event = "message";
+  const data = [];
+
+  for (const line of frame.split("\n")) {
+    if (!line || line.startsWith(":")) continue;
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) {
+      data.push(line.slice(5).replace(/^ /, ""));
+    }
+  }
+
+  if (!data.length) return;
+  let payload;
+  try {
+    payload = JSON.parse(data.join("\n"));
+  } catch (cause) {
+    throw new Error("Received an invalid JSON event from the research stream.", { cause });
+  }
+
+  if (event === "progress") onProgress?.(payload);
+  else if (event === "complete") state.completed = payload;
+  else if (event === "error") {
+    throw new Error(payload.detail || "Research stream failed.");
+  }
+}
+
 export async function streamRequest(path, body, onProgress, signal) {
   const response = await fetch(`${API}${path}`, {
     method: "POST",
@@ -37,26 +64,37 @@ export async function streamRequest(path, body, onProgress, signal) {
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  const state = { completed: null };
   let buffer = "";
-  let completed = null;
+  let streamEnded = false;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-    const frames = buffer.split("\n\n");
-    buffer = frames.pop() || "";
-    for (const frame of frames) {
-      const lines = frame.split("\n");
-      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() || "message";
-      const dataLine = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
-      if (!dataLine) continue;
-      const payload = JSON.parse(dataLine);
-      if (event === "progress") onProgress?.(payload);
-      if (event === "complete") completed = payload;
-      if (event === "error") throw new Error(payload.detail || "Research stream failed.");
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() || "";
+      for (const frame of frames) {
+        if (frame.trim()) parseSSEFrame(frame, onProgress, state);
+      }
+
+      if (done) {
+        streamEnded = true;
+        if (buffer.trim()) parseSSEFrame(buffer, onProgress, state);
+        break;
+      }
     }
-    if (done) break;
+  } finally {
+    if (!streamEnded) {
+      await reader.cancel().catch(() => {});
+    }
+    reader.releaseLock();
   }
-  if (!completed) throw new Error("Research stream ended before returning a result.");
-  return completed;
+
+  if (!state.completed) {
+    throw new Error("Research stream ended before returning a result.");
+  }
+  return state.completed;
 }
