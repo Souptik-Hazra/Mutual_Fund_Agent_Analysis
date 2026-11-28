@@ -445,7 +445,7 @@ def test_llm_synthesis_is_opt_in_and_uses_provider_retry_policy(monkeypatch):
         def invoke(self, messages):
             captured["messages"] = messages
             return SimpleNamespace(
-                content="Evidence summary.",
+                content="Evidence summary. [C1]",
                 usage_metadata={
                     "input_tokens": 120,
                     "output_tokens": 24,
@@ -467,6 +467,6 @@ def test_llm_synthesis_is_opt_in_and_uses_provider_retry_policy(monkeypatch):
         }
     )
 
-    assert result["answer"] == "Evidence summary."
+    assert result["answer"] == "Evidence summary. [C1]"
     assert result["model_used"] == "StubModel"
     assert len(captured["messages"]) == 2
