@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { request, streamRequest } from "./api";
 import { buildDocumentSearchPath, isBenchmarkObservationUnavailable } from "./research";
 import { ActualExposureView, FundProfileView, SecurityModal } from "./AdvancedIntelligence";
@@ -226,22 +226,29 @@ function FundSelector({
   const [term, setTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
-
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   useEffect(() => {
     const trimmed = term.trim();
+    let active = true;
     if (trimmed.length < 2) {
-      setSuggestions([]);
-      return;
+      setSuggestions([]); setOpen(false); setSearching(false); setSearchError("");
+      return () => { active = false; };
     }
+    setSearching(true); setSearchError("");
     const handle = setTimeout(() => {
       request(`/schemes?q=${encodeURIComponent(trimmed)}&limit=12`)
         .then((res) => {
-          setSuggestions(res.items || []);
-          setOpen(true);
+          if (!active) return;
+          setSuggestions(Array.isArray(res.items) ? res.items : []); setOpen(true);
         })
-        .catch(() => setSuggestions([]));
+        .catch((error) => {
+          if (!active) return;
+          setSuggestions([]); setSearchError(error.message || "Unable to search funds."); setOpen(true);
+        })
+        .finally(() => { if (active) setSearching(false); });
     }, 220);
-    return () => clearTimeout(handle);
+    return () => { active = false; clearTimeout(handle); };
   }, [term]);
 
   return (
@@ -259,15 +266,16 @@ function FundSelector({
       )}
       <div className="field">
         <label>{label}</label>
-        <input
-          value={term}
+        <input value={term} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open}
           onChange={(e) => setTerm(e.target.value)}
-          onFocus={() => suggestions.length && setOpen(true)}
-          placeholder={placeholder}
-        />
+          onFocus={() => (suggestions.length || searching || searchError) && setOpen(true)}
+          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} placeholder={placeholder} />
       </div>
-      {open && suggestions.length > 0 && (
-        <div className="fund-suggestions">
+      {open && (searching || searchError || suggestions.length > 0) && (
+        <div className="fund-suggestions" role="listbox" aria-label="Fund search results">
+          {searching && <div className="fund-search-status">Searching funds…</div>}
+          {searchError && <div className="fund-search-error" role="status">{searchError}</div>}
+          {!searching && !searchError && suggestions.length === 0 && <div className="fund-search-status">No matching funds found.</div>}
           {suggestions.map((s) => {
             const added = selectedSchemes.some((item) => item.scheme_code === s.scheme_code);
             return (
@@ -370,6 +378,9 @@ export default function App() {
   const [transactionUnits, setTransactionUnits] = useState("100");
   const [transactionNav, setTransactionNav] = useState("");
   const [transactionNotes, setTransactionNotes] = useState("");
+  const compareSearchRequest = useRef(0);
+  const assistantSearchRequest = useRef(0);
+  const eventSearchRequest = useRef(0);
 
   const schemeCodes = useMemo(
     () =>
@@ -379,37 +390,24 @@ export default function App() {
         .filter((x) => Number.isInteger(x) && x > 0),
     [codes],
   );
-  const compareNameMap = useMemo(
-    () =>
-      Object.fromEntries([
-        ...selectedSchemes.map((s) => [s.scheme_code, s.scheme_name]),
-        ...compareSelected.map((s) => [s.scheme_code, s.scheme_name]),
-      ]),
-    [selectedSchemes, compareSelected],
-  );
-
+  const compareNameMap = useMemo(() => Object.fromEntries(selectedSchemes.map((s) => [s.scheme_code, s.scheme_name])), [selectedSchemes]);
+  const updateSchemeSelection = (next) => {
+    const unique = [...new Map(next.map((item) => [item.scheme_code, item])).values()].slice(0, 5);
+    setSelectedSchemes(unique); setCompareSelected(unique); setAssistantSelected(unique);
+    setCodes(unique.map((item) => item.scheme_code).join(","));
+  };
   const selectGlobalScheme = (scheme, maxCount = 5) => {
-    if (maxCount === 1) {
-      setSelectedSchemes([scheme]);
-      setCodes(String(scheme.scheme_code));
-      return;
-    }
     if (selectedSchemes.some((item) => item.scheme_code === scheme.scheme_code)) return;
     if (selectedSchemes.length >= maxCount) return setError(`Select a maximum of ${maxCount} funds.`);
-    const next = [...selectedSchemes, scheme];
-    setSelectedSchemes(next);
-    setCompareSelected(next);
-    setAssistantSelected(next);
-    setCodes(next.map((item) => item.scheme_code).join(","));
+    updateSchemeSelection([...selectedSchemes, scheme]);
   };
-
-  const removeGlobalScheme = (schemeCode) => {
-    const next = selectedSchemes.filter((item) => item.scheme_code !== schemeCode);
-    setSelectedSchemes(next);
-    setCompareSelected(next);
-    setAssistantSelected(next);
-    setCodes(next.map((item) => item.scheme_code).join(","));
+  const removeGlobalScheme = (schemeCode) => updateSchemeSelection(selectedSchemes.filter((item) => item.scheme_code !== schemeCode));
+  const validateDateRange = () => {
+    if (!dateFrom || !dateTo) { setError("Choose both a start date and an end date."); return false; }
+    if (dateFrom > dateTo) { setError("Start date must be on or before the end date."); return false; }
+    return true;
   };
+  const validPositiveNumber = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
 
   useEffect(() => {
     if (!busy) {
@@ -504,14 +502,11 @@ export default function App() {
         : "No valid official effective-dated mapping; fund-only analysis will be used unless you enter an explicit override.";
 
   async function run(fn, stepLabel = "") {
-    setBusy(true);
-    setBusyStep(stepLabel);
-    setError("");
-    setData(null);
+    setBusy(true); setBusyStep(stepLabel); setError(""); setData(null);
     try {
-      setData(await fn());
+      const result = await fn(); setData(result); return result;
     } catch (e) {
-      setError(e.message);
+      setError(e.message); return null;
     } finally {
       setBusy(false);
       setBusyStep("");
@@ -535,6 +530,7 @@ export default function App() {
   };
 
   const runFundAnalysis = (code) => {
+    if (!validateDateRange()) return;
     setCodes(String(code));
     setActiveRiskData(null);
     setCategoryData(null);
@@ -573,7 +569,7 @@ export default function App() {
   };
 
   const loadActiveRisk = async (schemeCode, benchmarkCode, benchmarkSource = "niftyindices") => {
-    if (!benchmarkCode) return;
+    if (!validateDateRange() || !benchmarkCode) return;
     setBusy(true);
     setBusyStep("Computing tracking error and information ratio…");
     setError("");
@@ -594,6 +590,7 @@ export default function App() {
   };
 
   const runCategoryAnalysis = async (targetCode = schemeCodes[0]) => {
+    if (!validateDateRange()) return;
     if (!targetCode) return setError("Enter a valid scheme code first.");
     setBusy(true);
     setBusyStep("Ranking category peers on common dates…");
@@ -616,6 +613,7 @@ export default function App() {
   };
 
   const loadFundProfile = async (targetCode = schemeCodes[0]) => {
+    if (!validateDateRange()) return;
     if (!targetCode) return setError("Enter a valid scheme code first.");
     setBusy(true);
     setBusyStep("Loading consolidated fund profile…");
@@ -634,6 +632,7 @@ export default function App() {
   };
 
   const searchCompareSchemes = async () => {
+    const requestId = ++compareSearchRequest.current;
     const term = compareSearch.trim();
     if (term.length < 2) return setError("Enter at least 2 characters to search for a scheme.");
     setBusy(true);
@@ -641,28 +640,23 @@ export default function App() {
     setError("");
     try {
       const result = await request("/schemes?q=" + encodeURIComponent(term) + "&limit=30");
+      if (requestId !== compareSearchRequest.current) return;
       setCompareResults(result.items || []);
       if (!result.items?.length) setError("No matching schemes found. Try a different name.");
     } catch (e) {
-      setError(e.message);
+      if (requestId === compareSearchRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === compareSearchRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
   const addCompareScheme = (scheme) => {
-    if (compareSelected.some((item) => item.scheme_code === scheme.scheme_code)) return;
-    if (compareSelected.length >= 5) return setError("You can compare a maximum of 5 schemes.");
-    const next = [...compareSelected, scheme];
-    setCompareSelected(next);
-    setCodes(next.map((item) => item.scheme_code).join(","));
+    if (selectedSchemes.some((item) => item.scheme_code === scheme.scheme_code)) return;
+    if (selectedSchemes.length >= 5) return setError("You can compare a maximum of 5 schemes.");
+    updateSchemeSelection([...selectedSchemes, scheme]);
   };
-  const removeCompareScheme = (schemeCode) => {
-    const next = compareSelected.filter((item) => item.scheme_code !== schemeCode);
-    setCompareSelected(next);
-    setCodes(next.map((item) => item.scheme_code).join(","));
-  };
+  const removeCompareScheme = (schemeCode) => updateSchemeSelection(selectedSchemes.filter((item) => item.scheme_code !== schemeCode));
   const runCompare = () => {
+    if (!validateDateRange()) return;
     if (schemeCodes.length < 2 || schemeCodes.length > 5) {
       setError("Enter 2 to 5 valid scheme codes, separated by commas, to compare funds.");
       return;
@@ -778,6 +772,7 @@ export default function App() {
     }
   };
   const runEvents = async () => {
+    if (!validateDateRange()) return;
     const selectedCode = eventScheme?.scheme_code || schemeCodes[0];
     if (!selectedCode) return setError("Search and select a fund before loading events.");
     const params = new URLSearchParams({ start_date: dateFrom, end_date: dateTo, limit: "100" });
@@ -836,33 +831,30 @@ export default function App() {
     run(() => request(buildDocumentSearchPath(documentQuery, schemeCodes[0])), "Searching indexed documents…");
 
   const searchAssistantSchemes = async () => {
+    const requestId = ++assistantSearchRequest.current;
     const term = assistantSearch.trim();
     if (term.length < 2) return setError("Enter at least 2 characters to search for a scheme.");
     setBusy(true);
     setError("");
     try {
       const result = await request("/schemes?q=" + encodeURIComponent(term) + "&limit=30");
+      if (requestId !== assistantSearchRequest.current) return;
       setAssistantResults(result.items || []);
       if (!result.items?.length) setError("No matching schemes found.");
     } catch (e) {
-      setError(e.message);
+      if (requestId === assistantSearchRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
+      if (requestId === assistantSearchRequest.current) setBusy(false);
     }
   };
   const addAssistantScheme = (scheme) => {
-    if (assistantSelected.some((item) => item.scheme_code === scheme.scheme_code)) return;
-    if (assistantSelected.length >= 5) return setError("Select a maximum of 5 schemes.");
-    const next = [...assistantSelected, scheme];
-    setAssistantSelected(next);
-    setCodes(next.map((item) => item.scheme_code).join(","));
+    if (selectedSchemes.some((item) => item.scheme_code === scheme.scheme_code)) return;
+    if (selectedSchemes.length >= 5) return setError("Select a maximum of 5 schemes.");
+    updateSchemeSelection([...selectedSchemes, scheme]);
   };
-  const removeAssistantScheme = (schemeCode) => {
-    const next = assistantSelected.filter((item) => item.scheme_code !== schemeCode);
-    setAssistantSelected(next);
-    setCodes(next.map((item) => item.scheme_code).join(","));
-  };
+  const removeAssistantScheme = (schemeCode) => updateSchemeSelection(selectedSchemes.filter((item) => item.scheme_code !== schemeCode));
   async function runAssistant() {
+    if (!validateDateRange()) return;
     setBusy(true);
     setBusyStep("Syncing NAVs…");
     setError("");
@@ -901,6 +893,9 @@ export default function App() {
   }
 
   const runSipSimulation = () => {
+    if (!validateDateRange()) return;
+    if (!validPositiveNumber(sipAmount)) return setError("Enter a SIP amount greater than zero.");
+    if (!Number.isInteger(Number(sipDay)) || Number(sipDay) < 1 || Number(sipDay) > 31) return setError("SIP installment day must be between 1 and 31.");
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     return run(
       () =>
@@ -926,6 +921,11 @@ export default function App() {
     return run(() => request(`/schemes/${schemeCodes[0]}/investor-returns`), "Calculating actual XIRR…");
   };
   const addTransaction = () => {
+    if (!transactionDate || transactionDate > localDateString()) return setError("Choose a valid transaction date that is not in the future.");
+    if (!validPositiveNumber(transactionAmount)) return setError("Transaction amount must be greater than zero.");
+    const needsUnits = ["purchase", "sip", "additional_purchase", "redemption", "switch_in", "switch_out"].includes(transactionType);
+    if (needsUnits && !validPositiveNumber(transactionUnits)) return setError("Units must be greater than zero.");
+    if (transactionNav && !validPositiveNumber(transactionNav)) return setError("NAV must be greater than zero.");
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     const unitTypes = ["purchase", "sip", "additional_purchase", "redemption", "switch_in", "switch_out"];
     const payload = {
@@ -952,21 +952,25 @@ export default function App() {
 
   async function importDocument() {
     if (!selectedDocument) return setError("Choose a PDF first.");
+    if (!/\.pdf$/i.test(selectedDocument.name) || (selectedDocument.type && selectedDocument.type !== "application/pdf")) return setError("Upload a PDF file only.");
     const form = new FormData();
     form.append("file", selectedDocument);
     form.append("source_key", "amc_disclosures");
     form.append("title", documentTitle || selectedDocument.name);
     if (schemeCodes[0]) form.append("scheme_code", String(schemeCodes[0]));
-    await run(() => request("/documents/upload", { method: "POST", body: form }), "Uploading and indexing PDF…");
+    const result = await run(() => request("/documents/upload", { method: "POST", body: form }), "Uploading and indexing PDF…");
+    if (result) { setSelectedDocument(null); setDocumentTitle(""); const picker = document.getElementById("document-upload-input"); if (picker) picker.value = ""; }
   }
   async function importPortfolio() {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     if (!selectedFile) return setError("Choose a normalized AMC CSV or XLSX file first.");
+    if (!/\.(csv|xlsx)$/i.test(selectedFile.name)) return setError("Upload a CSV or XLSX file only.");
     const form = new FormData();
     form.append("file", selectedFile);
     form.append("scheme_code", String(schemeCodes[0]));
     form.append("effective_date", dateTo);
-    await run(() => request("/portfolios/import-file", { method: "POST", body: form }), "Importing AMC disclosure…");
+    const result = await run(() => request("/portfolios/import-file", { method: "POST", body: form }), "Importing AMC disclosure…");
+    if (result) { setSelectedFile(null); const picker = document.getElementById("portfolio-upload-input"); if (picker) picker.value = ""; }
   }
 
   return (
@@ -1436,7 +1440,7 @@ export default function App() {
                   <button className="secondary" disabled={busy || !schemeCodes[0]} onClick={runEquityStatus}>Check underlying equities</button>
                 </div>
                 <div className="toolbar upload">
-                  <input type="file" accept=".csv,.xlsx" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+                  <input id="portfolio-upload-input" type="file" accept=".csv,.xlsx" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
                   <button className="secondary" disabled={busy} onClick={importPortfolio}>Import disclosure</button>
                 </div>
               </Panel>
@@ -1846,9 +1850,10 @@ export default function App() {
               {assistantSubtab === "docs" && (
                 <Panel title="PDF Factsheets & Disclosures">
                   <div className="upload-block">
-                    <div className="field"><label>Upload a text-based PDF factsheet, SID or disclosure</label><input type="file" accept="application/pdf,.pdf" onChange={(e) => setSelectedDocument(e.target.files?.[0] || null)} /></div>
+                    <div className="field"><label>Upload a text-based PDF factsheet, SID or disclosure</label><input id="document-upload-input" type="file" accept="application/pdf,.pdf" onChange={(e) => setSelectedDocument(e.target.files?.[0] || null)} /></div>
                     <div className="field"><label>Document title</label><input value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} placeholder="Optional title" /></div>
-                    <button className="secondary" disabled={busy} onClick={importDocument}>Upload and index PDF</button>
+                    <button className="secondary" disabled={busy || !selectedDocument} onClick={importDocument}>Upload and index PDF</button>
+                    {selectedDocument && <p className="upload-selected">Selected: {selectedDocument.name}</p>}
                   </div>
                   <div className="toolbar">
                     <input value={documentQuery} onChange={(e) => setDocumentQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runDocuments()} />
