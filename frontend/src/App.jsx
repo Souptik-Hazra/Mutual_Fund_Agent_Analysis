@@ -757,18 +757,20 @@ export default function App() {
   };
 
   const searchEventSchemes = async () => {
+    const requestId = ++eventSearchRequest.current;
     const term = eventSearch.trim();
     if (term.length < 2) return setError("Enter at least 2 characters to search for a scheme.");
     setBusy(true);
     setError("");
     try {
       const result = await request("/schemes?q=" + encodeURIComponent(term) + "&limit=30");
+      if (requestId !== eventSearchRequest.current) return;
       setEventResults(result.items || []);
       if (!result.items?.length) setError("No matching schemes found.");
     } catch (e) {
-      setError(e.message);
+      if (requestId === eventSearchRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
+      if (requestId === eventSearchRequest.current) setBusy(false);
     }
   };
   const runEvents = async () => {
@@ -990,6 +992,9 @@ export default function App() {
               key={item}
               className={tab === item ? "nav-item active" : "nav-item"}
               onClick={() => {
+                compareSearchRequest.current += 1;
+                assistantSearchRequest.current += 1;
+                eventSearchRequest.current += 1;
                 setTab(item);
                 setData(null);
                 setError("");
@@ -1408,7 +1413,8 @@ export default function App() {
                           {equityCompareData.aggregated_equity_exposure?.slice(0, 30).map((item) => (
                             <tr
                               key={item.security_key}
-                              className="clickable-row"
+                              className="clickable-row" role="button" tabIndex={0} aria-label={`Inspect ${item.name}`}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setModalSecurity({ key: item.security_key, name: item.name }); } }}
                               onClick={() => setModalSecurity({ key: item.security_key, name: item.name })}
                             >
                               <td>{item.name}<small>{item.security_key}</small></td>
@@ -1441,6 +1447,7 @@ export default function App() {
                 </div>
                 <div className="toolbar upload">
                   <input id="portfolio-upload-input" type="file" accept=".csv,.xlsx" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+                  {selectedFile && <span className="upload-selected">Selected: {selectedFile.name}</span>}
                   <button className="secondary" disabled={busy} onClick={importPortfolio}>Import disclosure</button>
                 </div>
               </Panel>
@@ -1455,6 +1462,9 @@ export default function App() {
                           <tr
                             key={i}
                             className={h.security_key || h.isin ? "clickable-row" : ""}
+                            role={h.security_key || h.isin ? "button" : undefined} tabIndex={h.security_key || h.isin ? 0 : undefined}
+                            aria-label={h.security_key || h.isin ? `Inspect ${h.security_name}` : undefined}
+                            onKeyDown={(e) => { if ((h.security_key || h.isin) && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setModalSecurity({ key: h.isin || h.security_key, name: h.security_name }); } }}
                             onClick={() => (h.security_key || h.isin) && setModalSecurity({ key: h.isin || h.security_key, name: h.security_name })}
                           >
                             <td>{h.security_name}{(h.isin || h.security_key) && <small>{h.isin || h.security_key}</small>}</td>
@@ -1493,7 +1503,8 @@ export default function App() {
                         {equityStatusData.items.map((item) => (
                           <tr
                             key={item.security_key}
-                            className="clickable-row"
+                            className="clickable-row" role="button" tabIndex={0} aria-label={`Inspect ${item.security_name}`}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setModalSecurity({ key: item.isin || item.security_key, name: item.security_name }); } }}
                             onClick={() => setModalSecurity({ key: item.isin || item.security_key, name: item.security_name })}
                           >
                             <td>{item.security_name}<small>{item.isin || item.security_key}</small></td>
