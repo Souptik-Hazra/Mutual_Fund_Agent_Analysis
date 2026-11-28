@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { request, streamRequest } from "./api";
 import { buildDocumentSearchPath, isBenchmarkObservationUnavailable } from "./research";
 import { isPositiveNumber, isValidDateRange, validateTransactionDraft } from "./validation";
@@ -340,6 +340,7 @@ export default function App() {
   const [equityCompareData, setEquityCompareData] = useState(null);
   const [actualExposureData, setActualExposureData] = useState(null);
   const [modalSecurity, setModalSecurity] = useState(null);
+  const closeSecurityModal = useCallback(() => setModalSecurity(null), []);
 
   const [query, setQuery] = useState("");
   const [codes, setCodes] = useState("125497");
@@ -1914,7 +1915,7 @@ export default function App() {
           securityName={modalSecurity.name}
           schemeCodes={schemeCodes}
           dateTo={dateTo}
-          onClose={() => setModalSecurity(null)}
+          onClose={closeSecurityModal}
         />
       )}
     </div>
