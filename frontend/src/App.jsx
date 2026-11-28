@@ -447,6 +447,7 @@ export default function App() {
   }, [tab, assistantSubtab]);
 
   async function resolveBenchmarkForCodes(targetCodes, asOf, override = "") {
+    const requestId = operationRequest.current;
     if (override.trim()) {
       const result = {
         availability: "overridden",
@@ -486,7 +487,7 @@ export default function App() {
       benchmark: common ? first : null,
       mappings,
     };
-    setBenchmarkResolution(result);
+    if (requestId === operationRequest.current) setBenchmarkResolution(result);
     return result;
   }
 
@@ -580,6 +581,7 @@ export default function App() {
 
   const loadActiveRisk = async (schemeCode, benchmarkCode, benchmarkSource = "niftyindices") => {
     if (!validateDateRange() || !benchmarkCode) return;
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Computing tracking error and information ratio…");
     setError("");
@@ -590,18 +592,19 @@ export default function App() {
         start_date: dateFrom,
         end_date: dateTo,
       });
-      setActiveRiskData(await request(`/schemes/${schemeCode}/active-risk?${params.toString()}`));
+      const result = await request(`/schemes/${schemeCode}/active-risk?${params.toString()}`);
+      if (requestId === operationRequest.current) setActiveRiskData(result);
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
   const runCategoryAnalysis = async (targetCode = schemeCodes[0]) => {
     if (!validateDateRange()) return;
     if (!targetCode) return setError("Enter a valid scheme code first.");
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Ranking category peers on common dates…");
     setError("");
@@ -613,18 +616,18 @@ export default function App() {
         params.set("benchmark_source", selection.benchmark.source);
       }
       const result = await request(`/fund-intelligence/schemes/${targetCode}/category?${params.toString()}`);
-      setCategoryData({ ...result, benchmark_selection: selection });
+      if (requestId === operationRequest.current) setCategoryData({ ...result, benchmark_selection: selection });
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
   const loadFundProfile = async (targetCode = schemeCodes[0]) => {
     if (!validateDateRange()) return;
     if (!targetCode) return setError("Enter a valid scheme code first.");
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Loading consolidated fund profile…");
     setError("");
@@ -632,12 +635,12 @@ export default function App() {
       const params = new URLSearchParams();
       if (dateFrom) params.set("start_date", dateFrom);
       if (dateTo) params.set("end_date", dateTo);
-      setProfileData(await request(`/fund-intelligence/schemes/${targetCode}/profile?${params}`));
+      const result = await request(`/fund-intelligence/schemes/${targetCode}/profile?${params}`);
+      if (requestId === operationRequest.current) setProfileData(result);
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
@@ -708,18 +711,17 @@ export default function App() {
 
   const runEquityComparison = async () => {
     if (schemeCodes.length < 2 || schemeCodes.length > 5) return setError("Enter two to five scheme codes.");
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Comparing disclosed equity overlap…");
     setError("");
     try {
-      setEquityCompareData(
-        await request("/fund-intelligence/compare", json("POST", { scheme_codes: schemeCodes })),
-      );
+      const result = await request("/fund-intelligence/compare", json("POST", { scheme_codes: schemeCodes }));
+      if (requestId === operationRequest.current) setEquityCompareData(result);
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
@@ -733,23 +735,23 @@ export default function App() {
 
   const runEquityStatus = async () => {
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Loading underlying equity status…");
     setError("");
     try {
-      setEquityStatusData(
-        await request(`/fund-intelligence/schemes/${schemeCodes[0]}/equity-status?as_of=${encodeURIComponent(dateTo)}`),
-      );
+      const result = await request(`/fund-intelligence/schemes/${schemeCodes[0]}/equity-status?as_of=${encodeURIComponent(dateTo)}`);
+      if (requestId === operationRequest.current) setEquityStatusData(result);
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
   const loadActualExposure = async () => {
     if (!schemeCodes.length) return setError("Enter at least one scheme code.");
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Computing ledger-weighted equity exposure…");
     setError("");
@@ -757,12 +759,12 @@ export default function App() {
       const params = new URLSearchParams();
       if (dateTo) params.set("as_of_date", dateTo);
       schemeCodes.forEach((code) => params.append("scheme_codes", String(code)));
-      setActualExposureData(await request(`/fund-intelligence/portfolio/actual-exposure?${params}`));
+      const result = await request(`/fund-intelligence/portfolio/actual-exposure?${params}`);
+      if (requestId === operationRequest.current) setActualExposureData(result);
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   };
 
@@ -867,6 +869,7 @@ export default function App() {
   const removeAssistantScheme = (schemeCode) => updateSchemeSelection(selectedSchemes.filter((item) => item.scheme_code !== schemeCode));
   async function runAssistant() {
     if (!validateDateRange()) return;
+    const requestId = ++operationRequest.current;
     setBusy(true);
     setBusyStep("Syncing NAVs…");
     setError("");
@@ -895,12 +898,11 @@ export default function App() {
         },
         (progress) => setStreamProgress((current) => [...current, progress]),
       );
-      setData(result);
+      if (requestId === operationRequest.current) setData(result);
     } catch (e) {
-      setError(e.message);
+      if (requestId === operationRequest.current) setError(e.message);
     } finally {
-      setBusy(false);
-      setBusyStep("");
+      if (requestId === operationRequest.current) { setBusy(false); setBusyStep(""); }
     }
   }
 
@@ -1582,7 +1584,7 @@ export default function App() {
               </Panel>
               <Panel title="Actual investor transaction ledger & exposure">
                 <div className="field-row">
-                  <div className="field"><label>Transaction date</label><input type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} /></div>
+                  <div className="field"><label>Transaction date</label><input type="date" max={localDateString()} value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} /></div>
                   <div className="field">
                     <label>Transaction type</label>
                     <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)}>
