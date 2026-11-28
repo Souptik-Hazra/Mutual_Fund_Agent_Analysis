@@ -83,6 +83,10 @@ export async function streamRequest(path, body, onProgress, signal) {
   const state = { completed: null };
   let buffer = "";
   let streamEnded = false;
+  const cancelOnAbort = () => {
+    reader.cancel().catch(() => {});
+  };
+  signal?.addEventListener("abort", cancelOnAbort, { once: true });
 
   // Detect complete SSE frame separators without normalizing partial CRLF sequences.
   const separator = /(?:\r\n|\r|\n){2}/;
@@ -90,6 +94,9 @@ export async function streamRequest(path, body, onProgress, signal) {
   try {
     while (true) {
       const { value, done } = await reader.read();
+      if (signal?.aborted) {
+        throw signal.reason || new DOMException("The operation was aborted.", "AbortError");
+      }
       buffer += decoder.decode(value, { stream: !done });
 
       let match;
@@ -108,6 +115,7 @@ export async function streamRequest(path, body, onProgress, signal) {
       }
     }
   } finally {
+    signal?.removeEventListener("abort", cancelOnAbort);
     if (!streamEnded) {
       await reader.cancel().catch(() => {});
     }
