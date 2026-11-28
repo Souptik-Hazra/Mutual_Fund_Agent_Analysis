@@ -1,0 +1,101 @@
+[
+  {
+    "name": "factsheet terminology",
+    "lexical": [
+      [
+        10,
+        0
+      ],
+      [
+        10,
+        1
+      ]
+    ],
+    "semantic": [
+      [
+        11,
+        0
+      ],
+      [
+        10,
+        1
+      ]
+    ],
+    "relevant": [
+      [
+        10,
+        1
+      ],
+      [
+        11,
+        0
+      ]
+    ]
+  },
+  {
+    "name": "scheme disclosure phrase",
+    "lexical": [
+      [
+        20,
+        2
+      ],
+      [
+        20,
+        3
+      ]
+    ],
+    "semantic": [
+      [
+        21,
+        0
+      ],
+      [
+        20,
+        2
+      ]
+    ],
+    "relevant": [
+      [
+        20,
+        2
+      ],
+      [
+        21,
+        0
+      ]
+    ]
+  },
+  {
+    "name": "expense ratio paraphrase",
+    "lexical": [
+      [
+        30,
+        0
+      ],
+      [
+        30,
+        1
+      ]
+    ],
+    "semantic": [
+      [
+        30,
+        1
+      ],
+      [
+        31,
+        0
+      ]
+    ],
+    "relevant": [
+      [
+        30,
+        1
+      ],
+      [
+        31,
+        0
+      ]
+    ]
+  }
+]
