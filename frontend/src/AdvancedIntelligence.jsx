@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "./api";
+import { isValidDateRange } from "./validation";
 
 const pretty = (value) => JSON.stringify(value, null, 2);
 const number = (value) =>
@@ -422,13 +423,17 @@ export default function AdvancedIntelligence({ tab, schemeCodes, dateFrom, dateT
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const requestVersion = useRef(0);
+  useEffect(() => {
+    requestVersion.current += 1;
+    return () => { requestVersion.current += 1; };
+  }, [tab, (schemeCodes || []).join(","), dateFrom, dateTo]);
 
   async function load() {
-    if (dateFrom && dateTo && dateFrom > dateTo) { setError("Start date must be on or before the end date."); return; }
+    if (dateFrom && dateTo && !isValidDateRange(dateFrom, dateTo)) { setError("Choose valid dates. Start date must be on or before the end date."); return; }
     if (tab !== "Security Intelligence" && !dateTo) { setError("Choose an end date."); return; }
-    setBusy(true);
-    setError("");
-    setData(null);
+    const requestId = ++requestVersion.current;
+    setBusy(true); setError(""); setData(null);
     try {
       if (!schemeCodes?.length && tab !== "Security Intelligence") {
         throw new Error("Enter at least one valid scheme code in the workspace.");
@@ -452,11 +457,12 @@ export default function AdvancedIntelligence({ tab, schemeCodes, dateFrom, dateT
         (schemeCodes || []).forEach((code) => params.append("scheme_codes", String(code)));
         path = `/market-data/securities/${encodeURIComponent(securityKey.trim())}?${params}`;
       }
-      setData(await request(path));
+      const result = await request(path);
+      if (requestId === requestVersion.current) setData(result);
     } catch (exception) {
-      setError(exception.message);
+      if (requestId === requestVersion.current) setError(exception.message);
     } finally {
-      setBusy(false);
+      if (requestId === requestVersion.current) setBusy(false);
     }
   }
 
