@@ -290,12 +290,15 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
 
     from mutual_fund_agent_analysis.agents import research_graph
 
-    expected_report = {
-        "cagr": "0.123456",
-        "volatility": "0.087654",
-        "as_of": "2026-11-25",
-        "return_basis": "growth_nav",
-    }
+    expected_report = SimpleNamespace(
+        cagr="0.123456",
+        volatility="0.087654",
+        as_of=date(2026, 11, 25),
+        return_basis="growth_nav",
+        scheme_code=125497,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 11, 25),
+    )
     captured = {}
 
     def deterministic_analysis(session, scheme_code, *args, **kwargs):
@@ -315,6 +318,20 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
                 canonical_nav="123.45",
                 source_values={"amfi": "123.45"},
             )
+
+        def scalars(self, _statement):
+            return type(
+                "Rows",
+                (),
+                {"all": lambda _self: [
+                    SimpleNamespace(
+                        canonical_source="amfi",
+                        evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
+                        nav_date=date(2026, 11, 25),
+                        status="matched",
+                    )
+                ]},
+            )()
 
         def get(self, model, _key):
             if model.__name__ == "DataSource":
@@ -345,9 +362,21 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
 
     assert captured["session"] is session
     assert captured["scheme_code"] == 125497
-    assert result["results"]["fund"] == expected_report
+    assert result["results"]["fund"]["cagr"] == expected_report.cagr
     assert result["research_run_id"] == "parity-run-1"
     assert result["citations"][0]["type"] == "financial_data"
+
+
+
+def test_synthesis_validation_rejects_unknown_citations_and_unsupported_numbers():
+    from mutual_fund_agent_analysis.agents.research_graph import _validate_synthesized_answer
+
+    results = {"fund": {"cagr": "0.12", "nav": "123.45"}}
+    citations = [{"citation_id": "C1", "type": "financial_data"}]
+    assert _validate_synthesized_answer("CAGR is 0.12 [C1].", results, citations)[0]
+    assert not _validate_synthesized_answer("CAGR is 0.99 [C1].", results, citations)[0]
+    assert not _validate_synthesized_answer("CAGR is 0.12 [C9].", results, citations)[0]
+    assert not _validate_synthesized_answer("CAGR is 0.12.", results, citations)[0]
 
 
 def test_llm_synthesis_is_skipped_by_default(monkeypatch):
