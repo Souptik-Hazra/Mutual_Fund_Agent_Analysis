@@ -155,3 +155,29 @@ button:focus-visible{outline:2px solid #c5f06b;outline-offset:3px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
+/* Selection, search feedback, validation and upload states */
+.fund-selector .field{margin-bottom:8px}
+.fund-selector input[role=combobox]{padding-right:38px}
+.fund-suggestions{z-index:40;max-height:300px;overscroll-behavior:contain}
+.fund-search-status,.fund-search-error{padding:12px 14px;font-size:11px;color:#9aabb3}
+.fund-search-error{color:#ffb6b6;background:#321f23}
+.fund-suggestion-item:disabled{opacity:.55;cursor:not-allowed}
+.fund-chip{max-width:100%;min-width:0}
+.fund-chip>span{overflow-wrap:anywhere}
+.fund-chip button{flex:0 0 auto;min-width:22px;min-height:22px;border-radius:50%}
+.fund-chip button:hover{background:#42272d;color:#ffd4d4}
+.clickable-row[role=button]{cursor:pointer}
+.clickable-row[role=button]:focus-visible{outline:2px solid #c5f06b;outline-offset:-2px;background:#20333b}
+.upload-selected{display:block;max-width:100%;margin:7px 0;color:#b9d98b;font-size:10px;overflow-wrap:anywhere}
+.field input[type=date]:invalid,.field input[type=number]:invalid{border-color:#a34d54}
+.field input[type=date]:focus-visible,.field input[type=number]:focus-visible{outline:2px solid #9fc66d;outline-offset:1px}
+.fund-selector .field input[aria-expanded=true]{border-color:#8eaf60}
+.modal-card[role=dialog]{outline:none}
+.modal-card[role=dialog]:focus{outline:none}
+@media(max-width:650px){
+  .fund-suggestions{max-height:min(42vh,280px)}
+  .fund-chip{width:100%;justify-content:space-between;border-radius:9px}
+  .fund-chip>span{flex:1;min-width:0}
+  .upload-block{padding:10px}
+}
+
