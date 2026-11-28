@@ -159,14 +159,19 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
     from pydantic import SecretStr
 
     class FakeClient:
+        def __init__(self):
+            self.delete_calls = 0
+
         def collection_exists(self, _collection):
             return True
 
         def delete(self, **_kwargs):
-            return None
+            self.delete_calls += 1
 
         def close(self):
             return None
+
+    client = FakeClient()
 
     class FakeEmbeddings:
         def __init__(self, **_kwargs):
@@ -189,7 +194,7 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
         },
     )()
     monkeypatch.setattr(document_vectors, "get_settings", lambda: settings)
-    monkeypatch.setattr(document_vectors, "_configured_client", lambda _settings: FakeClient())
+    monkeypatch.setattr(document_vectors, "_configured_client", lambda _settings: client)
 
     import sys
     from types import ModuleType
@@ -240,6 +245,7 @@ def test_indexing_returns_false_when_vector_store_write_fails(monkeypatch):
         )
         is False
     )
+    assert client.delete_calls == 0
 
 
 def test_search_chunks_falls_back_when_embedding_provider_is_unavailable(monkeypatch):
