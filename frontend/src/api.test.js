@@ -35,9 +35,9 @@ test("parses split SSE frames and a final frame without a blank-line terminator"
 
 test("preserves CRLF when the pair is split across network chunks", async (t) => {
   mockStream(t, [
-    'event: progress\r',
+    "event: progress\r",
     '\ndata: {"node":"plan"}\r',
-    '\n\r',
+    "\n\r",
     '\nevent: complete\r\ndata: {"answer":"ok"}\r\n\r\n',
   ]);
   const progress = [];
@@ -62,6 +62,17 @@ test("supports multiple events in one chunk and ignores unknown event types", as
   assert.deepEqual(result, { answer: "ok" });
 });
 
+test("supports lone CR line endings", async (t) => {
+  mockStream(t, ['event: progress\rdata: {"step":1}\r\revent: complete\rdata: {"answer":"ok"}']);
+  const progress = [];
+  const result = await streamRequest("/assistant/research/stream", {}, (event) =>
+    progress.push(event),
+  );
+
+  assert.deepEqual(progress, [{ step: 1 }]);
+  assert.deepEqual(result, { answer: "ok" });
+});
+
 test("reports malformed SSE JSON clearly", async (t) => {
   mockStream(t, ['event: complete\ndata: {"answer":\n\n']);
   await assert.rejects(
@@ -70,8 +81,16 @@ test("reports malformed SSE JSON clearly", async (t) => {
   );
 });
 
-test("rejects an empty or invalid completion payload", async (t) => {
+test("rejects null completion payload", async (t) => {
   mockStream(t, ["event: complete\ndata: null\n\n"]);
+  await assert.rejects(
+    streamRequest("/assistant/research/stream", {}),
+    /invalid completion payload/,
+  );
+});
+
+test("rejects completion payload without a string answer", async (t) => {
+  mockStream(t, ['event: complete\ndata: {"results":{}}\n\n']);
   await assert.rejects(
     streamRequest("/assistant/research/stream", {}),
     /invalid completion payload/,
@@ -86,11 +105,37 @@ test("surfaces server-sent error events", async (t) => {
   );
 });
 
+test("handles null server-sent error payload safely", async (t) => {
+  mockStream(t, ["event: error\ndata: null\n\n"]);
+  await assert.rejects(streamRequest("/assistant/research/stream", {}), {
+    message: "Research stream failed.",
+  });
+});
+
 test("reports a stream that closes before a completion event", async (t) => {
   mockStream(t, ['event: progress\ndata: {"step":1}\n\n']);
   await assert.rejects(
     streamRequest("/assistant/research/stream", {}),
     /ended before returning a result/,
+  );
+});
+
+test("rejects immediately when signal is aborted while fetch resolves", async (t) => {
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(
+      new ReadableStream({
+        start() {},
+        cancel() {},
+      }),
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    ),
+  );
+  const controller = new AbortController();
+  controller.abort();
+
+  await assert.rejects(
+    streamRequest("/assistant/research/stream", {}, undefined, controller.signal),
+    { name: "AbortError" },
   );
 });
 
