@@ -338,7 +338,9 @@ def test_semantic_search_applies_scheme_metadata_filter(monkeypatch):
                 )
             ]
 
-    fake_google = sys.modules["langchain_google_genai"]
+    import langchain_google_genai
+
+    fake_google = langchain_google_genai
     monkeypatch.setattr(fake_google, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
     fake_qdrant = ModuleType("langchain_qdrant")
     fake_qdrant.QdrantVectorStore = FakeStore
