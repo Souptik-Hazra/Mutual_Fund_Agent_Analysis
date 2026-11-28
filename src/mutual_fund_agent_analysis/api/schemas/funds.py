@@ -56,6 +56,9 @@ class FundAnalyticsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scheme_code: int
+    scheme_name: str | None = None
+    fund_house: str | None = None
+    scheme_category: str | None = None
     observation_count: int
     start_date: date
     end_date: date

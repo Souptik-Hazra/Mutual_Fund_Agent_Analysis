@@ -56,3 +56,42 @@
 .peer-scheme-cell small{font-size:10px;color:#8fa1aa;margin-top:4px}
 .peer-table td:not(.peer-scheme-cell),.peer-table th:not(:first-child){white-space:nowrap}
 .peer-table tbody tr:hover{background:#192831}
+
+/* Enhanced profile sections, multi-fund compare chart, and timing feedback */
+.profile-section{margin-top:20px;padding-top:16px;border-top:1px solid #273740}
+.profile-section h3{font:700 13px Manrope;margin:0 0 12px;color:#d8e6ea}
+.btn-danger{background:#4b2327;border:1px solid #7c3b40;color:#ffc4c4;border-radius:6px;padding:5px 9px;font-size:10px}
+.btn-danger:hover{background:#5d2b30}
+.compare-chart-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 10px;font-size:11px;color:#c9d6dc}
+.compare-legend-item{display:flex;align-items:center;gap:6px}
+.compare-legend-swatch{display:inline-block;width:14px;height:3px;border-radius:4px}
+.compare-line{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.metric-grid-compact{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:14px}
+
+/* Consolidated 6-page layout, sub-tabs, clickable security drawer, and fintech polish */
+.subtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.subtab{background:#131f27;border:1px solid #2a3b45;color:#93a5af;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;transition:all .15s ease}
+.subtab:hover{border-color:#4b6355;color:#dce8ec}
+.subtab.active{background:#1e3037;border-color:#c5f06b;color:#d8f49b}
+.clickable-row{cursor:pointer;transition:background .12s ease}
+.clickable-row:hover{background:#1b2c36}
+.link-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#c5f06b;background:#1f3026;border:1px solid #3f5a42;border-radius:20px;padding:3px 9px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(6,11,15,.76);backdrop-filter:blur(4px);display:grid;place-items:center;padding:20px;z-index:50}
+.modal-card{width:min(860px,100%);max-height:88vh;overflow-y:auto;background:#111c24;border:1px solid #344a54;border-radius:14px;padding:22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid #263740}
+.modal-head h2{margin:0;font:700 17px Manrope;color:#eef5f7}
+.pos{color:#4cd48d}.neg{color:#f06d78}
+.nav-section-label{font-size:9px;letter-spacing:1.5px;color:#667a85;padding:12px 13px 4px;text-transform:uppercase;font-weight:700}
+
+/* Fund name autocomplete selector & chips */
+.fund-selector{position:relative;margin:10px 0}
+.fund-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.fund-chip{display:inline-flex;align-items:center;gap:8px;background:#1a2b34;border:1px solid #39505a;color:#e3eef2;border-radius:20px;padding:6px 12px;font-size:11px}
+.fund-chip small{color:#8fa6b0;font-size:10px}
+.fund-chip button{border:0;background:transparent;color:#f0848d;font-weight:700;padding:0 2px;font-size:13px;line-height:1}
+.fund-suggestions{position:absolute;left:0;right:0;top:100%;z-index:30;background:#101c24;border:1px solid #3c525e;border-radius:9px;margin-top:4px;max-height:260px;overflow-y:auto;box-shadow:0 16px 36px rgba(0,0,0,.5)}
+.fund-suggestion-item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;padding:10px 13px;border-bottom:1px solid #1f3039;color:#e1ecef;font-size:12px}
+.fund-suggestion-item:last-child{border-bottom:0}
+.fund-suggestion-item:hover{background:#1b2c37}
+.fund-suggestion-item strong{display:block;font-size:12px;color:#e8f3f6}
+.fund-suggestion-item small{display:block;font-size:10px;color:#8aa0aa;margin-top:2px}

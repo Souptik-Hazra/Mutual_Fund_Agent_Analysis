@@ -111,22 +111,21 @@ def security_profile(
     latest_by_scheme: dict[int, PortfolioSnapshot] = {}
     for snapshot in snapshots:
         latest_by_scheme.setdefault(snapshot.scheme_code, snapshot)
+    snapshot_by_id = {snapshot.snapshot_id: snapshot for snapshot in latest_by_scheme.values()}
 
     positions: list[dict[str, Any]] = []
     if latest_by_scheme:
         holdings = session.scalars(
             select(PortfolioHolding).where(
-                PortfolioHolding.snapshot_id.in_(
-                    [snapshot.snapshot_id for snapshot in latest_by_scheme.values()]
-                ),
+                PortfolioHolding.snapshot_id.in_(list(snapshot_by_id)),
                 or_(PortfolioHolding.security_key == key, PortfolioHolding.isin == key),
             )
         ).all()
         positions = [
             {
-                "scheme_code": latest_by_scheme[row.snapshot_id].scheme_code,
+                "scheme_code": snapshot_by_id[row.snapshot_id].scheme_code,
                 "snapshot_id": row.snapshot_id,
-                "effective_date": latest_by_scheme[row.snapshot_id].effective_date,
+                "effective_date": snapshot_by_id[row.snapshot_id].effective_date,
                 "security_name": row.security_name,
                 "asset_class": row.asset_class,
                 "sector": row.sector,

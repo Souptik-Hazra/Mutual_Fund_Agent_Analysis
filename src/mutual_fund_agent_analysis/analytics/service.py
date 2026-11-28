@@ -72,6 +72,9 @@ class FundAnalyticsReport:
     methodology: dict[str, str] = field(default_factory=dict)
     distribution_coverage_status: str = "not_required"
     benchmark_unavailable_reason: str | None = None
+    scheme_name: str | None = None
+    fund_house: str | None = None
+    scheme_category: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,6 +301,9 @@ def _build_report(
     return_basis: str = "growth_nav_total_return",
     distribution_coverage_status: str = "not_required",
     distribution_unavailable_reason: str | None = None,
+    scheme_name: str | None = None,
+    fund_house: str | None = None,
+    scheme_category: str | None = None,
 ) -> FundAnalyticsReport:
     benchmark_unavailable_reason = None
     if return_basis == "nav_only_excludes_idcw" and benchmark_code is not None:
@@ -366,6 +372,9 @@ def _build_report(
         benchmark_return_basis="tri" if benchmark_code is not None else None,
         distribution_coverage_status=distribution_coverage_status,
         benchmark_unavailable_reason=benchmark_unavailable_reason,
+        scheme_name=scheme_name,
+        fund_house=fund_house,
+        scheme_category=scheme_category,
         base100_series=tuple(
             (point.date, Decimal("100") * point.value / prices[0].value) for point in prices
         ),
@@ -418,6 +427,7 @@ def analyze_fund(
     prices, conflicts, return_basis, coverage_status, coverage_reason = load_fund_return_prices(
         session, scheme_code, start_date, end_date, allow_nav_conflicts
     )
+    scheme = session.get(MutualFundScheme, scheme_code) if hasattr(session, "get") else None
     benchmark_prices = (
         load_benchmark_prices(
             session, benchmark_code, prices[0].date, prices[-1].date, benchmark_source
@@ -442,6 +452,9 @@ def analyze_fund(
         return_basis,
         coverage_status,
         coverage_reason,
+        scheme_name=getattr(scheme, "scheme_name", None),
+        fund_house=getattr(scheme, "fund_house", None),
+        scheme_category=getattr(scheme, "scheme_category", None),
     )
 
 
@@ -468,6 +481,7 @@ def compare_funds(
     scheme_rows = session.scalars(
         select(MutualFundScheme).where(MutualFundScheme.scheme_code.in_(codes))
     ).all()
+    scheme_by_code = {row.scheme_code: row for row in scheme_rows}
     option_by_code = {row.scheme_code: row.option_type for row in scheme_rows}
     if set(option_by_code) != set(codes):
         raise ValueError("One or more selected schemes are missing from the local catalogue.")
@@ -518,10 +532,19 @@ def compare_funds(
         latest = min(item[0][-1].date for item in loaded.values())
         if earliest > latest:
             raise ValueError("Selected funds have no overlapping date range.")
-        benchmark_prices = load_benchmark_prices(
+        candidate_benchmark = load_benchmark_prices(
             session, effective_benchmark, earliest, latest, benchmark_source
         )
-        common_dates.intersection_update(point.date for point in benchmark_prices)
+        aligned_dates = common_dates & {point.date for point in candidate_benchmark}
+        if len(aligned_dates) < 2:
+            warnings.append(
+                f"No TRI observations returned for {effective_benchmark} in the overlapping "
+                "date range; benchmark-relative metrics were omitted."
+            )
+            effective_benchmark = None
+        else:
+            benchmark_prices = candidate_benchmark
+            common_dates = aligned_dates
 
     ordered_dates = sorted(common_dates)
     if len(ordered_dates) < 2:
@@ -537,6 +560,7 @@ def compare_funds(
         source_prices, conflicts, basis, coverage_status, coverage_reason = loaded[code]
         aligned_prices = [point for point in source_prices if point.date in date_set]
         aligned_conflicts = tuple(day for day in conflicts if day in date_set)
+        scheme_row = scheme_by_code.get(code)
         reports.append(
             _build_report(
                 code,
@@ -552,6 +576,9 @@ def compare_funds(
                 basis,
                 coverage_status,
                 coverage_reason,
+                scheme_name=getattr(scheme_row, "scheme_name", None),
+                fund_house=getattr(scheme_row, "fund_house", None),
+                scheme_category=getattr(scheme_row, "scheme_category", None),
             )
         )
 

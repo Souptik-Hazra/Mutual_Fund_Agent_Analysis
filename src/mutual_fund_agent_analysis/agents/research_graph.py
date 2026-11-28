@@ -137,6 +137,7 @@ class ResearchState(TypedDict, total=False):
     results: dict[str, Any]
     errors: list[str]
     specialist_statuses: dict[str, str]
+    specialist_timings_ms: dict[str, float]
     answer: str
     citations: list[dict[str, Any]]
     model_used: str | None
@@ -237,9 +238,11 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
     errors: list[str] = []
     citations: list[dict[str, Any]] = []
     specialist_statuses: dict[str, str] = {}
+    specialist_timings_ms: dict[str, float] = {}
     codes = request.scheme_codes
 
     for intent in state.get("intents", []):
+        started_intent = perf_counter()
         try:
             if intent == "fund":
                 if not codes:
@@ -597,16 +600,19 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         }
                     )
             specialist_statuses[intent] = "completed"
+            specialist_timings_ms[intent] = round((perf_counter() - started_intent) * 1000, 2)
             logger.info(
                 "research.specialist.completed",
                 extra={
                     "research_run_id": state.get("research_run_id"),
                     "specialist": intent,
                     "status": "completed",
+                    "duration_ms": specialist_timings_ms[intent],
                 },
             )
         except (ValueError, LookupError) as exc:
             specialist_statuses[intent] = "limited"
+            specialist_timings_ms[intent] = round((perf_counter() - started_intent) * 1000, 2)
             errors.append(f"{intent}: {exc}")
             logger.warning(
                 "research.specialist.limited specialist=%s error_type=%s detail=%s",
@@ -625,6 +631,7 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
         "results": results,
         "errors": errors,
         "specialist_statuses": specialist_statuses,
+        "specialist_timings_ms": specialist_timings_ms,
         "citations": citations,
         "research_run_id": state.get("research_run_id"),
     }

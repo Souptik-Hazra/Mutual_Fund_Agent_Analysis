@@ -8,7 +8,15 @@ from decimal import Decimal
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from mutual_fund_agent_analysis.analytics.service import analyze_fund
+from mutual_fund_agent_analysis.analytics.risk import DEFAULT_PERIODS_PER_YEAR
+from mutual_fund_agent_analysis.analytics.series import PricePoint
+from mutual_fund_agent_analysis.analytics.service import (
+    _build_report,
+    analyze_fund,
+    load_benchmark_prices,
+)
+
+_DEFAULT_ANALYZE_FUND = analyze_fund
 from mutual_fund_agent_analysis.models.intelligence import DataSource, EvidenceRecord
 from mutual_fund_agent_analysis.models.nav_reconciliation import NavReconciliation
 from mutual_fund_agent_analysis.models.research import PortfolioHolding, PortfolioSnapshot
@@ -92,32 +100,128 @@ def analyze_category_peers(
         raise ValueError("Category peers do not share a common observation window.")
 
     aligned_reports = {}
-    for peer in eligible_peers:
-        code = peer.scheme_code
-        try:
-            report = analyze_fund(
-                session,
-                code,
-                benchmark_code=benchmark_code,
-                start_date=common_start,
-                end_date=common_end,
-                benchmark_source=benchmark_source,
+    use_batch = selected.option_type == "growth" and analyze_fund is _DEFAULT_ANALYZE_FUND
+    navs_by_code: dict[int, list[NavReconciliation]] = defaultdict(list)
+    shared_benchmark_prices = None
+    if use_batch:
+        eligible_codes = [peer.scheme_code for peer in eligible_peers]
+        nav_rows = session.scalars(
+            select(NavReconciliation)
+            .where(
+                NavReconciliation.scheme_code.in_(eligible_codes),
+                NavReconciliation.nav_date >= common_start,
+                NavReconciliation.nav_date <= common_end,
             )
-        except ValueError as exc:
-            excluded.append({"scheme_code": code, "reason": str(exc)})
-            continue
-        if report.start_date != common_start or report.end_date != common_end:
-            excluded.append(
-                {
-                    "scheme_code": code,
-                    "reason": (
-                        f"Actual observations {report.start_date} to {report.end_date} do not "
-                        f"cover the common window {common_start} to {common_end}."
-                    ),
-                }
+            .order_by(NavReconciliation.scheme_code, NavReconciliation.nav_date)
+        ).all()
+        if all(
+            hasattr(row, "scheme_code")
+            and hasattr(row, "nav_date")
+            and hasattr(row, "canonical_nav")
+            and hasattr(row, "status")
+            for row in nav_rows
+        ):
+            for row in nav_rows:
+                navs_by_code[row.scheme_code].append(row)
+            shared_benchmark_prices = (
+                load_benchmark_prices(
+                    session, benchmark_code, common_start, common_end, benchmark_source
+                )
+                if benchmark_code is not None
+                else None
             )
-            continue
-        aligned_reports[code] = report
+        else:
+            use_batch = False
+
+    if use_batch:
+        for peer in eligible_peers:
+            code = peer.scheme_code
+            rows = navs_by_code.get(code, [])
+            if not rows:
+                excluded.append(
+                    {"scheme_code": code, "reason": "No reconciled NAV observations in window."}
+                )
+                continue
+            conflicts = tuple(row.nav_date for row in rows if row.status == "conflict")
+            if conflicts:
+                excluded.append(
+                    {
+                        "scheme_code": code,
+                        "reason": (
+                            f"{len(conflicts)} NAV reconciliation conflict(s) found; "
+                            "resolve them or explicitly set allow_nav_conflicts=True."
+                        ),
+                    }
+                )
+                continue
+            prices = [PricePoint(row.nav_date, Decimal(row.canonical_nav)) for row in rows]
+            peer_benchmark_prices = (
+                [
+                    point
+                    for point in shared_benchmark_prices
+                    if prices[0].date <= point.date <= prices[-1].date
+                ]
+                if shared_benchmark_prices is not None
+                else None
+            )
+            try:
+                report = _build_report(
+                    code,
+                    prices,
+                    conflicts,
+                    benchmark_code,
+                    benchmark_source,
+                    peer_benchmark_prices,
+                    Decimal("0"),
+                    DEFAULT_PERIODS_PER_YEAR,
+                    None,
+                    "daily",
+                    "growth_nav_total_return",
+                    "not_required",
+                    None,
+                )
+            except ValueError as exc:
+                excluded.append({"scheme_code": code, "reason": str(exc)})
+                continue
+            if report.start_date != common_start or report.end_date != common_end:
+                excluded.append(
+                    {
+                        "scheme_code": code,
+                        "reason": (
+                            f"Actual observations {report.start_date} to {report.end_date} do not "
+                            f"cover the common window {common_start} to {common_end}."
+                        ),
+                    }
+                )
+                continue
+            aligned_reports[code] = report
+    else:
+        for peer in eligible_peers:
+            code = peer.scheme_code
+            try:
+                report = analyze_fund(
+                    session,
+                    code,
+                    benchmark_code=benchmark_code,
+                    start_date=common_start,
+                    end_date=common_end,
+                    benchmark_source=benchmark_source,
+                )
+            except ValueError as exc:
+                excluded.append({"scheme_code": code, "reason": str(exc)})
+                continue
+            if report.start_date != common_start or report.end_date != common_end:
+                excluded.append(
+                    {
+                        "scheme_code": code,
+                        "reason": (
+                            f"Actual observations {report.start_date} to {report.end_date} do not "
+                            f"cover the common window {common_start} to {common_end}."
+                        ),
+                    }
+                )
+                continue
+            aligned_reports[code] = report
 
     if scheme_code not in aligned_reports:
         raise ValueError("Selected scheme cannot satisfy the common category observation window.")

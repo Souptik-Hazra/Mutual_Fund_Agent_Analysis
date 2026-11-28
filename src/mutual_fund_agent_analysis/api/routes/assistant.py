@@ -108,6 +108,7 @@ def stream_research(
                     "citations": final_state.get("citations", []),
                     "errors": final_state.get("errors", []),
                     "specialist_statuses": final_state.get("specialist_statuses", {}),
+                    "specialist_timings_ms": final_state.get("specialist_timings_ms", {}),
                     "model_used": final_state.get("model_used"),
                 },
             )
@@ -151,6 +152,7 @@ def run_research(
                 "citations": result.get("citations", []),
                 "errors": result.get("errors", []),
                 "specialist_statuses": result.get("specialist_statuses", {}),
+                "specialist_timings_ms": result.get("specialist_timings_ms", {}),
                 "model_used": result.get("model_used"),
             }
         )
