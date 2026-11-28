@@ -224,6 +224,44 @@ def _provenance_citation(
     }
 
 
+def _historical_nav_citations(
+    session: Session, scheme_code: int, start_date: date, end_date: date
+) -> list[dict[str, Any]]:
+    """Cite the NAV observations in the exact window used by fund analytics."""
+    rows = session.scalars(
+        select(NavReconciliation)
+        .where(
+            NavReconciliation.scheme_code == scheme_code,
+            NavReconciliation.nav_date >= start_date,
+            NavReconciliation.nav_date <= end_date,
+            NavReconciliation.status.in_(["single_source", "matched"]),
+        )
+        .order_by(NavReconciliation.nav_date)
+    ).all()
+    grouped: dict[str, list[Any]] = {}
+    for row in rows:
+        if row.canonical_source and row.evaluated_at is not None:
+            grouped.setdefault(row.canonical_source, []).append(row)
+    citations = []
+    for source_key, observations in grouped.items():
+        citation = _provenance_citation(
+            session,
+            source_key,
+            None,
+            max(row.evaluated_at for row in observations),
+            "unverified",
+            type="financial_data",
+            data_scope="historical_nav_series",
+            scheme_code=scheme_code,
+            nav_start_date=min(row.nav_date for row in observations),
+            nav_end_date=max(row.nav_date for row in observations),
+            observation_count=len(observations),
+        )
+        if citation:
+            citations.append(citation)
+    return citations
+
+
 def _plan(state: ResearchState) -> dict[str, Any]:
     request = state["request"]
     return {
@@ -270,29 +308,16 @@ def _run_tools(state: ResearchState) -> dict[str, Any]:
                         benchmark_source=request.benchmark_source or "niftyindices",
                     )
                 results[intent] = _jsonable(report)
-                for code in codes:
-                    nav = session.scalar(
-                        select(NavReconciliation)
-                        .where(NavReconciliation.scheme_code == code)
-                        .where(NavReconciliation.status.in_(["single_source", "matched"]))
-                        .order_by(NavReconciliation.nav_date.desc())
-                        .limit(1)
-                    )
-                    if nav is not None:
-                        citation = _provenance_citation(
+                reports = report.funds if len(codes) > 1 else (report,)
+                for fund_report in reports:
+                    citations.extend(
+                        _historical_nav_citations(
                             session,
-                            nav.canonical_source,
-                            None,
-                            nav.evaluated_at,
-                            "unverified",
-                            type="financial_data",
-                            scheme_code=code,
-                            nav_date=nav.nav_date,
-                            canonical_nav=str(nav.canonical_nav),
-                            source_values=nav.source_values,
+                            fund_report.scheme_code,
+                            fund_report.start_date,
+                            fund_report.end_date,
                         )
-                        if citation:
-                            citations.append(citation)
+                    )
             elif intent == "category":
                 if not codes or len(codes) != 1:
                     raise ValueError("Category analysis requires exactly one selected scheme_code.")
