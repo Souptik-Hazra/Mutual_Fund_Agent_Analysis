@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { request, streamRequest } from "./api";
 import { buildDocumentSearchPath, isBenchmarkObservationUnavailable } from "./research";
+import { isPositiveNumber, isValidDateRange, validateTransactionDraft } from "./validation";
 import { ActualExposureView, FundProfileView, SecurityModal } from "./AdvancedIntelligence";
 
 const tabs = ["Overview", "Funds", "Compare", "Portfolio", "Investments", "Assistant"];
@@ -407,11 +408,12 @@ export default function App() {
   };
   const removeGlobalScheme = (schemeCode) => updateSchemeSelection(selectedSchemes.filter((item) => item.scheme_code !== schemeCode));
   const validateDateRange = () => {
-    if (!dateFrom || !dateTo) { setError("Choose both a start date and an end date."); return false; }
-    if (dateFrom > dateTo) { setError("Start date must be on or before the end date."); return false; }
+    if (!isValidDateRange(dateFrom, dateTo)) {
+      setError("Choose valid dates. Start date must be on or before the end date.");
+      return false;
+    }
     return true;
   };
-  const validPositiveNumber = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
 
   useEffect(() => {
     if (!busy) {
@@ -903,7 +905,7 @@ export default function App() {
 
   const runSipSimulation = () => {
     if (!validateDateRange()) return;
-    if (!validPositiveNumber(sipAmount)) return setError("Enter a SIP amount greater than zero.");
+    if (!isPositiveNumber(sipAmount)) return setError("Enter a SIP amount greater than zero.");
     if (!Number.isInteger(Number(sipDay)) || Number(sipDay) < 1 || Number(sipDay) > 31) return setError("SIP installment day must be between 1 and 31.");
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     return run(
@@ -930,11 +932,10 @@ export default function App() {
     return run(() => request(`/schemes/${schemeCodes[0]}/investor-returns`), "Calculating actual XIRR…");
   };
   const addTransaction = () => {
-    if (!transactionDate || transactionDate > localDateString()) return setError("Choose a valid transaction date that is not in the future.");
-    if (!validPositiveNumber(transactionAmount)) return setError("Transaction amount must be greater than zero.");
-    const needsUnits = ["purchase", "sip", "additional_purchase", "redemption", "switch_in", "switch_out"].includes(transactionType);
-    if (needsUnits && !validPositiveNumber(transactionUnits)) return setError("Units must be greater than zero.");
-    if (transactionNav && !validPositiveNumber(transactionNav)) return setError("NAV must be greater than zero.");
+    const validationError = validateTransactionDraft({
+      transactionDate, type: transactionType, amount: transactionAmount, units: transactionUnits, nav: transactionNav,
+    }, localDateString());
+    if (validationError) return setError(validationError);
     if (!schemeCodes[0]) return setError("Enter a valid scheme code first.");
     const unitTypes = ["purchase", "sip", "additional_purchase", "redemption", "switch_in", "switch_out"];
     const payload = {
@@ -1080,8 +1081,8 @@ export default function App() {
                   label="Select funds by name (up to 5)"
                 />
                 <div className="field-row">
-                  <div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-                  <div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                  <div className="field"><label>From</label><input type="date" max={dateTo || undefined} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                  <div className="field"><label>To</label><input type="date" min={dateFrom || undefined} value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
                 </div>
               </Panel>
             </>
@@ -1109,8 +1110,8 @@ export default function App() {
                 </div>
                 <div className="field-row">
                   <div className="field"><label>Benchmark TRI override (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} placeholder="Leave blank for official mapping" /></div>
-                  <div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-                  <div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                  <div className="field"><label>From</label><input type="date" max={dateTo || undefined} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                  <div className="field"><label>To</label><input type="date" min={dateFrom || undefined} value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
                 </div>
                 {data?.items?.length ? (
                   <div className="table-wrap">
@@ -1316,8 +1317,8 @@ export default function App() {
                 )}
                 <div className="field-row">
                   <div className="field"><label>Benchmark TRI override (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} placeholder="Leave blank to use a common verified mapping" /></div>
-                  <div className="field"><label>Start date</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-                  <div className="field"><label>End date</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                  <div className="field"><label>Start date</label><input type="date" max={dateTo || undefined} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                  <div className="field"><label>End date</label><input type="date" min={dateFrom || undefined} value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
                   <div className="field">
                     <label>Return frequency</label>
                     <select value={analysisFrequency} onChange={(e) => setAnalysisFrequency(e.target.value)}>
@@ -1547,8 +1548,8 @@ export default function App() {
                   label="Select fund(s) by name"
                 />
                 <div className="field-row">
-                  <div className="field"><label>Start date</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-                  <div className="field"><label>End / valuation date</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                  <div className="field"><label>Start date</label><input type="date" max={dateTo || undefined} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                  <div className="field"><label>End / valuation date</label><input type="date" min={dateFrom || undefined} value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
                 </div>
               </Panel>
               <Panel title="Historical SIP simulation">
@@ -1725,8 +1726,8 @@ export default function App() {
                     )}
                     <div className="field-row">
                       <div className="field"><label>Benchmark TRI override (optional)</label><input value={benchmark} onChange={(e) => setBenchmark(e.target.value)} placeholder="Leave blank for official mapping" /></div>
-                      <div className="field"><label>Start date</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-                      <div className="field"><label>End date</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                      <div className="field"><label>Start date</label><input type="date" max={dateTo || undefined} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                      <div className="field"><label>End date</label><input type="date" min={dateFrom || undefined} value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
                     </div>
                     <p className="muted">{benchmarkDescription}</p>
                     <button className="primary" disabled={busy} onClick={runAssistant}>{busy ? `Researching… (${elapsedSec}s)` : "Run research"}</button>
@@ -1817,8 +1818,8 @@ export default function App() {
                     </div>
                   )}
                   <div className="field-row">
-                    <div className="field"><label>From</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-                    <div className="field"><label>To</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                    <div className="field"><label>From</label><input type="date" max={dateTo || undefined} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                    <div className="field"><label>To</label><input type="date" min={dateFrom || undefined} value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
                     <div className="field">
                       <label>Status</label>
                       <select value={eventStatus} onChange={(e) => setEventStatus(e.target.value)}>
