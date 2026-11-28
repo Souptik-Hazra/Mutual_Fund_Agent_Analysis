@@ -290,15 +290,15 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
 
     from mutual_fund_agent_analysis.agents import research_graph
 
-    expected_report = SimpleNamespace(
-        cagr="0.123456",
-        volatility="0.087654",
-        as_of=date(2026, 11, 25),
-        return_basis="growth_nav",
-        scheme_code=125497,
-        start_date=date(2026, 1, 1),
-        end_date=date(2026, 11, 25),
-    )
+    expected_report = {
+        "cagr": "0.123456",
+        "volatility": "0.087654",
+        "as_of": "2026-11-25",
+        "return_basis": "growth_nav",
+        "scheme_code": 125497,
+        "start_date": "2026-01-01",
+        "end_date": "2026-11-25",
+    }
     captured = {}
 
     def deterministic_analysis(session, scheme_code, *args, **kwargs):
@@ -362,7 +362,7 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
 
     assert captured["session"] is session
     assert captured["scheme_code"] == 125497
-    assert result["results"]["fund"]["cagr"] == expected_report.cagr
+    assert result["results"]["fund"]["cagr"] == expected_report["cagr"]
     assert result["research_run_id"] == "parity-run-1"
     assert result["citations"][0]["type"] == "financial_data"
 
