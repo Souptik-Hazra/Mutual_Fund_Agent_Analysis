@@ -35,6 +35,17 @@ class GraphSession:
 
     def scalars(self, statement):
         entity = statement.column_descriptions[0].get("entity")
+        if entity is research_graph.NavReconciliation:
+            return _Rows(
+                [
+                    SimpleNamespace(
+                        canonical_source="amfi",
+                        evaluated_at=datetime(2026, 11, 26, tzinfo=UTC),
+                        nav_date=date(2026, 11, 25),
+                        status="matched",
+                    )
+                ]
+            )
         if entity is research_graph.SocialPost:
             return _Rows(
                 [
@@ -479,13 +490,21 @@ def test_compiled_graph_returns_provenance_complete_fund_citation(monkeypatch):
         def scalar(self, _statement):
             return nav
 
+        def scalars(self, _statement):
+            return _Rows([nav])
+
         def get(self, _model, _key):
             return SimpleNamespace(base_url="https://www.amfiindia.com")
 
     monkeypatch.setattr(
         research_graph,
         "analyze_fund",
-        lambda *_args, **_kwargs: {"cagr": "0.125"},
+        lambda *_args, **_kwargs: SimpleNamespace(
+            cagr="0.125",
+            scheme_code=125497,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 11, 25),
+        ),
     )
     result = build_research_graph().invoke({"request": request, "session": Session()})
     citation = result["citations"][0]
@@ -493,6 +512,9 @@ def test_compiled_graph_returns_provenance_complete_fund_citation(monkeypatch):
     assert citation["canonical_url"] == "https://www.amfiindia.com"
     assert citation["retrieved_at"] == nav.evaluated_at
     assert citation["verification_status"] == "unverified"
+    assert citation["data_scope"] == "historical_nav_series"
+    assert citation["observation_count"] == 1
+    assert citation["nav_start_date"] == date(2026, 11, 25)
 
 
 def test_compiled_graph_returns_portfolio_citation_with_complete_provenance(monkeypatch):
