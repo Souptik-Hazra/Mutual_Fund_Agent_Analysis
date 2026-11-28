@@ -182,5 +182,101 @@
       "actual_exposure",
       "security"
     ]
+  },
+  {
+    "question": "How did my scheme perform over this period?",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "fund"
+    ]
+  },
+  {
+    "question": "Where does this scheme stand versus category peers?",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "category"
+    ]
+  },
+  {
+    "question": "Break down this fund by sectors and companies.",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "portfolio"
+    ]
+  },
+  {
+    "question": "Show my actual exposure from the investment ledger.",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "actual_exposure"
+    ]
+  },
+  {
+    "question": "What are the P/E ratios and ROE of underlying stocks?",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "security"
+    ]
+  },
+  {
+    "question": "List recent corporate announcements and filings.",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "events"
+    ]
+  },
+  {
+    "question": "What are people discussing on Reddit about this fund?",
+    "scheme_codes": [],
+    "expected_intents": [
+      "social"
+    ]
+  },
+  {
+    "question": "Find the scheme information document.",
+    "scheme_codes": [],
+    "expected_intents": [
+      "documents"
+    ]
+  },
+  {
+    "question": "Show exposure",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "portfolio"
+    ]
+  },
+  {
+    "question": "Show dividend yield",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "security"
+    ]
+  },
+  {
+    "question": "Compare fund returns and holdings",
+    "scheme_codes": [
+      125497
+    ],
+    "expected_intents": [
+      "fund",
+      "portfolio"
+    ]
   }
 ]
