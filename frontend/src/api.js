@@ -29,12 +29,16 @@ function parseSSEFrame(frame, onProgress, state) {
   let event = "message";
   const data = [];
 
-  for (const line of frame.split("\n")) {
+  for (const line of frame.split(/\r\n|\r|\n/)) {
     if (!line || line.startsWith(":")) continue;
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) {
-      data.push(line.slice(5).replace(/^ /, ""));
-    }
+
+    const separator = line.indexOf(":");
+    const field = separator === -1 ? line : line.slice(0, separator);
+    let value = separator === -1 ? "" : line.slice(separator + 1);
+    if (value.startsWith(" ")) value = value.slice(1);
+
+    if (field === "event") event = value || "message";
+    else if (field === "data") data.push(value);
   }
 
   if (!data.length) return;
@@ -45,11 +49,23 @@ function parseSSEFrame(frame, onProgress, state) {
     throw new Error("Received an invalid JSON event from the research stream.", { cause });
   }
 
-  if (event === "progress") onProgress?.(payload);
-  else if (event === "complete") state.completed = payload;
-  else if (event === "error") {
-    throw new Error(payload.detail || "Research stream failed.");
+  if (event === "progress") {
+    onProgress?.(payload);
+  } else if (event === "complete") {
+    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error("Research stream returned an invalid completion payload.");
+    }
+    state.completed = payload;
+  } else if (event === "error") {
+    const detail =
+      typeof payload === "string"
+        ? payload
+        : typeof payload.detail === "string"
+          ? payload.detail
+          : "Research stream failed.";
+    throw new Error(detail);
   }
+  // Unknown event types are ignored, as required by the SSE event model.
 }
 
 export async function streamRequest(path, body, onProgress, signal) {
@@ -68,20 +84,25 @@ export async function streamRequest(path, body, onProgress, signal) {
   let buffer = "";
   let streamEnded = false;
 
+  // Detect complete SSE frame separators without normalizing partial CRLF sequences.
+  const separator = /(?:\r\n|\r|\n){2}/;
+
   try {
     while (true) {
       const { value, done } = await reader.read();
       buffer += decoder.decode(value, { stream: !done });
-      buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
-      const frames = buffer.split("\n\n");
-      buffer = frames.pop() || "";
-      for (const frame of frames) {
-        if (frame.trim()) parseSSEFrame(frame, onProgress, state);
+      let match;
+      while ((match = separator.exec(buffer)) !== null) {
+        const frame = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
+        if (frame) parseSSEFrame(frame, onProgress, state);
       }
 
       if (done) {
         streamEnded = true;
+        // Preserve compatibility with servers that close after the final event
+        // without sending the usual blank-line terminator.
         if (buffer.trim()) parseSSEFrame(buffer, onProgress, state);
         break;
       }
