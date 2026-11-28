@@ -62,7 +62,8 @@ def test_reviewed_retrieval_benchmark_exercises_lexical_semantic_and_fused_ranki
         fused = reciprocal_rank_fusion(
             rows(case["lexical"]), rows(case["semantic"]), limit=5
         )
-        encode = lambda pair: pair[0] * 1000 + pair[1]
+        def encode(pair):
+            return pair[0] * 1000 + pair[1]
         metrics = retrieval_metrics(
             [encode(pair) for pair in case["relevant"]],
             [encode([row["document_id"], row["chunk_index"]]) for row in fused],
