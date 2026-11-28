@@ -48,6 +48,7 @@ def test_reviewed_retrieval_benchmark_exercises_lexical_semantic_and_fused_ranki
     cases = json.loads(Path("evaluation/retrieval-benchmark.json").read_text(encoding="utf-8"))
     assert len(cases) >= 3
     for case in cases:
+
         def rows(items):
             return [
                 {
@@ -60,8 +61,10 @@ def test_reviewed_retrieval_benchmark_exercises_lexical_semantic_and_fused_ranki
             ]
 
         fused = reciprocal_rank_fusion(rows(case["lexical"]), rows(case["semantic"]), limit=5)
+
         def encode(pair):
             return pair[0] * 1000 + pair[1]
+
         metrics = retrieval_metrics(
             [encode(pair) for pair in case["relevant"]],
             [encode([row["document_id"], row["chunk_index"]]) for row in fused],
@@ -399,7 +402,6 @@ def test_fund_specialist_preserves_deterministic_analytics_output(monkeypatch):
     assert result["results"]["fund"]["cagr"] == expected_report["cagr"]
     assert result["research_run_id"] == "parity-run-1"
     assert result["citations"][0]["type"] == "financial_data"
-
 
 
 def test_synthesis_validation_rejects_unknown_citations_and_unsupported_numbers():
