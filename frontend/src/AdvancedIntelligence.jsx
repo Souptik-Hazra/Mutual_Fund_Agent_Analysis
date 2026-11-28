@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { request } from "./api";
 
 const pretty = (value) => JSON.stringify(value, null, 2);
@@ -358,6 +358,7 @@ export function ActualExposureView({ data, dateTo, onSelectSecurity }) {
 }
 
 export function SecurityModal({ securityKey, securityName, schemeCodes, dateTo, onClose }) {
+  const closeButtonRef = useRef(null);
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
@@ -379,13 +380,34 @@ export function SecurityModal({ securityKey, securityName, schemeCodes, dateTo, 
     };
   }, [securityKey, schemeCodes, dateTo]);
 
+  useEffect(() => {
+    if (!securityKey) return undefined;
+    const previousFocus = document.activeElement;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+      if (event.key !== "Tab") return;
+      const dialog = document.getElementById("security-dialog");
+      const focusable = dialog?.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+      if (!focusable?.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    closeButtonRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
+    };
+  }, [securityKey, onClose]);
+
   if (!securityKey) return null;
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div id="security-dialog" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="security-dialog-title">
         <div className="modal-head">
-          <h2>{securityName || securityKey}</h2>
-          <button className="secondary" onClick={onClose}>Close</button>
+          <h2 id="security-dialog-title">{securityName || securityKey}</h2>
+          <button ref={closeButtonRef} className="secondary" onClick={onClose}>Close</button>
         </div>
         {busy && <div className="loading"><span></span> Loading security intelligence…</div>}
         {error && <div className="error">{error}</div>}
@@ -402,6 +424,8 @@ export default function AdvancedIntelligence({ tab, schemeCodes, dateFrom, dateT
   const [error, setError] = useState("");
 
   async function load() {
+    if (dateFrom && dateTo && dateFrom > dateTo) { setError("Start date must be on or before the end date."); return; }
+    if (tab !== "Security Intelligence" && !dateTo) { setError("Choose an end date."); return; }
     setBusy(true);
     setError("");
     setData(null);
