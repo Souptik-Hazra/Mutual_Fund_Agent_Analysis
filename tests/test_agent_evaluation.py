@@ -39,6 +39,39 @@ def test_retrieval_metrics_measure_precision_recall_and_rank():
     assert metrics["reciprocal_rank"] == 0.5
 
 
+def test_reviewed_retrieval_benchmark_exercises_lexical_semantic_and_fused_ranking():
+    import json
+
+    from mutual_fund_agent_analysis.analytics.hybrid_retrieval import reciprocal_rank_fusion
+    from mutual_fund_agent_analysis.evaluation.runner import retrieval_metrics
+
+    cases = json.loads(Path("evaluation/retrieval-benchmark.json").read_text(encoding="utf-8"))
+    assert len(cases) >= 3
+    for case in cases:
+        def rows(items):
+            return [
+                {
+                    "document_id": document_id,
+                    "chunk_index": chunk_index,
+                    "text": f"chunk {document_id}:{chunk_index}",
+                    "citation": {"document_id": document_id, "chunk_index": chunk_index},
+                }
+                for document_id, chunk_index in items
+            ]
+
+        fused = reciprocal_rank_fusion(
+            rows(case["lexical"]), rows(case["semantic"]), limit=5
+        )
+        encode = lambda pair: pair[0] * 1000 + pair[1]
+        metrics = retrieval_metrics(
+            [encode(pair) for pair in case["relevant"]],
+            [encode([row["document_id"], row["chunk_index"]]) for row in fused],
+        )
+        assert metrics["recall_at_k"] == 1.0, case["name"]
+        assert fused
+        assert all(row["retrieval_mode"] in {"lexical", "semantic", "hybrid_rrf"} for row in fused)
+
+
 def test_grounding_contract_requires_citations_for_returned_result_groups():
     from mutual_fund_agent_analysis.evaluation.runner import evaluate_grounding_contract
 
