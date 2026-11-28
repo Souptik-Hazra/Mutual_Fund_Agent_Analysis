@@ -273,3 +273,121 @@ def test_search_chunks_falls_back_when_embedding_provider_is_unavailable(monkeyp
     monkeypatch.setattr(langchain_google_genai, "GoogleGenerativeAIEmbeddings", FailingEmbeddings)
 
     assert document_vectors.search_chunks("fund expenses", 5) is None
+
+
+def test_semantic_search_applies_scheme_metadata_filter(monkeypatch):
+    import sys
+    from types import ModuleType, SimpleNamespace
+
+    from pydantic import SecretStr
+
+    settings = type(
+        "Settings",
+        (),
+        {
+            "qdrant_url": "http://qdrant:6333",
+            "qdrant_api_key": None,
+            "qdrant_collection": "test_vectors",
+            "gemini_api_key": SecretStr("test-key"),
+            "document_embedding_model": "test-embedding",
+        },
+    )()
+    monkeypatch.setattr(document_vectors, "get_settings", lambda: settings)
+
+    class FakeEmbeddings:
+        def __init__(self, **_kwargs):
+            pass
+
+    class FakeFilter:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeCondition:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeMatchValue:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class FakeStore:
+        @classmethod
+        def from_existing_collection(cls, **_kwargs):
+            return cls()
+
+        def similarity_search_with_score(self, _query, **kwargs):
+            condition = kwargs["filter"].must[0]
+            assert condition.key == "metadata.scheme_code"
+            assert condition.match.value == 125497
+            return [
+                (
+                    SimpleNamespace(
+                        metadata={
+                            "document_id": 10,
+                            "title": "Factsheet",
+                            "page_number": 2,
+                            "chunk_index": 1,
+                            "scheme_code": 125497,
+                            "source_key": "amfi",
+                            "canonical_url": "https://amfi.example/factsheet",
+                            "content_hash": "a" * 64,
+                        },
+                        page_content="Expense ratio details",
+                    ),
+                    0.91,
+                )
+            ]
+
+    fake_google = sys.modules["langchain_google_genai"]
+    monkeypatch.setattr(fake_google, "GoogleGenerativeAIEmbeddings", FakeEmbeddings)
+    fake_qdrant = ModuleType("langchain_qdrant")
+    fake_qdrant.QdrantVectorStore = FakeStore
+    fake_models = ModuleType("qdrant_client.models")
+    fake_models.FieldCondition = FakeCondition
+    fake_models.Filter = FakeFilter
+    fake_models.MatchValue = FakeMatchValue
+    fake_client = ModuleType("qdrant_client")
+    fake_client.models = fake_models
+    monkeypatch.setitem(sys.modules, "langchain_qdrant", fake_qdrant)
+    monkeypatch.setitem(sys.modules, "qdrant_client", fake_client)
+    monkeypatch.setitem(sys.modules, "qdrant_client.models", fake_models)
+
+    results = document_vectors.search_chunks("expense ratio", 5, scheme_code=125497)
+    assert len(results) == 1
+    assert results[0]["document_id"] == 10
+    assert results[0]["text"] == "Expense ratio details"
+
+
+def test_document_search_uses_lexical_fallback_when_semantic_search_is_unavailable(monkeypatch):
+    from types import SimpleNamespace
+
+    from mutual_fund_agent_analysis.data.services import research_intelligence
+
+    chunk = SimpleNamespace(
+        chunk_text="The scheme expense ratio is documented in the factsheet.",
+        document_id=10,
+        page_number=2,
+        chunk_index=0,
+        chunk_id=100,
+    )
+    document = SimpleNamespace(
+        document_id=10,
+        title="Scheme factsheet",
+        source_key="amfi",
+        content_hash="a" * 64,
+        effective_date=None,
+        published_at=None,
+    )
+
+    class Rows:
+        def all(self):
+            return [(chunk, document)]
+
+    class Session:
+        def execute(self, _statement):
+            return Rows()
+
+    monkeypatch.setattr(document_vectors, "search_chunks", lambda *_args, **_kwargs: None)
+    result = research_intelligence.search_documents(Session(), "expense ratio", None, 5)
+    assert result["retrieval_mode"] == "lexical_fallback"
+    assert result["results"][0]["document_id"] == 10
