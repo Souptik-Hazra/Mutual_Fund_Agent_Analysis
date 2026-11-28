@@ -49,6 +49,10 @@ jobs:
       QDRANT_TEST_URL: http://localhost:6333
     steps:
       - uses: actions/checkout@v4
+      - name: Validate shell scripts and Compose configuration
+        run: |
+          find scripts -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
+          docker compose config --quiet
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
