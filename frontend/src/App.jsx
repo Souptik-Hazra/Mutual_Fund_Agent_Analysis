@@ -398,7 +398,7 @@ export default function App() {
     const unique = [...new Map(next.map((item) => [item.scheme_code, item])).values()].slice(0, 5);
     setSelectedSchemes(unique); setCompareSelected(unique); setAssistantSelected(unique);
     setCodes(unique.map((item) => item.scheme_code).join(","));
-    setData(null); setError("");
+    setData(null); setError(""); setBusy(false); setBusyStep("");
   };
   const selectGlobalScheme = (scheme, maxCount = 5) => {
     if (maxCount === 1) return updateSchemeSelection([scheme]);
@@ -1424,7 +1424,7 @@ export default function App() {
                           {equityCompareData.aggregated_equity_exposure?.slice(0, 30).map((item) => (
                             <tr
                               key={item.security_key}
-                              className="clickable-row" role="button" tabIndex={0} aria-label={`Inspect ${item.name}`}
+                              className="clickable-row" tabIndex={0} aria-label={`Inspect ${item.name}`}
                               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setModalSecurity({ key: item.security_key, name: item.name }); } }}
                               onClick={() => setModalSecurity({ key: item.security_key, name: item.name })}
                             >
@@ -1459,7 +1459,7 @@ export default function App() {
                 <div className="toolbar upload">
                   <input id="portfolio-upload-input" type="file" accept=".csv,.xlsx" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
                   {selectedFile && <span className="upload-selected">Selected: {selectedFile.name}</span>}
-                  <button className="secondary" disabled={busy} onClick={importPortfolio}>Import disclosure</button>
+                  <button className="secondary" disabled={busy || !selectedFile} onClick={importPortfolio}>Import disclosure</button>
                 </div>
               </Panel>
               {data?.holdings && (
@@ -1473,7 +1473,7 @@ export default function App() {
                           <tr
                             key={i}
                             className={h.security_key || h.isin ? "clickable-row" : ""}
-                            role={h.security_key || h.isin ? "button" : undefined} tabIndex={h.security_key || h.isin ? 0 : undefined}
+                            tabIndex={h.security_key || h.isin ? 0 : undefined}
                             aria-label={h.security_key || h.isin ? `Inspect ${h.security_name}` : undefined}
                             onKeyDown={(e) => { if ((h.security_key || h.isin) && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setModalSecurity({ key: h.isin || h.security_key, name: h.security_name }); } }}
                             onClick={() => (h.security_key || h.isin) && setModalSecurity({ key: h.isin || h.security_key, name: h.security_name })}
@@ -1514,7 +1514,7 @@ export default function App() {
                         {equityStatusData.items.map((item) => (
                           <tr
                             key={item.security_key}
-                            className="clickable-row" role="button" tabIndex={0} aria-label={`Inspect ${item.security_name}`}
+                            className="clickable-row" tabIndex={0} aria-label={`Inspect ${item.security_name}`}
                             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setModalSecurity({ key: item.isin || item.security_key, name: item.security_name }); } }}
                             onClick={() => setModalSecurity({ key: item.isin || item.security_key, name: item.security_name })}
                           >
