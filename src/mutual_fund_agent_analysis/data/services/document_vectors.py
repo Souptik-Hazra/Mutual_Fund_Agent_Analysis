@@ -28,23 +28,35 @@ def _configured_client(settings: Any) -> Any:
     )
 
 
-def _delete_document_points(client: Any, collection_name: str, document_id: int) -> None:
+def _delete_document_points(
+    client: Any,
+    collection_name: str,
+    document_id: int,
+    *,
+    keep_version: str | None = None,
+) -> None:
     from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
 
     if not client.collection_exists(collection_name):
         return
+    selector = {
+        "must": [
+            FieldCondition(
+                key="metadata.document_id",
+                match=MatchValue(value=document_id),
+            )
+        ]
+    }
+    if keep_version is not None:
+        selector["must_not"] = [
+            FieldCondition(
+                key="metadata.index_version",
+                match=MatchValue(value=keep_version),
+            )
+        ]
     client.delete(
         collection_name=collection_name,
-        points_selector=FilterSelector(
-            filter=Filter(
-                must=[
-                    FieldCondition(
-                        key="metadata.document_id",
-                        match=MatchValue(value=document_id),
-                    )
-                ]
-            )
-        ),
+        points_selector=FilterSelector(filter=Filter(**selector)),
         wait=True,
     )
 
@@ -70,11 +82,10 @@ def delete_document_chunks(document_id: int) -> bool:
 
 
 def index_chunks(document_id: int, title: str, chunks: list[dict[str, Any]]) -> bool:
-    """Replace a document's semantic chunks atomically at the document-filter level.
+    """Replace semantic chunks without removing the last successful index on write failure.
 
-    Stable point IDs make retries idempotent. Old points are removed before the new
-    chunk set is written, so a shorter reindex cannot leave stale trailing chunks.
-    PostgreSQL lexical chunks remain available if Qdrant or embeddings are unavailable.
+    New points are tagged with a unique version. Only after every new point is written
+    are older versions deleted. PostgreSQL lexical chunks remain authoritative fallback.
     """
     settings = get_settings()
     if not settings.qdrant_url or not settings.gemini_api_key:
@@ -92,11 +103,13 @@ def index_chunks(document_id: int, title: str, chunks: list[dict[str, Any]]) -> 
             model=settings.document_embedding_model,
             google_api_key=settings.gemini_api_key.get_secret_value(),
         )
+        index_version = str(uuid.uuid4())
         documents = [
             Document(
                 page_content=row["text"],
                 metadata={
                     "document_id": document_id,
+                    "index_version": index_version,
                     "title": title,
                     "chunk_index": row["chunk_index"],
                     "page_number": row.get("page_number"),
@@ -112,8 +125,8 @@ def index_chunks(document_id: int, title: str, chunks: list[dict[str, Any]]) -> 
             document_chunk_point_id(document_id, row["chunk_index"], row["content_hash"])
             for row in chunks
         ]
-        _delete_document_points(client, settings.qdrant_collection, document_id)
         if not documents:
+            _delete_document_points(client, settings.qdrant_collection, document_id)
             return True
 
         if client.collection_exists(settings.qdrant_collection):
@@ -137,6 +150,12 @@ def index_chunks(document_id: int, title: str, chunks: list[dict[str, Any]]) -> 
                 collection_name=settings.qdrant_collection,
                 ids=point_ids,
             )
+        _delete_document_points(
+            client,
+            settings.qdrant_collection,
+            document_id,
+            keep_version=index_version,
+        )
         return True
     except Exception:
         logger.exception(
